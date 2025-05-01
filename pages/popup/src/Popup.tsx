@@ -1,8 +1,7 @@
 import '@src/Popup.css';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { exampleThemeStorage } from '@extension/storage';
-import { t } from '@extension/i18n';
-import { ToggleButton } from '@extension/ui';
+import { AIAgentChat } from './AIAgentChat';
 
 const notificationOptions = {
   type: 'basic',
@@ -14,9 +13,6 @@ const notificationOptions = {
 const Popup = () => {
   const theme = useStorage(exampleThemeStorage);
   const isLight = theme === 'light';
-  const logo = isLight ? 'popup/logo_vertical.svg' : 'popup/logo_vertical_dark.svg';
-  const goGithubSite = () =>
-    chrome.tabs.create({ url: 'https://github.com/Jonghakseo/chrome-extension-boilerplate-react-vite' });
 
   const injectContentScript = async () => {
     const [tab] = await chrome.tabs.query({ currentWindow: true, active: true });
@@ -38,27 +34,34 @@ const Popup = () => {
       });
   };
 
+  const goToOptions = () => {
+    chrome.runtime.openOptionsPage();
+  };
+
   return (
     <div className={`App ${isLight ? 'bg-slate-50' : 'bg-gray-800'}`}>
-      <header className={`App-header ${isLight ? 'text-gray-900' : 'text-gray-100'}`}>
-        <button onClick={goGithubSite}>
-          <img src={chrome.runtime.getURL(logo)} className="App-logo" alt="logo" />
-        </button>
-        <p>
-          Edit <code>pages/popup/src/Popup.tsx</code>
-        </p>
-        <button
-          className={
-            'font-bold mt-4 py-1 px-4 rounded shadow hover:scale-105 ' +
-            (isLight ? 'bg-blue-200 text-black' : 'bg-gray-700 text-white')
-          }
-          onClick={injectContentScript}>
-          Click to inject Content Script
-        </button>
-        <ToggleButton>{t('toggleTheme')}</ToggleButton>
+      <header className={`App-header ${isLight ? 'text-gray-900' : 'text-gray-100'} shadow-sm`}>
+        <div className="flex justify-between items-center w-full px-4 py-2">
+          <div className="flex items-center">
+            <span className="text-2xl mr-2">🦤</span>
+            <h1 className="text-lg font-semibold">DoDai</h1>
+          </div>
+          <button
+            className="px-3 py-1 rounded-md text-sm font-medium bg-blue-50 text-blue-600 hover:bg-blue-100 dark:bg-blue-900/30 dark:text-blue-300 dark:hover:bg-blue-800/50 transition-colors"
+            onClick={goToOptions}>
+            Options
+          </button>
+        </div>
       </header>
+
+      <div style={{ width: '350px', height: '450px' }}>
+        <AIAgentChat />
+      </div>
     </div>
   );
 };
 
-export default withErrorBoundary(withSuspense(Popup, <div> Loading ... </div>), <div> Error Occur </div>);
+export default withErrorBoundary(
+  withSuspense(Popup, <div className="flex h-screen w-full items-center justify-center">Loading...</div>),
+  <div className="p-4 text-red-500">Une erreur est survenue</div>,
+);

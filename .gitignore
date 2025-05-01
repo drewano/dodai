@@ -24,3 +24,5 @@ tsconfig.tsbuildinfo
 
 # compiled
 **/tailwind-output.css
+**/*.crusor
+**/.cursor

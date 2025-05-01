@@ -16,5 +16,11 @@
     "@inquirer/prompts": "^7.3.2",
     "fflate": "^0.8.2",
     "tsx": "^4.19.2"
+  },
+  "dependencies": {
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1"
   }
 }

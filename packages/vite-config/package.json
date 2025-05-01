@@ -15,7 +15,11 @@
     "ready": "tsc -b"
   },
   "dependencies": {
-    "@extension/env": "workspace:*"
+    "@extension/env": "workspace:*",
+    "react-markdown": "^10.1.0",
+    "rehype-raw": "^7.0.0",
+    "rehype-sanitize": "^6.0.0",
+    "remark-gfm": "^4.0.1"
   },
   "devDependencies": {
     "@extension/hmr": "workspace:*",

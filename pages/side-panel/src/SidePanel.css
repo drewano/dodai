@@ -4,7 +4,6 @@
   bottom: 0;
   left: 0;
   right: 0;
-  text-align: center;
   height: 100%;
   padding: 1rem;
 }
@@ -27,4 +26,82 @@ code {
   background: rgba(148, 163, 184, 0.5);
   border-radius: 0.25rem;
   padding: 0.2rem 0.5rem;
+}
+
+/* Styles pour le Markdown */
+.markdown-content {
+  text-align: left;
+}
+
+.markdown-content p {
+  margin-bottom: 0.5rem;
+  text-align: left;
+}
+
+.markdown-content p:last-child {
+  margin-bottom: 0;
+}
+
+.markdown-content ul, .markdown-content ol {
+  margin-left: 1rem;
+  margin-bottom: 0.5rem;
+  text-align: left;
+}
+
+.markdown-content li {
+  margin-bottom: 0.2rem;
+  text-align: left;
+}
+
+.markdown-content pre {
+  white-space: pre-wrap;
+  overflow-x: auto;
+  text-align: left;
+}
+
+.markdown-content blockquote {
+  margin: 0.5rem 0;
+  padding-left: 1rem;
+  border-left: 3px solid rgba(148, 163, 184, 0.5);
+  font-style: italic;
+  text-align: left;
+}
+
+/* Styles pour les bulles de message */
+.message-bubble {
+  text-align: left;
+}
+
+.message-content {
+  text-align: left;
+}
+
+/* Animation pour le dropdown */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(5px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fadeIn {
+  animation: fadeIn 0.15s ease-out forwards;
+}
+
+/* Animation pour le dropdown */
+@keyframes spin {
+  from {
+    transform: rotate(0deg);
+  }
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.animate-spin {
+  animation: spin 1s linear infinite;
 }
