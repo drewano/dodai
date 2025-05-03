@@ -7,6 +7,8 @@ import {
   chatHistoryStorage,
   ChatMessage,
   ChatConversation,
+  mcpLoadedToolsStorage,
+  McpToolInfo,
 } from '@extension/storage';
 import { aiAgent } from '@extension/shared/lib/services/ai-agent';
 import { ToggleButton } from '@extension/ui';
@@ -149,6 +151,7 @@ const SidePanel = () => {
   const theme = useStorage(exampleThemeStorage);
   const settings = useStorage(aiAgentStorage);
   const chatHistory = useStorage(chatHistoryStorage);
+  const loadedTools = useStorage(mcpLoadedToolsStorage);
   const isLight = false; // Toujours utiliser le thème sombre
 
   const [activeTab, setActiveTab] = useState<TabType>('chat');
@@ -578,91 +581,122 @@ const SidePanel = () => {
     ]);
 
     try {
-      // Forcer le rechargement des paramètres de l'agent AI pour prendre en compte les changements de modèle
-      await aiAgent.loadSettings();
+      // Préparer le payload avec le message et l'historique
+      const requestPayload = {
+        message: input,
+        chatHistory: messages.filter(m => m.role !== 'system'),
+        streamHandler: true, // Indique au background qu'on veut utiliser le streaming
+        // Remarque: Nous ne pouvons pas passer directement de callbacks via sendMessage,
+        // mais nous allons les déplacer dans le gestionnaire de réponse ci-dessous
+      };
 
-      // Utiliser la nouvelle méthode streamChat qui supporte le streaming
-      await aiAgent.streamChat(
-        input,
-        // Callback appelé à chaque nouveau token
-        token => {
-          // Traiter le token pour séparer contenu visible et raisonnement
-          const { visibleContent, reasoningContent } = processStreamToken(token);
+      // Envoyer la requête au background script
+      chrome.runtime.sendMessage(
+        {
+          type: 'AI_CHAT_REQUEST',
+          payload: requestPayload,
+        },
+        response => {
+          // Vérifier s'il y a une erreur de communication
+          const runtimeError = chrome.runtime.lastError;
+          if (runtimeError) {
+            // CORRECTION: Accéder correctement au message d'erreur
+            const errorMessage = runtimeError.message || 'Communication avec le background impossible';
+            console.error('Erreur de communication avec le background:', errorMessage);
 
-          setMessages(prev => {
-            const newMessages = [...prev];
-            // Trouver le message en cours de streaming
-            const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-            if (streamingMessageIndex !== -1) {
-              // Mettre à jour le contenu visible
-              if (visibleContent) {
+            // Mettre à jour le message en streaming avec une erreur
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+              if (streamingMessageIndex !== -1) {
                 newMessages[streamingMessageIndex] = {
-                  ...newMessages[streamingMessageIndex],
-                  content: newMessages[streamingMessageIndex].content + visibleContent,
+                  role: 'system',
+                  content: `Erreur: ${errorMessage}`,
                 };
               }
+              return newMessages;
+            });
 
-              // Mettre à jour le raisonnement s'il y en a un
-              if (reasoningContent) {
-                const currentReasoning = newMessages[streamingMessageIndex].reasoning || '';
-                newMessages[streamingMessageIndex] = {
-                  ...newMessages[streamingMessageIndex],
-                  reasoning: currentReasoning + reasoningContent,
-                };
-              }
-            }
-            return newMessages;
-          });
-        },
-        // Callback appelé en cas d'erreur
-        error => {
-          console.error('Error streaming chat:', error);
-          setMessages(prev => {
-            const newMessages = [...prev];
-            // Remplacer le message en streaming par un message d'erreur
-            const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-            if (streamingMessageIndex !== -1) {
-              newMessages[streamingMessageIndex] = {
-                role: 'system',
-                content: error.message || 'Une erreur est survenue pendant la génération de la réponse.',
-              };
-            }
-            return newMessages;
-          });
-          setIsLoading(false);
-        },
-        // Callback appelé quand le streaming est terminé
-        () => {
-          setMessages(prev => {
-            const newMessages = [...prev];
-            // Trouver le message en cours de streaming
-            const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-            if (streamingMessageIndex !== -1) {
-              // Nettoyer et finaliser le message
-              newMessages[streamingMessageIndex] = {
-                ...newMessages[streamingMessageIndex],
-                isStreaming: false,
-              };
+            setIsLoading(false);
+            return;
+          }
 
-              // Enregistrer le message final dans l'historique des conversations
-              if (activeConversationId) {
-                const finalMessage = newMessages[streamingMessageIndex];
-                chatHistoryStorage.addMessageToConversation(activeConversationId, {
-                  role: finalMessage.role,
-                  content: finalMessage.content,
-                  reasoning: finalMessage.reasoning || null,
-                  timestamp: Date.now(),
-                });
-              }
-            }
-            return newMessages;
-          });
-          setIsLoading(false);
+          // Traiter la réponse du background script
+          if (response) {
+            if (response.status === 'error') {
+              // Gérer une erreur retournée par le background
+              console.error('Erreur retournée par le background:', response.error);
 
-          // Réinitialiser les variables de suivi du raisonnement
-          isInThinkMode.current = false;
-          thinkContentBuffer.current = '';
-          thinkDepth.current = 0;
+              // Mettre à jour le message en streaming avec l'erreur
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+                if (streamingMessageIndex !== -1) {
+                  newMessages[streamingMessageIndex] = {
+                    role: 'system',
+                    content: `Erreur: ${response.error || 'Une erreur est survenue'}`,
+                  };
+                }
+                return newMessages;
+              });
+
+              setIsLoading(false);
+            } else if (response.status === 'token') {
+              // Recevoir un nouveau token
+              const { visibleContent, reasoningContent } = processStreamToken(response.token);
+
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+                if (streamingMessageIndex !== -1) {
+                  // Mettre à jour le contenu visible
+                  if (visibleContent) {
+                    newMessages[streamingMessageIndex] = {
+                      ...newMessages[streamingMessageIndex],
+                      content: newMessages[streamingMessageIndex].content + visibleContent,
+                    };
+                  }
+
+                  // Mettre à jour le raisonnement s'il y en a un
+                  if (reasoningContent) {
+                    const currentReasoning = newMessages[streamingMessageIndex].reasoning || '';
+                    newMessages[streamingMessageIndex] = {
+                      ...newMessages[streamingMessageIndex],
+                      reasoning: currentReasoning + reasoningContent,
+                    };
+                  }
+                }
+                return newMessages;
+              });
+            } else if (response.status === 'complete') {
+              // Le streaming est terminé
+              setMessages(prev => {
+                const newMessages = [...prev];
+                const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+                if (streamingMessageIndex !== -1) {
+                  // Nettoyer et finaliser le message
+                  newMessages[streamingMessageIndex] = {
+                    ...newMessages[streamingMessageIndex],
+                    isStreaming: false,
+                  };
+
+                  // Enregistrer le message final dans l'historique des conversations
+                  if (activeConversationId) {
+                    const finalMessage = newMessages[streamingMessageIndex];
+                    chatHistoryStorage.addMessageToConversation(activeConversationId, {
+                      role: finalMessage.role,
+                      content: finalMessage.content,
+                      reasoning: finalMessage.reasoning || null,
+                      timestamp: Date.now(),
+                    });
+                  }
+                }
+                return newMessages;
+              });
+
+              setIsLoading(false);
+            }
+          }
         },
       );
     } catch (error) {
@@ -1202,13 +1236,30 @@ const SidePanel = () => {
         )}
 
         {activeTab === 'tools' && (
-          <div className="flex-1 flex items-center justify-center bg-gray-900">
-            <p className="text-gray-400">Fonctionnalité Outils en développement</p>
+          <div className="flex-1 overflow-y-auto p-4 bg-gray-800">
+            <h2 className="text-lg font-semibold text-gray-200 mb-4">Outils MCP Disponibles</h2>
+            {loadedTools === null ? (
+              <p className="text-gray-400">Chargement des outils...</p>
+            ) : loadedTools.length === 0 ? (
+              <p className="text-gray-400">
+                Aucun outil MCP n'est actuellement chargé ou connecté. Vérifiez la configuration dans les options.
+              </p>
+            ) : (
+              <div className="space-y-3">
+                {loadedTools.map((tool, index) => (
+                  <div key={index} className="bg-gray-700 p-3 rounded-lg shadow">
+                    <h3 className="text-sm font-medium text-blue-300 break-all">{tool.name}</h3>
+                    <p className="text-xs text-gray-400 mt-1 mb-2">Serveur: {tool.serverName}</p>
+                    <p className="text-xs text-gray-300">{tool.description}</p>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {activeTab === 'memory' && (
-          <div className="flex-1 flex items-center justify-center bg-gray-900">
+          <div className="flex-1 flex items-center justify-center bg-gray-800">
             <p className="text-gray-400">Fonctionnalité Mémoire en développement</p>
           </div>
         )}

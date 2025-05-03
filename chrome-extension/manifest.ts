@@ -29,7 +29,12 @@ const manifest = {
   },
   version: packageJson.version,
   description: '__MSG_extensionDescription__',
-  host_permissions: ['<all_urls>', 'http://localhost:11434/'],
+  host_permissions: [
+    '<all_urls>',
+    'http://localhost:11434/',
+    'http://localhost:*/*', // Pour les serveurs MCP locaux SSE
+    'https://localhost:*/*', // Pour les serveurs MCP locaux SSE en HTTPS
+  ],
   permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel'],
   options_page: 'options/index.html',
   background: {
@@ -55,7 +60,7 @@ const manifest = {
   },
   content_security_policy: {
     extension_pages:
-      "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:11434/ https://localhost:11434/;",
+      "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:11434/ https://localhost:11434/ http://localhost:*/* https://localhost:*/*;",
   },
 } satisfies chrome.runtime.ManifestV3;
 

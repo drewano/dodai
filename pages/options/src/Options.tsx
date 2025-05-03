@@ -4,6 +4,7 @@ import { exampleThemeStorage } from '@extension/storage';
 import { ToggleButton } from '@extension/ui';
 import { t } from '@extension/i18n';
 import { AIAgentOptions } from './AIAgentOptions';
+import { McpServerOptions } from './McpServerOptions';
 
 const Options = () => {
   const theme = useStorage(exampleThemeStorage);
@@ -23,6 +24,9 @@ const Options = () => {
 
       <div className="my-8 mx-auto max-w-2xl">
         <AIAgentOptions />
+        <div className="mt-8">
+          <McpServerOptions />
+        </div>
       </div>
     </div>
   );

@@ -1,8 +1,32 @@
 import { ChatOllama } from '@langchain/ollama';
 import { StringOutputParser } from '@langchain/core/output_parsers';
-import { ChatPromptTemplate } from '@langchain/core/prompts';
+import {
+  ChatPromptTemplate,
+  HumanMessagePromptTemplate,
+  SystemMessagePromptTemplate,
+  MessagesPlaceholder,
+} from '@langchain/core/prompts';
 import { RunnableSequence } from '@langchain/core/runnables';
-import { aiAgentStorage } from '@extension/storage';
+import { aiAgentStorage, mcpConfigStorage, mcpLoadedToolsStorage, McpToolInfo } from '@extension/storage';
+import { HumanMessage, SystemMessage, AIMessage } from '@langchain/core/messages';
+import { BaseMessage } from '@langchain/core/messages';
+
+// Type pour l'état d'une connexion MCP
+export type McpConnectionStatus = {
+  connected: boolean;
+  errorMessage?: string;
+  lastUpdated: number;
+};
+
+// Type pour l'état de toutes les connexions MCP
+export type McpConnectionsState = Record<string, McpConnectionStatus>;
+
+// Type pour représenter un outil MCP simplifié
+export type McpTool = {
+  name: string;
+  description: string;
+  serverName?: string;
+};
 
 /**
  * AI Agent service using Langchain and Ollama
@@ -22,6 +46,18 @@ export class AIAgent {
    */
   constructor() {
     this.initializeSettings();
+
+    // Subscribe to MCP config changes to notify background script
+    mcpConfigStorage.subscribe(() => {
+      console.log('Détection de changement de configuration MCP. Notification au background...');
+      chrome.runtime
+        .sendMessage({
+          type: 'MCP_CONFIG_CHANGED',
+        })
+        .catch(error => {
+          console.error('Erreur lors de la notification du changement de configuration MCP :', error);
+        });
+    });
   }
 
   /**
@@ -217,12 +253,13 @@ export class AIAgent {
       if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Failed to fetch')) {
         throw new Error("Impossible de se connecter au serveur Ollama. Vérifiez qu'il est bien lancé.");
       }
-      throw error;
+
+      throw new Error("Erreur lors de la requête à l'agent IA: " + errorMessage);
     }
   }
 
   /**
-   * Creates a chat system with memory
+   * Creates a chat system without tools
    */
   createChatSystem() {
     try {
@@ -233,98 +270,61 @@ export class AIAgent {
       });
 
       const prompt = ChatPromptTemplate.fromMessages([
-        ['system', "Vous êtes un assistant IA intelligent et utile qui aide l'utilisateur."],
-        ['human', '{input}'],
+        SystemMessagePromptTemplate.fromTemplate(
+          `Vous êtes un assistant IA intelligent et utile. Répondez de manière précise, pertinente et aidez l'utilisateur du mieux possible. Soyez concis mais complet.`,
+        ),
+        new MessagesPlaceholder('chat_history'),
+        HumanMessagePromptTemplate.fromTemplate('{input}'),
       ]);
 
       return prompt.pipe(llm).pipe(new StringOutputParser());
-    } catch (error: unknown) {
+    } catch (error) {
       console.error('Error creating chat system:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
-      throw new Error('Impossible de créer le système de chat: ' + errorMessage);
+      throw new Error(
+        `Impossible de créer le système de chat: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
   }
 
   /**
-   * Send a message to the chat system using an alternative method
-   * that works when LangChain fails due to CORS or other issues
+   * Performs a direct chat with Ollama without using LangChain
    */
   private async directOllamaChat(message: string): Promise<string> {
-    // Utiliser l'API native de l'extension Chrome pour contourner les restrictions CORS
-    const self = this; // Capture this pour l'utiliser dans les callbacks
-
     try {
-      // Création d'une requête XMLHttpRequest au lieu de fetch
-      // Cette méthode permet d'éviter certaines restrictions CORS dans les extensions Chrome
-      return new Promise((resolve, reject) => {
-        const xhr = new XMLHttpRequest();
-        xhr.open('POST', `${self.baseUrl}/api/chat`, true);
-        xhr.setRequestHeader('Content-Type', 'application/json');
-        xhr.setRequestHeader('Accept', 'application/json');
-
-        xhr.onload = function () {
-          if (xhr.status >= 200 && xhr.status < 300) {
-            try {
-              const data = JSON.parse(xhr.responseText);
-              resolve(data.message?.content || "Désolé, je n'ai pas pu générer de réponse.");
-            } catch (parseError) {
-              reject(new Error("Erreur d'analyse de la réponse: " + parseError));
-            }
-          } else {
-            let errorMessage = 'Erreur API Ollama';
-
-            if (xhr.status === 403) {
-              errorMessage = `Erreur 403: Accès interdit à l'API Ollama. Vérifiez les autorisations du serveur.`;
-            } else if (xhr.status === 404) {
-              errorMessage = `Le modèle "${self.selectedModel}" n'a pas été trouvé. Utilisez la commande "ollama pull ${self.selectedModel}".`;
-            } else {
-              errorMessage = `Erreur API Ollama (${xhr.status}): ${xhr.responseText}`;
-            }
-
-            reject(new Error(errorMessage));
-          }
-        };
-
-        xhr.onerror = function () {
-          reject(new Error('Erreur réseau lors de la communication avec Ollama'));
-        };
-
-        xhr.ontimeout = function () {
-          reject(new Error('La requête a expiré. Vérifiez que le serveur Ollama répond correctement.'));
-        };
-
-        const payload = {
-          model: self.selectedModel,
+      const response = await fetch(`${this.baseUrl}/api/chat`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: this.selectedModel,
           messages: [
-            {
-              role: 'system',
-              content: "Vous êtes un assistant IA intelligent et utile qui aide l'utilisateur.",
-            },
             {
               role: 'user',
               content: message,
             },
           ],
-          stream: false,
           options: {
-            temperature: self.temperature,
+            temperature: this.temperature,
           },
-        };
-
-        xhr.send(JSON.stringify(payload));
+        }),
       });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new Error(`Erreur lors de la requête Ollama: ${response.status} ${response.statusText} - ${errorText}`);
+      }
+
+      const data = await response.json();
+      return data.message?.content || 'Pas de réponse du modèle.';
     } catch (error) {
-      console.error('Erreur XHR avec Ollama:', error);
+      console.error('Error in direct Ollama chat:', error);
       throw error;
     }
   }
 
   /**
-   * Stream a chat response from Ollama
-   * @param message The user message
-   * @param onToken Callback that receives each token as it arrives
-   * @param onError Callback for error handling
-   * @param onComplete Callback when stream is complete
+   * Stream chat response using LangChain streaming
    */
   async streamChat(
     message: string,
@@ -332,178 +332,260 @@ export class AIAgent {
     onError: (error: Error) => void,
     onComplete: () => void,
   ): Promise<void> {
-    // Force a fresh check of server status and reload settings
-    this.lastCheckTime = 0;
     try {
-      // Reload settings to ensure we're using the latest model
-      await this.loadSettings();
-
       const ready = await this.isReady();
       if (!ready) {
-        if (this.availableModels.length === 0) {
-          throw new Error(
-            `Aucun modèle disponible dans Ollama. Veuillez installer un modèle avec la commande: ollama pull llama3`,
-          );
-        } else {
-          throw new Error("L'agent IA n'est pas prêt. Vérifiez que le serveur Ollama est en cours d'exécution.");
-        }
+        throw new Error(
+          "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        );
       }
 
-      // Essayer l'approche XHR directe avec streaming
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', `${this.baseUrl}/api/chat`, true);
-      xhr.setRequestHeader('Content-Type', 'application/json');
-      xhr.setRequestHeader('Accept', 'application/json');
+      // Try direct Ollama streaming API first
+      try {
+        const response = await fetch(`${this.baseUrl}/api/chat`, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: this.selectedModel,
+            messages: [
+              {
+                role: 'user',
+                content: message,
+              },
+            ],
+            options: {
+              temperature: this.temperature,
+            },
+            stream: true,
+          }),
+        });
 
-      let buffer = '';
-      let responseComplete = false;
+        if (!response.ok) {
+          throw new Error(`HTTP error! status: ${response.status}`);
+        }
 
-      // Utiliser le gestionnaire d'événements onprogress pour traiter les chunks de données
-      xhr.onprogress = function () {
-        // Ignorer si la réponse est déjà marquée comme complète
-        if (responseComplete) return;
+        if (!response.body) {
+          throw new Error('ReadableStream not supported');
+        }
 
-        // Récupérer uniquement les nouveaux chunks de données
-        const newData = xhr.responseText.substring(buffer.length);
-        buffer = xhr.responseText;
+        // Create a reader to process the stream
+        const reader = response.body.getReader();
+        const decoder = new TextDecoder('utf-8');
+        let receivedText = '';
 
-        if (newData) {
-          // Le stream de Ollama est au format JSON par ligne
-          // Chaque ligne est un objet JSON avec un champ "message" qui contient le token
-          const lines = newData.split('\n');
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              break;
+            }
 
-          for (const line of lines) {
-            if (!line.trim()) continue;
+            // Decode the stream chunk and parse JSON
+            const chunk = decoder.decode(value, { stream: true });
+            const lines = chunk.split('\n').filter(Boolean);
 
-            try {
-              const data = JSON.parse(line);
-              if (data.message?.content) {
-                onToken(data.message.content);
+            for (const line of lines) {
+              if (line.startsWith('data: ')) {
+                const jsonStr = line.slice(6); // Remove 'data: ' prefix
+                if (jsonStr === '[DONE]') continue;
+
+                try {
+                  const data = JSON.parse(jsonStr);
+                  if (data.message?.content) {
+                    const newContent = data.message.content;
+                    const token = newContent.slice(receivedText.length);
+                    if (token) {
+                      receivedText = newContent;
+                      onToken(token);
+                    }
+                  }
+                } catch (e) {
+                  console.error('Error parsing stream JSON:', e, jsonStr);
+                }
               }
-
-              // Vérifier si c'est le dernier message du stream
-              if (data.done) {
-                responseComplete = true;
-                onComplete();
-              }
-            } catch (e) {
-              console.warn('Impossible de parser la ligne JSON:', line, e);
             }
           }
-        }
-      };
 
-      xhr.onload = function () {
-        if (!responseComplete) {
-          responseComplete = true;
           onComplete();
+        } catch (error) {
+          reader.cancel();
+          console.error('Stream reading error:', error);
+          throw error;
         }
-      };
-
-      xhr.onerror = function () {
-        onError(new Error('Erreur réseau lors de la communication avec Ollama'));
-      };
-
-      xhr.ontimeout = function () {
-        onError(new Error('La requête a expiré. Vérifiez que le serveur Ollama répond correctement.'));
-      };
-
-      const payload = {
-        model: this.selectedModel,
-        messages: [
-          {
-            role: 'system',
-            content: "Vous êtes un assistant IA intelligent et utile qui aide l'utilisateur.",
-          },
-          {
-            role: 'user',
-            content: message,
-          },
-        ],
-        stream: true, // Activer le streaming
-        options: {
+      } catch (directStreamError) {
+        console.error('Direct Ollama streaming failed, falling back to LangChain:', directStreamError);
+        // Fallback to LangChain streaming
+        const llm = new ChatOllama({
+          baseUrl: this.baseUrl,
+          model: this.selectedModel,
           temperature: this.temperature,
-        },
-      };
+        });
 
-      xhr.send(JSON.stringify(payload));
-    } catch (error) {
-      console.error('Error streaming chat with AI Agent:', error);
-      const errorMessage = error instanceof Error ? error.message : String(error);
+        const chain = this.createChatSystem();
 
-      // Provide better error messages
-      if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Failed to fetch')) {
-        onError(new Error("Impossible de se connecter au serveur Ollama. Vérifiez qu'il est bien lancé."));
-      } else if (errorMessage.includes('404')) {
-        onError(
-          new Error(
-            `Le modèle "${this.selectedModel}" n'a pas été trouvé. Utilisez la commande "ollama pull ${this.selectedModel}" pour le télécharger.`,
-          ),
-        );
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
-        onError(new Error('La connexion au serveur Ollama a expiré. Vérifiez que le serveur répond correctement.'));
-      } else {
-        onError(error instanceof Error ? error : new Error(String(error)));
+        const stream = await chain.stream({
+          input: message,
+          chat_history: [],
+        });
+
+        for await (const chunk of stream) {
+          onToken(chunk);
+        }
+
+        onComplete();
       }
+    } catch (error) {
+      console.error('Error in streamChat:', error);
+      onError(error instanceof Error ? error : new Error(String(error)));
     }
   }
 
   /**
-   * Send a message to the chat system
+   * Regular chat without tools
    */
   async chat(message: string): Promise<string> {
     try {
-      // Force a fresh check of server status
-      this.lastCheckTime = 0;
       const ready = await this.isReady();
       if (!ready) {
-        if (this.availableModels.length === 0) {
-          throw new Error(
-            `Aucun modèle disponible dans Ollama. Veuillez installer un modèle avec la commande: ollama pull llama3`,
-          );
-        } else {
-          throw new Error("L'agent IA n'est pas prêt. Vérifiez que le serveur Ollama est en cours d'exécution.");
-        }
+        throw new Error(
+          "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        );
       }
 
-      // Essayer l'approche XHR directe qui contourne les restrictions CORS
+      // Try using LangChain by default for consistency
       try {
+        const chain = this.createChatSystem();
+        return await chain.invoke({
+          input: message,
+          chat_history: [],
+        });
+      } catch (langchainError) {
+        console.error('Error using LangChain chat, falling back to direct Ollama API:', langchainError);
+
+        // Fallback to direct Ollama API if LangChain fails
         return await this.directOllamaChat(message);
-      } catch (directApiError) {
-        console.error('Direct API error, falling back to LangChain:', directApiError);
-
-        // Si l'approche directe XHR échoue, essayer LangChain
-        try {
-          const chain = this.createChatSystem();
-          return await chain.invoke({ input: message });
-        } catch (langchainError) {
-          console.error('LangChain error:', langchainError);
-
-          // Si les deux méthodes échouent, renvoyer un message clair à l'utilisateur
-          if (directApiError instanceof Error) {
-            throw directApiError; // Renvoyer l'erreur originale qui contient plus d'informations
-          } else {
-            throw new Error('Impossible de communiquer avec Ollama.');
-          }
-        }
       }
-    } catch (error: unknown) {
-      console.error('Error chatting with AI Agent:', error);
+    } catch (error) {
+      console.error('Error in chat:', error);
 
       const errorMessage = error instanceof Error ? error.message : String(error);
-
-      // Provide better error messages
       if (errorMessage.includes('ECONNREFUSED') || errorMessage.includes('Failed to fetch')) {
         throw new Error("Impossible de se connecter au serveur Ollama. Vérifiez qu'il est bien lancé.");
-      } else if (errorMessage.includes('404')) {
-        throw new Error(
-          `Le modèle "${this.selectedModel}" n'a pas été trouvé. Utilisez la commande "ollama pull ${this.selectedModel}" pour le télécharger.`,
-        );
-      } else if (errorMessage.includes('timeout') || errorMessage.includes('aborted')) {
-        throw new Error('La connexion au serveur Ollama a expiré. Vérifiez que le serveur répond correctement.');
       }
 
-      throw error;
+      throw error instanceof Error ? error : new Error(String(error));
+    }
+  }
+
+  /**
+   * Returns the connection status for all MCP servers
+   * This now delegates to the background script
+   */
+  async getMcpConnectionsState(): Promise<McpConnectionsState> {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'GET_MCP_CONNECTION_STATUS',
+      });
+
+      if (response && response.success) {
+        return response.connectionState || {};
+      }
+
+      return {};
+    } catch (error) {
+      console.error('Erreur lors de la récupération des états de connexion MCP:', error);
+      return {};
+    }
+  }
+
+  /**
+   * Returns the currently loaded MCP tools
+   * This now delegates to the background script
+   */
+  async getMcpTools(): Promise<McpTool[]> {
+    try {
+      const response = await chrome.runtime.sendMessage({
+        type: 'GET_MCP_TOOLS',
+      });
+
+      if (response && response.success) {
+        return response.tools || [];
+      }
+
+      return [];
+    } catch (error) {
+      console.error('Erreur lors de la récupération des outils MCP:', error);
+      return [];
+    }
+  }
+
+  /**
+   * Chat with the assistant using tools when available
+   * This now delegates to the background script
+   */
+  async chatWithTools(
+    message: string,
+    chatHistory: BaseMessage[] = [],
+  ): Promise<{ response: string; toolUsed: boolean; error?: string }> {
+    try {
+      const ready = await this.isReady();
+      if (!ready) {
+        throw new Error(
+          "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        );
+      }
+
+      console.log('Délégation du chat avec outils au background script...');
+
+      // Format chat history to send to background
+      const serializedHistory = chatHistory.map(msg => {
+        if ('type' in msg) {
+          return {
+            type: msg.type,
+            content: msg.content,
+          };
+        }
+        // Fallback if the message doesn't have a type property
+        return {
+          type: 'human',
+          content: String(msg),
+        };
+      });
+
+      // Send to background script
+      const response = await chrome.runtime.sendMessage({
+        type: 'CHAT_WITH_TOOLS',
+        query: message,
+        history: serializedHistory,
+      });
+
+      if (!response || !response.success) {
+        throw new Error(response?.error || 'Erreur lors de la communication avec le background script');
+      }
+
+      return {
+        response: response.response,
+        toolUsed: response.toolUsed || false,
+        error: response.error,
+      };
+    } catch (error) {
+      console.error('Error in chatWithTools:', error);
+
+      // Try falling back to regular chat
+      try {
+        console.log('Fallback vers le chat standard après erreur.');
+        const response = await this.chat(message);
+        return {
+          response,
+          toolUsed: false,
+          error: error instanceof Error ? error.message : String(error),
+        };
+      } catch (fallbackError) {
+        // If even the fallback fails, throw the original error
+        throw error;
+      }
     }
   }
 }

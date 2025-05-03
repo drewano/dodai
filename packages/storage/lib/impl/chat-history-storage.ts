@@ -1,4 +1,5 @@
-import { BaseStorage, createStorage, StorageEnum } from '../base/index.js';
+import type { BaseStorage } from '../base/index.js';
+import { createStorage, StorageEnum } from '../base/index.js';
 
 // Définition de la structure d'un message
 export interface ChatMessage {
