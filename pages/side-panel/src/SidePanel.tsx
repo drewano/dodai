@@ -597,12 +597,14 @@ const SidePanel = () => {
           payload: requestPayload,
         },
         response => {
+          console.log('[SidePanel] Callback sendMessage reçu avec la réponse:', response);
+
           // Vérifier s'il y a une erreur de communication
           const runtimeError = chrome.runtime.lastError;
           if (runtimeError) {
             // CORRECTION: Accéder correctement au message d'erreur
             const errorMessage = runtimeError.message || 'Communication avec le background impossible';
-            console.error('Erreur de communication avec le background:', errorMessage);
+            console.error('[SidePanel] Erreur de communication détectée:', errorMessage);
 
             // Mettre à jour le message en streaming avec une erreur
             setMessages(prev => {
@@ -622,81 +624,55 @@ const SidePanel = () => {
           }
 
           // Traiter la réponse du background script
-          if (response) {
-            if (response.status === 'error') {
-              // Gérer une erreur retournée par le background
-              console.error('Erreur retournée par le background:', response.error);
+          if (response && response.success) {
+            console.log(
+              "[SidePanel] Réponse SUCCESS reçue, mise à jour de l'UI avec:",
+              typeof response.data === 'string' ? response.data.substring(0, 50) + '...' : response.data,
+            );
 
-              // Mettre à jour le message en streaming avec l'erreur
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-                if (streamingMessageIndex !== -1) {
-                  newMessages[streamingMessageIndex] = {
-                    role: 'system',
-                    content: `Erreur: ${response.error || 'Une erreur est survenue'}`,
-                  };
-                }
-                return newMessages;
-              });
+            // Remplacer le message "en streaming" par la réponse finale
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+              if (streamingMessageIndex !== -1) {
+                newMessages[streamingMessageIndex] = {
+                  role: 'assistant',
+                  content: response.data,
+                };
+              } else {
+                // Ajouter un nouveau message si aucun n'est en streaming
+                newMessages.push({
+                  role: 'assistant',
+                  content: response.data,
+                });
+              }
+              return newMessages;
+            });
+          } else {
+            console.error('[SidePanel] Réponse ERROR reçue du background:', response?.error);
 
-              setIsLoading(false);
-            } else if (response.status === 'token') {
-              // Recevoir un nouveau token
-              const { visibleContent, reasoningContent } = processStreamToken(response.token);
-
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-                if (streamingMessageIndex !== -1) {
-                  // Mettre à jour le contenu visible
-                  if (visibleContent) {
-                    newMessages[streamingMessageIndex] = {
-                      ...newMessages[streamingMessageIndex],
-                      content: newMessages[streamingMessageIndex].content + visibleContent,
-                    };
-                  }
-
-                  // Mettre à jour le raisonnement s'il y en a un
-                  if (reasoningContent) {
-                    const currentReasoning = newMessages[streamingMessageIndex].reasoning || '';
-                    newMessages[streamingMessageIndex] = {
-                      ...newMessages[streamingMessageIndex],
-                      reasoning: currentReasoning + reasoningContent,
-                    };
-                  }
-                }
-                return newMessages;
-              });
-            } else if (response.status === 'complete') {
-              // Le streaming est terminé
-              setMessages(prev => {
-                const newMessages = [...prev];
-                const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-                if (streamingMessageIndex !== -1) {
-                  // Nettoyer et finaliser le message
-                  newMessages[streamingMessageIndex] = {
-                    ...newMessages[streamingMessageIndex],
-                    isStreaming: false,
-                  };
-
-                  // Enregistrer le message final dans l'historique des conversations
-                  if (activeConversationId) {
-                    const finalMessage = newMessages[streamingMessageIndex];
-                    chatHistoryStorage.addMessageToConversation(activeConversationId, {
-                      role: finalMessage.role,
-                      content: finalMessage.content,
-                      reasoning: finalMessage.reasoning || null,
-                      timestamp: Date.now(),
-                    });
-                  }
-                }
-                return newMessages;
-              });
-
-              setIsLoading(false);
-            }
+            // Remplacer le message en streaming avec l'erreur
+            setMessages(prev => {
+              const newMessages = [...prev];
+              const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+              if (streamingMessageIndex !== -1) {
+                newMessages[streamingMessageIndex] = {
+                  role: 'system',
+                  content: `Erreur de l'agent: ${response?.error || 'Inconnue'}`,
+                };
+              } else {
+                // Ajouter un nouveau message si aucun n'est en streaming
+                newMessages.push({
+                  role: 'system',
+                  content: `Erreur de l'agent: ${response?.error || 'Inconnue'}`,
+                });
+              }
+              return newMessages;
+            });
           }
+
+          console.log('[SidePanel] Fin du traitement du callback, setIsLoading(false)');
+          setIsLoading(false);
         },
       );
     } catch (error) {

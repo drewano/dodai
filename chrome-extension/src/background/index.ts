@@ -212,11 +212,12 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     console.log('[MCP Background] Reçu AI_CHAT_REQUEST', message.payload);
 
     if (!agentExecutorInstance) {
-      console.warn("[MCP Background] AgentExecutor non prêt pour AI_CHAT_REQUEST. Tentative d'appel direct Ollama.");
+      console.error('[MCP Background] AgentExecutor non prêt pour AI_CHAT_REQUEST. Appel direct Ollama...');
       // Fallback: Appel direct à Ollama sans outils si l'agent n'est pas prêt
       aiAgentStorage
         .get()
         .then(settings => {
+          console.log('[MCP Background] Fallback Ollama - configuration chargée');
           const llm = new ChatOllama({
             baseUrl: settings.baseUrl || 'http://localhost:11434',
             model: settings.selectedModel || 'llama3',
@@ -225,21 +226,43 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
           const history = (message.payload.chatHistory || []).map((msg: { role: string; content: string }) =>
             msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
           );
+          console.log('[MCP Background] Fallback Ollama - appel à invoke avec historique:', history.length, 'messages');
           return llm.invoke([...history, new HumanMessage(message.payload.message)]);
         })
         .then(result => {
+          console.log('[MCP Background] Fallback Ollama réussi avec contenu de longueur:', result.content.length);
+          console.log(
+            "[MCP Background] Fallback : Tentative d'envoi de la réponse SUCCESS via sendResponse. Données:",
+            typeof result.content === 'string'
+              ? result.content.substring(0, 100) + (result.content.length > 100 ? '...' : '')
+              : JSON.stringify(result.content).substring(0, 100) + '...',
+          );
           sendResponse({ success: true, data: result.content });
         })
         .catch((error: Error) => {
           console.error('[MCP Background] Erreur appel direct Ollama:', error);
+          console.error("[MCP Background] Stack trace de l'erreur Ollama:", error.stack); // Loggue la stack trace
+          console.error(
+            "[MCP Background] Fallback : Tentative d'envoi de la réponse ERROR via sendResponse. Erreur:",
+            error.message,
+          );
           sendResponse({ success: false, error: "L'agent IA n'est pas prêt et l'appel direct a échoué." });
         });
       return true; // La réponse sera asynchrone
     }
 
+    // --- Logique Agent Executor ---
     const { message: userInput, chatHistory = [] } = message.payload;
     const history = chatHistory.map((msg: { role: string; content: string }) =>
       msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
+    );
+
+    console.log("[MCP Background] Préparation de l'invocation AgentExecutor...");
+    console.log(
+      '[MCP Background] Historique:',
+      history.length,
+      'messages, Entrée:',
+      userInput.substring(0, 50) + (userInput.length > 50 ? '...' : ''),
     );
 
     agentExecutorInstance
@@ -248,16 +271,32 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         chat_history: history,
       })
       .then(result => {
-        console.log("[MCP Background] Réponse de l'AgentExecutor:", result);
-        sendResponse({ success: true, data: result.output });
+        console.log('[MCP Background] AgentExecutor.invoke a RÉSOLU avec succès:', result);
+        try {
+          // Vérifie si result.output existe et est une chaîne
+          const output = typeof result?.output === 'string' ? result.output : JSON.stringify(result); // Fallback si output n'est pas string
+          console.log('[MCP Background] Envoi de la réponse SUCCESS via sendResponse, longueur:', output.length);
+          sendResponse({ success: true, data: output });
+        } catch (e) {
+          console.error('[MCP Background] Erreur DANS le .then() AVANT sendResponse:', e);
+          sendResponse({ success: false, error: 'Erreur interne lors de la préparation de la réponse.' });
+        }
       })
       .catch((error: Error) => {
-        console.error("[MCP Background] Erreur lors de l'invocation de l'agent:", error);
-        sendResponse({
-          success: false,
-          error: error.message || "Erreur inconnue de l'agent",
-        });
+        console.error("[MCP Background] AgentExecutor.invoke a ÉCHOUÉ (REJETÉ) avec l'erreur:", error);
+        console.error("[MCP Background] Stack trace de l'erreur:", error.stack); // Loggue la stack trace
+        try {
+          console.log('[MCP Background] Envoi de la réponse ERROR via sendResponse:', error.message);
+          sendResponse({
+            success: false,
+            error: error.message || "Erreur inconnue de l'agent",
+          });
+        } catch (e) {
+          console.error('[MCP Background] Erreur DANS le .catch() AVANT sendResponse:', e);
+          // Si sendResponse échoue ici, c'est probablement que le port est fermé
+        }
       });
+    console.log('[MCP Background] Appel AgentExecutor.invoke lancé (asynchrone). Attente de résolution...');
 
     return true; // Réponse asynchrone
   }
