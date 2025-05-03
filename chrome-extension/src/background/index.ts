@@ -159,10 +159,11 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
           temperature: settings.temperature || 0.7,
         });
 
+        // Option 1: Remplacer le template pour ne pas utiliser la variable tools externe
         const prompt = ChatPromptTemplate.fromMessages([
           [
             'system',
-            "You are a helpful AI assistant. You have access to the following tools provided by external MCP servers:\n\n{tools}\n\nUse these tools ONLY when necessary to answer the user's query. Think step-by-step if you need to use a tool.",
+            "You are a helpful AI assistant. You have access to tools provided by external MCP servers. Use these tools ONLY when necessary to answer the user's query. Think step-by-step if you need to use a tool.",
           ],
           ['placeholder', '{chat_history}'],
           ['human', '{input}'],
@@ -269,6 +270,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .invoke({
         input: userInput,
         chat_history: history,
+        // Pas besoin de fournir 'tools' car le template ne l'utilise plus
       })
       .then(result => {
         console.log('[MCP Background] AgentExecutor.invoke a RÉSOLU avec succès:', result);
