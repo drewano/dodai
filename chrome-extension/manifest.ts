@@ -34,6 +34,7 @@ const manifest = {
     'http://localhost:11434/',
     'http://localhost:*/*', // Pour les serveurs MCP locaux SSE
     'https://localhost:*/*', // Pour les serveurs MCP locaux SSE en HTTPS
+    'http://127.0.0.1:8080/', // Ajout explicite du serveur MCP à l'adresse 127.0.0.1:8080
   ],
   permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel'],
   options_page: 'options/index.html',
@@ -60,7 +61,7 @@ const manifest = {
   },
   content_security_policy: {
     extension_pages:
-      "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:11434/ https://localhost:11434/ http://localhost:*/* https://localhost:*/*;",
+      "script-src 'self'; object-src 'self'; connect-src 'self' http://localhost:11434/ https://localhost:11434/ http://localhost:*/* https://localhost:*/* http://127.0.0.1:*/* http://127.0.0.1:8080/ https://127.0.0.1:8080/;",
   },
 } satisfies chrome.runtime.ManifestV3;
 
