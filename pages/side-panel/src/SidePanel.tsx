@@ -32,14 +32,20 @@ let streamingPort: chrome.runtime.Port | null = null;
 
 // Fonction utilitaire pour extraire le raisonnement entre balises <think>...</think>
 const extractReasoning = (content: string): { reasoning: string | null; cleanContent: string } => {
-  const thinkPattern = /<think>([\s\S]*?)<\/think>/;
-  const match = content.match(thinkPattern);
+  const thinkPattern = /<think>([\s\S]*?)<\/think>/g;
+  const matches = Array.from(content.matchAll(thinkPattern));
 
-  if (match && match[1]) {
-    // Retourne le contenu sans les balises <think> et le raisonnement séparément
+  if (matches.length > 0) {
+    // Extraire tous les blocs de raisonnement
+    const reasoningBlocks = matches.map(match => match[1].trim());
+    const reasoning = reasoningBlocks.join('\n\n');
+
+    // Supprimer tous les blocs <think> du contenu visible
+    const cleanContent = content.replace(thinkPattern, '').trim();
+
     return {
-      reasoning: match[1].trim(),
-      cleanContent: content.replace(thinkPattern, '').trim(),
+      reasoning: reasoning,
+      cleanContent: cleanContent,
     };
   }
 
@@ -441,62 +447,36 @@ const SidePanel = () => {
     return () => clearInterval(interval);
   }, [settings]);
 
-  // Fonction pour traiter les tokens en streaming avec détection du raisonnement
-  const processStreamToken = (token: string) => {
-    // Vérifier si on entre dans un bloc de raisonnement <think>
-    if (token.includes('<think>')) {
-      isInThinkMode.current = true;
-      thinkDepth.current += 1;
-
-      // Extraire la partie avant <think> pour l'ajouter au contenu visible
-      const parts = token.split('<think>');
-      const contentBeforeThink = parts[0];
-
-      // Ajouter le début de la balise <think> au buffer de raisonnement
-      thinkContentBuffer.current += '<think>';
-
-      if (parts.length > 1) {
-        // Ajouter le contenu après <think> au buffer de raisonnement
-        thinkContentBuffer.current += parts[1];
-      }
-
-      // Retourner seulement la partie avant <think> pour affichage
-      return { visibleContent: contentBeforeThink, reasoningContent: token };
-    }
-
-    // Vérifier si on sort d'un bloc de raisonnement </think>
-    if (token.includes('</think>')) {
-      thinkDepth.current -= 1;
-
-      // Ajouter au buffer de raisonnement
-      thinkContentBuffer.current += token;
-
-      // Si c'est la fin du dernier bloc de raisonnement, passer en mode normal
-      if (thinkDepth.current === 0) {
-        isInThinkMode.current = false;
-      }
-
-      // Extraire la partie après </think> pour l'ajouter au contenu visible
-      const parts = token.split('</think>');
-      const contentAfterThink = parts.length > 1 ? parts[1] : '';
-
-      return { visibleContent: contentAfterThink, reasoningContent: token };
-    }
-
-    // Si on est en mode raisonnement, ajouter au buffer de raisonnement
-    if (isInThinkMode.current) {
-      thinkContentBuffer.current += token;
-      return { visibleContent: '', reasoningContent: token };
-    }
-
-    // Sinon, c'est du contenu normal
-    return { visibleContent: token, reasoningContent: '' };
-  };
-
   // Gère la réception des chunks de streaming depuis le background
   const handleStreamChunk = (chunk: string) => {
-    // Traiter le chunk avec la fonction processStreamToken
-    const { visibleContent, reasoningContent } = processStreamToken(chunk);
+    // Logguer pour déboguer (en développement)
+    console.log(
+      `[SidePanel] Chunk reçu (${chunk.length} chars):`,
+      chunk.length > 50 ? chunk.substring(0, 50) + '...' : chunk,
+    );
+
+    // Changement important : traiter le chunk complet immédiatement pour séparer contenu et raisonnement
+    // Certains modèles comme qwen3 envoient des réponses complètes avec <think> en un seul chunk
+    let visibleContent = '';
+    let reasoningContent = '';
+
+    // Si le chunk contient <think>, faire la séparation immédiatement
+    if (chunk.includes('<think>')) {
+      // Extraire les blocs de raisonnement et le contenu propre
+      const extracted = extractReasoning(chunk);
+      visibleContent = extracted.cleanContent || '';
+      reasoningContent = extracted.reasoning || '';
+
+      // Loguer les résultats de l'extraction pour débogage
+      console.log('[SidePanel] Séparation immédiate - Content:', visibleContent.substring(0, 50) + '...');
+      console.log(
+        '[SidePanel] Séparation immédiate - Reasoning:',
+        reasoningContent?.substring(0, 50) + (reasoningContent?.length > 50 ? '...' : '') || 'aucun',
+      );
+    } else {
+      // Pas de balise <think>, tout est du contenu visible
+      visibleContent = chunk;
+    }
 
     // Mettre à jour le message en streaming
     setMessages(prev => {
@@ -507,25 +487,22 @@ const SidePanel = () => {
         // Mise à jour du message existant
         const currentMessage = newMessages[streamingMessageIndex];
 
-        // Mettre à jour le raisonnement
+        // Ajouter le nouveau contenu visible au contenu existant
+        const updatedContent = currentMessage.content + visibleContent;
+
+        // Mettre à jour le raisonnement si nécessaire
         let updatedReasoning = currentMessage.reasoning || '';
         if (reasoningContent) {
-          updatedReasoning += reasoningContent;
-        }
-
-        // Si on quitte un bloc think et qu'on a du contenu dans le buffer, l'utiliser comme raisonnement
-        if (thinkDepth.current === 0 && thinkContentBuffer.current !== '') {
-          // Extraire le contenu du buffer
-          const { reasoning } = extractReasoning(thinkContentBuffer.current);
-          if (reasoning) {
-            updatedReasoning = reasoning;
-            // Ne pas réinitialiser thinkContentBuffer ici car il peut contenir plusieurs blocs
+          if (updatedReasoning) {
+            updatedReasoning += '\n' + reasoningContent;
+          } else {
+            updatedReasoning = reasoningContent;
           }
         }
 
         newMessages[streamingMessageIndex] = {
           ...currentMessage,
-          content: currentMessage.content + visibleContent,
+          content: updatedContent,
           reasoning: updatedReasoning,
           isStreaming: true,
         };
@@ -546,18 +523,29 @@ const SidePanel = () => {
         if (streamingMessageIndex !== -1) {
           const currentMessage = newMessages[streamingMessageIndex];
 
-          // Traiter une dernière fois pour extraire tout raisonnement
+          // Une dernière vérification pour s'assurer que tout contenu <think> a été extrait
+          let finalContent = currentMessage.content;
           let finalReasoning = currentMessage.reasoning || '';
-          if (thinkContentBuffer.current !== '') {
-            const { reasoning } = extractReasoning(thinkContentBuffer.current);
-            if (reasoning) {
-              finalReasoning = reasoning;
+
+          if (finalContent.includes('<think>')) {
+            console.log('[SidePanel] Extraction finale nécessaire à la fin du streaming');
+            const extractedContent = extractReasoning(finalContent);
+
+            finalContent = extractedContent.cleanContent || '';
+
+            if (extractedContent.reasoning) {
+              if (finalReasoning) {
+                finalReasoning += '\n\n' + extractedContent.reasoning;
+              } else {
+                finalReasoning = extractedContent.reasoning;
+              }
             }
           }
 
           // Enlever le marqueur de streaming et finaliser le contenu
           newMessages[streamingMessageIndex] = {
             ...currentMessage,
+            content: finalContent,
             isStreaming: false,
             reasoning: finalReasoning,
           };
@@ -890,8 +878,32 @@ const SidePanel = () => {
 
   // Rendu d'un message avec prise en charge du raisonnement
   const renderMessage = (message: Message, index: number) => {
-    const hasReasoning = message.reasoning && message.reasoning.length > 0;
+    // Extraire le raisonnement et le contenu propre ici, pour s'assurer
+    // que même si ça n'a pas été fait correctement pendant le streaming,
+    // l'affichage sera correct
+    let displayContent = message.content || '';
+    let displayReasoning = message.reasoning || '';
+
+    // Si le contenu contient des balises <think>, les extraire maintenant
+    if (displayContent && displayContent.includes('<think>')) {
+      const extracted = extractReasoning(displayContent);
+      displayContent = extracted.cleanContent;
+
+      // Si on a extrait du raisonnement, l'ajouter à celui existant
+      if (extracted.reasoning) {
+        if (displayReasoning) {
+          displayReasoning += '\n\n' + extracted.reasoning;
+        } else {
+          displayReasoning = extracted.reasoning;
+        }
+      }
+    }
+
+    const hasReasoning = displayReasoning && displayReasoning.length > 0;
     const isCurrentlyInThinkMode = message.isStreaming && isInThinkMode.current;
+
+    // Vérifier si le contenu est vide (pour éviter d'afficher une bulle vide)
+    const hasContent = displayContent && displayContent.trim().length > 0;
 
     return (
       <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-1.5`}>
@@ -907,21 +919,33 @@ const SidePanel = () => {
           {isCurrentlyInThinkMode && (
             <div className="mb-1 text-xs text-blue-400 flex items-center">
               <span className="inline-block w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-1"></span>
-              Thinking...
+              Utilisation d'outils en cours...
+            </div>
+          )}
+
+          {/* Si le message est vide mais en streaming avec raisonnement, afficher un indicateur */}
+          {message.isStreaming && !hasContent && hasReasoning && !isCurrentlyInThinkMode && (
+            <div className="mb-1 text-xs text-blue-400 flex items-center">
+              <span className="inline-block w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-1"></span>
+              Traitement des informations...
             </div>
           )}
 
           {message.role === 'assistant' ? (
             <div className="message-content">
-              <MarkdownRenderer content={message.content} />
-              {message.isStreaming && !isInThinkMode.current && (
+              {hasContent ? (
+                <MarkdownRenderer content={displayContent} />
+              ) : message.isStreaming && !isCurrentlyInThinkMode ? (
+                <span className="inline-block w-3 h-3 bg-current animate-pulse rounded"></span>
+              ) : null}
+              {message.isStreaming && !isCurrentlyInThinkMode && hasContent && (
                 <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse rounded"></span>
               )}
             </div>
           ) : (
             <p className="message-content whitespace-pre-wrap text-sm leading-tight m-0">
               {message.content}
-              {message.isStreaming && !isInThinkMode.current && (
+              {message.isStreaming && !isCurrentlyInThinkMode && (
                 <span className="inline-block w-1.5 h-4 ml-0.5 bg-current animate-pulse rounded"></span>
               )}
             </p>
@@ -931,10 +955,10 @@ const SidePanel = () => {
           {hasReasoning && showReasoning && (
             <div className="mt-2 pt-2 border-t border-gray-600 text-left">
               <div className="text-xs text-gray-400 mb-1">
-                <span>Raisonnement:</span>
+                <span>Utilisation des outils et raisonnement:</span>
               </div>
               <pre className="text-xs bg-gray-800 p-2 rounded whitespace-pre-wrap text-gray-300 overflow-auto max-h-64 text-left">
-                {message.reasoning}
+                {displayReasoning}
               </pre>
             </div>
           )}
@@ -948,7 +972,7 @@ const SidePanel = () => {
                   showReasoning ? 'bg-blue-800/40 text-blue-300' : 'bg-gray-800/40 text-gray-300 hover:bg-blue-900/20'
                 }`}>
                 <ThinkingIcon />
-                <span className="ml-1">{showReasoning ? 'Masquer' : 'Afficher le raisonnement'}</span>
+                <span className="ml-1">{showReasoning ? 'Masquer' : 'Afficher les détails'}</span>
               </button>
             </div>
           )}

@@ -312,20 +312,71 @@ async function executeStreamingAgentOrLLM(
         chat_history: history,
       });
 
+      // Pour le débogage et l'analyse, nous allons stocker la trace complète
+      let fullTrace = '';
+
       for await (const chunk of streamIterator) {
-        // Seuls les chunks avec output sont importants pour le streaming de texte
-        if (chunk.output) {
+        // Pour le débogage complet
+        const chunkStr = JSON.stringify(chunk);
+        console.log(
+          `[MCP Background] Chunk reçu (${chunkStr.length} chars):`,
+          chunkStr.length > 200 ? chunkStr.substring(0, 200) + '...' : chunkStr,
+        );
+
+        fullTrace += `\nCHUNK TYPE: ${Object.keys(chunk).join(', ')}\n`;
+
+        // APPROCHE SIMPLIFIÉE : Envoyer toutes les données de sortie à l'UI
+        // L'UI décidera comment les traiter
+        let chunkToSend = '';
+
+        // 1. Cas principal: output direct (contenu final ou partiel)
+        if (chunk.output !== undefined && typeof chunk.output === 'string') {
+          chunkToSend = chunk.output;
+          fullTrace += `OUTPUT: ${chunkToSend.substring(0, 100)}...\n`;
+        }
+        // 2. Cas des générations directes
+        else if (
+          chunk.generations &&
+          Array.isArray(chunk.generations) &&
+          chunk.generations.length > 0 &&
+          Array.isArray(chunk.generations[0]) &&
+          chunk.generations[0].length > 0
+        ) {
+          const gen = chunk.generations[0][0];
+          if (gen && (typeof gen.text === 'string' || typeof gen.message?.content === 'string')) {
+            chunkToSend = gen.text || gen.message?.content || '';
+            fullTrace += `GENERATIONS: ${chunkToSend.substring(0, 100)}...\n`;
+          }
+        }
+        // 3. Cas des tokens de streaming
+        else if (chunk.tokens && typeof chunk.tokens === 'string') {
+          chunkToSend = chunk.tokens;
+          fullTrace += `TOKENS: ${chunkToSend.substring(0, 100)}...\n`;
+        }
+        // 4. Cas des informations sur les outils
+        else if (chunk.steps && Array.isArray(chunk.steps) && chunk.steps.length > 0) {
+          const latestStep = chunk.steps[chunk.steps.length - 1];
+
+          if (latestStep?.action) {
+            chunkToSend = `<think>Utilisation de l'outil: ${latestStep.action.tool}\nParams: ${JSON.stringify(latestStep.action.toolInput)}</think>`;
+            fullTrace += `TOOL ACTION: ${chunkToSend.substring(0, 100)}...\n`;
+          } else if (latestStep?.observation) {
+            chunkToSend = `<think>Résultat de l'outil: ${latestStep.observation.substring(0, 300)}${latestStep.observation.length > 300 ? '...' : ''}</think>`;
+            fullTrace += `TOOL OBSERVATION: ${chunkToSend.substring(0, 100)}...\n`;
+          }
+        }
+
+        // Envoyer le chunk s'il y a du contenu
+        if (chunkToSend) {
           port.postMessage({
             type: 'STREAM_CHUNK',
-            chunk: chunk.output,
+            chunk: chunkToSend,
           });
         }
-        // Le client pourrait être intéressé par les tool_calls en cours
-        else if (chunk.steps) {
-          // Optionnel: envoyer des infos sur l'invocation d'outils
-          // port.postMessage({ type: 'TOOL_USAGE', data: chunk.steps });
-        }
       }
+
+      // Imprimer la trace pour l'analyse après la fin du streaming
+      console.log('[MCP Background] Trace complète du streaming:', fullTrace);
     } else {
       // Fallback: Appel direct au LLM avec streaming
       console.log('[MCP Background] Fallback: Démarrage du streaming via LLM direct...');
