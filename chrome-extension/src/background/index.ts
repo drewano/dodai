@@ -13,6 +13,10 @@ import { ChatOllama } from '@langchain/ollama';
 import { MultiServerMCPClient, type Connection } from '@langchain/mcp-adapters';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import type { StructuredToolInterface } from '@langchain/core/tools';
+import logger from './logger';
+
+// --- Types ---
+type ChatHistoryMessage = { role: string; content: string };
 
 // --- Variables Globales ---
 
@@ -30,6 +34,114 @@ type StreamingPort = {
 };
 const activeStreamingPorts: Map<string, StreamingPort> = new Map();
 
+// --- Fonctions utilitaires ---
+
+/**
+ * Convertit l'historique du chat du format client vers le format LangChain
+ */
+function convertChatHistory(chatHistory: ChatHistoryMessage[] = []): BaseMessage[] {
+  return chatHistory.map(msg => (msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content)));
+}
+
+/**
+ * Crée une instance de ChatOllama à partir des paramètres stockés
+ */
+async function createLLMInstance(): Promise<ChatOllama> {
+  const settings = await aiAgentStorage.get();
+  return new ChatOllama({
+    baseUrl: settings.baseUrl || 'http://localhost:11434',
+    model: settings.selectedModel || 'llama3',
+    temperature: settings.temperature || 0.7,
+  });
+}
+
+/**
+ * Crée un client MCP à partir de la configuration
+ */
+async function createMcpClient(): Promise<{
+  client: MultiServerMCPClient | null;
+  config: Record<string, Connection>;
+  initialStates: Record<string, { status: 'connected' | 'error' | 'unknown'; error?: string }>;
+  prefixToolNameWithServerName: boolean;
+  additionalToolNamePrefix: string;
+}> {
+  // Charger la configuration
+  const storedConfig: McpServersConfig = await mcpConfigStorage.get();
+  if (!storedConfig || Object.keys(storedConfig).length === 0) {
+    logger.info('Aucune configuration de serveur MCP trouvée.');
+    return {
+      client: null,
+      config: {},
+      initialStates: {},
+      prefixToolNameWithServerName: true,
+      additionalToolNamePrefix: 'mcp',
+    };
+  }
+
+  // Préparer la configuration pour MultiServerMCPClient (SSE uniquement)
+  const clientConfig: Record<string, Connection> = {};
+  const initialConnectionStates: Record<string, { status: 'connected' | 'error' | 'unknown'; error?: string }> = {};
+
+  for (const [serverName, config] of Object.entries(storedConfig)) {
+    clientConfig[serverName] = {
+      transport: 'sse', // Forcé car seule option viable depuis extension
+      url: config.url,
+      headers: config.headers,
+      useNodeEventSource: false, // Non applicable dans le navigateur
+      reconnect: { enabled: true, maxAttempts: 3, delayMs: 2000 }, // Reconnexion par défaut
+    };
+    initialConnectionStates[serverName] = { status: 'unknown' }; // État initial
+  }
+
+  if (Object.keys(clientConfig).length === 0) {
+    logger.info('Aucune configuration MCP valide trouvée.');
+    return {
+      client: null,
+      config: {},
+      initialStates: initialConnectionStates,
+      prefixToolNameWithServerName: true,
+      additionalToolNamePrefix: 'mcp',
+    };
+  }
+
+  // Définis les options qui seront utilisées pour créer le client
+  const mcpClientOptions = {
+    prefixToolNameWithServerName: true,
+    additionalToolNamePrefix: 'mcp',
+  };
+
+  // Créer le client MCP
+  const client = new MultiServerMCPClient({
+    mcpServers: clientConfig,
+    prefixToolNameWithServerName: mcpClientOptions.prefixToolNameWithServerName,
+    additionalToolNamePrefix: mcpClientOptions.additionalToolNamePrefix,
+    throwOnLoadError: false, // Important: ne pas planter si un serveur échoue
+  });
+
+  return {
+    client,
+    config: clientConfig,
+    initialStates: initialConnectionStates,
+    prefixToolNameWithServerName: mcpClientOptions.prefixToolNameWithServerName,
+    additionalToolNamePrefix: mcpClientOptions.additionalToolNamePrefix,
+  };
+}
+
+/**
+ * Crée le prompt pour l'agent
+ */
+function createAgentPrompt(): ChatPromptTemplate {
+  return ChatPromptTemplate.fromMessages([
+    [
+      'system',
+      "You are a helpful AI assistant. You have access to tools provided by external MCP servers. Use these tools ONLY when necessary to answer the user's query. Think step-by-step if you need to use a tool.",
+    ],
+    ['placeholder', '{chat_history}'],
+    ['human', '{input}'],
+    ['placeholder', '{agent_scratchpad}'],
+  ]);
+}
+
 // --- Initialisation MCP et Agent ---
 
 /**
@@ -38,12 +150,13 @@ const activeStreamingPorts: Map<string, StreamingPort> = new Map();
  * charge les outils et configure l'agent LangChain.
  */
 async function initializeOrReinitializeMcpClient(): Promise<boolean> {
-  console.log('[MCP Background] Initialisation/Réinitialisation...');
+  logger.info('Initialisation/Réinitialisation...');
+
   // 1. Nettoyage précédent
   if (mcpClient) {
-    console.log('[MCP Background] Fermeture du client MCP existant...');
+    logger.info('Fermeture du client MCP existant...');
     await mcpClient.close().catch(err => {
-      console.error('[MCP Background] Erreur lors de la fermeture:', err);
+      logger.error('Erreur lors de la fermeture:', err);
     });
   }
   mcpClient = null;
@@ -53,57 +166,30 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
   await mcpLoadedToolsStorage.set([]); // Vide le stockage des outils
 
   try {
-    // 2. Charger la configuration
-    const storedConfig: McpServersConfig = await mcpConfigStorage.get();
-    if (!storedConfig || Object.keys(storedConfig).length === 0) {
-      console.log('[MCP Background] Aucune configuration de serveur MCP trouvée.');
+    // 2. Créer et configurer le client MCP
+    const {
+      client,
+      config: clientConfig,
+      initialStates,
+      prefixToolNameWithServerName,
+      additionalToolNamePrefix,
+    } = await createMcpClient();
+
+    if (!client) {
       return false;
     }
 
-    // 3. Préparer la configuration pour MultiServerMCPClient (SSE uniquement)
-    const clientConfig: Record<string, Connection> = {};
-    const initialConnectionStates: typeof mcpConnectionState = {};
+    mcpClient = client;
+    mcpConnectionState = initialStates;
 
-    for (const [serverName, config] of Object.entries(storedConfig)) {
-      clientConfig[serverName] = {
-        transport: 'sse', // Forcé car seule option viable depuis extension
-        url: config.url,
-        headers: config.headers,
-        useNodeEventSource: false, // Non applicable dans le navigateur
-        reconnect: { enabled: true, maxAttempts: 3, delayMs: 2000 }, // Reconnexion par défaut
-      };
-      initialConnectionStates[serverName] = { status: 'unknown' }; // État initial
-    }
-    mcpConnectionState = initialConnectionStates; // Met à jour l'état global
+    logger.debug('Configuration Client:', clientConfig);
+    logger.info('Connexion aux serveurs MCP...');
 
-    if (Object.keys(clientConfig).length === 0) {
-      console.log('[MCP Background] Aucune configuration MCP valide trouvée.');
-      return false;
-    }
-
-    // 4. Instancier et Initialiser le Client MCP
-    console.log('[MCP Background] Configuration Client:', clientConfig);
-
-    // Définis les options qui seront utilisées pour créer le client
-    const mcpClientOptionsUsed = {
-      prefixToolNameWithServerName: true, // Correspond à ce qui est passé au constructeur
-      additionalToolNamePrefix: 'mcp', // Correspond à ce qui est passé au constructeur
-    };
-
-    mcpClient = new MultiServerMCPClient({
-      mcpServers: clientConfig,
-      // Utilise les mêmes valeurs:
-      prefixToolNameWithServerName: mcpClientOptionsUsed.prefixToolNameWithServerName,
-      additionalToolNamePrefix: mcpClientOptionsUsed.additionalToolNamePrefix,
-      throwOnLoadError: false, // Important: ne pas planter si un serveur échoue
-    });
-
-    console.log('[MCP Background] Connexion aux serveurs MCP...');
     // initializeConnections se connecte ET charge les outils en interne maintenant
     await mcpClient.initializeConnections();
-    console.log('[MCP Background] Connexions MCP initialisées (ou tentative effectuée).');
+    logger.info('Connexions MCP initialisées (ou tentative effectuée).');
 
-    // 5. Charger les outils et mettre à jour l'état de connexion
+    // 3. Charger les outils et mettre à jour l'état de connexion
     loadedMcpTools = await mcpClient.getTools(); // Récupère les outils chargés (peut être vide si erreur)
 
     // Mise à jour de l'état de connexion (simplifié)
@@ -125,16 +211,16 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
       }
       // Si déjà en erreur pendant initializeConnections, on ne l'écrase pas
     });
-    console.log('[MCP Background] État des connexions mis à jour:', mcpConnectionState);
+    logger.debug('État des connexions mis à jour:', mcpConnectionState);
 
-    // 6. Stocker les infos des outils chargés pour l'UI
+    // 4. Stocker les infos des outils chargés pour l'UI
     const simplifiedToolsInfo = loadedMcpTools.map(tool => {
       const parts = tool.name.split('__');
       let serverName = 'unknown';
 
-      // Utilise les options connues (mcpClientOptionsUsed) pour parser
-      const prefix = mcpClientOptionsUsed.additionalToolNamePrefix;
-      const useServerPrefix = mcpClientOptionsUsed.prefixToolNameWithServerName;
+      // Utilise les options connues pour parser
+      const prefix = additionalToolNamePrefix;
+      const useServerPrefix = prefixToolNameWithServerName;
 
       if (prefix && useServerPrefix && parts.length >= 3 && parts[0] === prefix) {
         serverName = parts[1]; // Le nom du serveur est la 2ème partie
@@ -153,29 +239,14 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
       };
     });
     await mcpLoadedToolsStorage.set(simplifiedToolsInfo);
-    console.log(`[MCP Background] Outils MCP chargés et stockés (${simplifiedToolsInfo.length})`);
+    logger.info(`Outils MCP chargés et stockés (${simplifiedToolsInfo.length})`);
 
-    // 7. Initialiser l'AgentExecutor SI des outils sont disponibles
+    // 5. Initialiser l'AgentExecutor SI des outils sont disponibles
     if (loadedMcpTools.length > 0) {
-      console.log('[MCP Background] Initialisation de AgentExecutor...');
+      logger.info('Initialisation de AgentExecutor...');
       try {
-        const settings = await aiAgentStorage.get();
-        const llm = new ChatOllama({
-          baseUrl: settings.baseUrl || 'http://localhost:11434',
-          model: settings.selectedModel || 'llama3', // Assurez-vous que ce modèle supporte les tool calls
-          temperature: settings.temperature || 0.7,
-        });
-
-        // Option 1: Remplacer le template pour ne pas utiliser la variable tools externe
-        const prompt = ChatPromptTemplate.fromMessages([
-          [
-            'system',
-            "You are a helpful AI assistant. You have access to tools provided by external MCP servers. Use these tools ONLY when necessary to answer the user's query. Think step-by-step if you need to use a tool.",
-          ],
-          ['placeholder', '{chat_history}'],
-          ['human', '{input}'],
-          ['placeholder', '{agent_scratchpad}'],
-        ]);
+        const llm = await createLLMInstance();
+        const prompt = createAgentPrompt();
 
         const agent = await createToolCallingAgent({
           llm,
@@ -186,28 +257,26 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
         agentExecutorInstance = new AgentExecutor({
           agent,
           tools: loadedMcpTools,
-          verbose: true, // Très utile pour le débogage
-          // handleParsingErrors: true, // Peut aider si le LLM formate mal les tool calls
+          verbose: false, // Désactivé pour réduire le bruit dans les logs
         });
-        console.log('[MCP Background] AgentExecutor initialisé avec succès.');
+        logger.info('AgentExecutor initialisé avec succès.');
       } catch (agentError) {
-        console.error('[MCP Background] Erreur lors de la création de AgentExecutor:', agentError);
+        logger.error('Erreur lors de la création de AgentExecutor:', agentError);
         agentExecutorInstance = null; // Assure la réinitialisation en cas d'échec
       }
     } else {
-      console.log('[MCP Background] Aucun outil MCP chargé, AgentExecutor non initialisé.');
+      logger.info('Aucun outil MCP chargé, AgentExecutor non initialisé.');
       agentExecutorInstance = null;
     }
 
     return true;
   } catch (error: any) {
-    console.error("[MCP Background] Erreur majeure lors de l'initialisation du client MCP:", error);
+    logger.error("Erreur majeure lors de l'initialisation du client MCP:", error);
     mcpClient = null;
     loadedMcpTools = [];
     agentExecutorInstance = null;
     mcpConnectionState = {}; // Réinitialise l'état
     await mcpLoadedToolsStorage.set([]);
-    // Notifier l'utilisateur pourrait être utile ici
     return false;
   }
 }
@@ -215,7 +284,7 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
 // --- Écouteur de changements dans le stockage pour les paramètres de l'Agent AI ---
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName === 'local' && changes['ai-agent-settings']) {
-    console.log("[MCP Background] Changement détecté dans les paramètres de l'Agent AI:", changes['ai-agent-settings']);
+    logger.debug("Changement détecté dans les paramètres de l'Agent AI:", changes['ai-agent-settings']);
 
     const oldSettings = changes['ai-agent-settings'].oldValue || {};
     const newSettings = changes['ai-agent-settings'].newValue || {};
@@ -227,11 +296,9 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
       oldSettings.baseUrl !== newSettings.baseUrl;
 
     if (criticalParamsChanged) {
-      console.log("[MCP Background] Paramètres critiques changés, réinitialisation de l'Agent AI...");
+      logger.info("Paramètres critiques changés, réinitialisation de l'Agent AI...");
       initializeOrReinitializeMcpClient().then(success => {
-        console.log(
-          `[MCP Background] Réinitialisation Agent AI suite au changement de paramètres: ${success ? 'réussie' : 'échouée'}`,
-        );
+        logger.info(`Réinitialisation Agent AI suite au changement de paramètres: ${success ? 'réussie' : 'échouée'}`);
       });
     }
   }
@@ -246,7 +313,7 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 function handleStreamingConnection(port: chrome.runtime.Port) {
   if (port.name.startsWith('ai_streaming_')) {
     const portId = port.name;
-    console.log(`[MCP Background] Nouvelle connexion de streaming établie: ${portId}`);
+    logger.debug(`Nouvelle connexion de streaming établie: ${portId}`);
 
     // Stocker le port pour référence future
     activeStreamingPorts.set(portId, {
@@ -256,18 +323,71 @@ function handleStreamingConnection(port: chrome.runtime.Port) {
 
     // Configurer la déconnexion
     port.onDisconnect.addListener(() => {
-      console.log(`[MCP Background] Port de streaming déconnecté: ${portId}`);
+      logger.debug(`Port de streaming déconnecté: ${portId}`);
       activeStreamingPorts.delete(portId);
     });
 
     // Gérer les messages de contrôle du port (demandes, annulations, etc.)
     port.onMessage.addListener(message => {
       if (message.type === 'CANCEL_STREAMING') {
-        console.log(`[MCP Background] Annulation de streaming reçue: ${portId}`);
+        logger.debug(`Annulation de streaming reçue: ${portId}`);
         // Logique d'annulation si nécessaire
       }
     });
   }
+}
+
+/**
+ * Traite un chunk de streaming de l'agent et le prépare pour l'envoi à l'UI
+ * @param chunk Le chunk à traiter
+ * @param fullTrace Référence au trace log à mettre à jour
+ * @returns Le contenu formaté à envoyer à l'UI
+ */
+function processAgentStreamingChunk(chunk: any, fullTrace: string): { chunkToSend: string; updatedTrace: string } {
+  let chunkToSend = '';
+  let traceUpdate = '';
+
+  // 1. Cas principal: output direct (contenu final ou partiel)
+  if (chunk.output !== undefined && typeof chunk.output === 'string') {
+    chunkToSend = chunk.output;
+    traceUpdate = `OUTPUT: ${chunkToSend.substring(0, 100)}...\n`;
+  }
+  // 2. Cas des générations directes
+  else if (
+    chunk.generations &&
+    Array.isArray(chunk.generations) &&
+    chunk.generations.length > 0 &&
+    Array.isArray(chunk.generations[0]) &&
+    chunk.generations[0].length > 0
+  ) {
+    const gen = chunk.generations[0][0];
+    if (gen && (typeof gen.text === 'string' || typeof gen.message?.content === 'string')) {
+      chunkToSend = gen.text || gen.message?.content || '';
+      traceUpdate = `GENERATIONS: ${chunkToSend.substring(0, 100)}...\n`;
+    }
+  }
+  // 3. Cas des tokens de streaming
+  else if (chunk.tokens && typeof chunk.tokens === 'string') {
+    chunkToSend = chunk.tokens;
+    traceUpdate = `TOKENS: ${chunkToSend.substring(0, 100)}...\n`;
+  }
+  // 4. Cas des informations sur les outils
+  else if (chunk.steps && Array.isArray(chunk.steps) && chunk.steps.length > 0) {
+    const latestStep = chunk.steps[chunk.steps.length - 1];
+
+    if (latestStep?.action) {
+      chunkToSend = `<think>Utilisation de l'outil: ${latestStep.action.tool}\nParams: ${JSON.stringify(latestStep.action.toolInput)}</think>`;
+      traceUpdate = `TOOL ACTION: ${chunkToSend.substring(0, 100)}...\n`;
+    } else if (latestStep?.observation) {
+      chunkToSend = `<think>Résultat de l'outil: ${latestStep.observation.substring(0, 300)}${latestStep.observation.length > 300 ? '...' : ''}</think>`;
+      traceUpdate = `TOOL OBSERVATION: ${chunkToSend.substring(0, 100)}...\n`;
+    }
+  }
+
+  return {
+    chunkToSend,
+    updatedTrace: fullTrace + traceUpdate,
+  };
 }
 
 /**
@@ -285,7 +405,7 @@ async function executeStreamingAgentOrLLM(
 ): Promise<void> {
   const streamingPort = activeStreamingPorts.get(portId);
   if (!streamingPort) {
-    console.error(`[MCP Background] Port de streaming non trouvé: ${portId}`);
+    logger.error(`Port de streaming non trouvé: ${portId}`);
     return;
   }
 
@@ -296,75 +416,33 @@ async function executeStreamingAgentOrLLM(
     port.postMessage({ type: 'STREAM_START' });
 
     // Récupérer les paramètres de l'agent
-    const settings = await aiAgentStorage.get();
-    const llm = new ChatOllama({
-      baseUrl: settings.baseUrl || 'http://localhost:11434',
-      model: settings.selectedModel || 'llama3',
-      temperature: settings.temperature || 0.7,
-    });
+    const llm = await createLLMInstance();
 
     if (useAgent && agentExecutorInstance) {
       // Utiliser l'AgentExecutor avec streaming
-      console.log('[MCP Background] Démarrage du streaming via AgentExecutor...');
+      logger.info('Démarrage du streaming via AgentExecutor...');
 
       const streamIterator = await agentExecutorInstance.stream({
         input: input,
         chat_history: history,
       });
 
-      // Pour le débogage et l'analyse, nous allons stocker la trace complète
+      // Pour le débogage et l'analyse
       let fullTrace = '';
 
       for await (const chunk of streamIterator) {
-        // Pour le débogage complet
+        // Pour le débogage
         const chunkStr = JSON.stringify(chunk);
-        console.log(
-          `[MCP Background] Chunk reçu (${chunkStr.length} chars):`,
+        logger.debug(
+          `Chunk reçu (${chunkStr.length} chars):`,
           chunkStr.length > 200 ? chunkStr.substring(0, 200) + '...' : chunkStr,
         );
 
         fullTrace += `\nCHUNK TYPE: ${Object.keys(chunk).join(', ')}\n`;
 
-        // APPROCHE SIMPLIFIÉE : Envoyer toutes les données de sortie à l'UI
-        // L'UI décidera comment les traiter
-        let chunkToSend = '';
-
-        // 1. Cas principal: output direct (contenu final ou partiel)
-        if (chunk.output !== undefined && typeof chunk.output === 'string') {
-          chunkToSend = chunk.output;
-          fullTrace += `OUTPUT: ${chunkToSend.substring(0, 100)}...\n`;
-        }
-        // 2. Cas des générations directes
-        else if (
-          chunk.generations &&
-          Array.isArray(chunk.generations) &&
-          chunk.generations.length > 0 &&
-          Array.isArray(chunk.generations[0]) &&
-          chunk.generations[0].length > 0
-        ) {
-          const gen = chunk.generations[0][0];
-          if (gen && (typeof gen.text === 'string' || typeof gen.message?.content === 'string')) {
-            chunkToSend = gen.text || gen.message?.content || '';
-            fullTrace += `GENERATIONS: ${chunkToSend.substring(0, 100)}...\n`;
-          }
-        }
-        // 3. Cas des tokens de streaming
-        else if (chunk.tokens && typeof chunk.tokens === 'string') {
-          chunkToSend = chunk.tokens;
-          fullTrace += `TOKENS: ${chunkToSend.substring(0, 100)}...\n`;
-        }
-        // 4. Cas des informations sur les outils
-        else if (chunk.steps && Array.isArray(chunk.steps) && chunk.steps.length > 0) {
-          const latestStep = chunk.steps[chunk.steps.length - 1];
-
-          if (latestStep?.action) {
-            chunkToSend = `<think>Utilisation de l'outil: ${latestStep.action.tool}\nParams: ${JSON.stringify(latestStep.action.toolInput)}</think>`;
-            fullTrace += `TOOL ACTION: ${chunkToSend.substring(0, 100)}...\n`;
-          } else if (latestStep?.observation) {
-            chunkToSend = `<think>Résultat de l'outil: ${latestStep.observation.substring(0, 300)}${latestStep.observation.length > 300 ? '...' : ''}</think>`;
-            fullTrace += `TOOL OBSERVATION: ${chunkToSend.substring(0, 100)}...\n`;
-          }
-        }
+        // Traiter le chunk et mettre à jour la trace
+        const { chunkToSend, updatedTrace } = processAgentStreamingChunk(chunk, fullTrace);
+        fullTrace = updatedTrace;
 
         // Envoyer le chunk s'il y a du contenu
         if (chunkToSend) {
@@ -376,10 +454,10 @@ async function executeStreamingAgentOrLLM(
       }
 
       // Imprimer la trace pour l'analyse après la fin du streaming
-      console.log('[MCP Background] Trace complète du streaming:', fullTrace);
+      logger.debug('Trace complète du streaming:', fullTrace);
     } else {
       // Fallback: Appel direct au LLM avec streaming
-      console.log('[MCP Background] Fallback: Démarrage du streaming via LLM direct...');
+      logger.info('Fallback: Démarrage du streaming via LLM direct...');
 
       // Nouveau stream avec l'historique complet + le message utilisateur
       const streamIterator = await llm.stream([...history, new HumanMessage(input)]);
@@ -397,7 +475,7 @@ async function executeStreamingAgentOrLLM(
     // Notifier la fin du streaming
     port.postMessage({ type: 'STREAM_END', success: true });
   } catch (error: any) {
-    console.error('[MCP Background] Erreur pendant le streaming:', error);
+    logger.error('Erreur pendant le streaming:', error);
 
     // Envoyer l'erreur au client
     port.postMessage({
@@ -418,23 +496,21 @@ chrome.runtime.onConnect.addListener(handleStreamingConnection);
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // --- Requête de Chat avec Agent (et potentiellement outils MCP) ---
   if (message.type === 'AI_CHAT_REQUEST') {
-    console.log('[MCP Background] Reçu AI_CHAT_REQUEST', message.payload);
+    logger.debug('Reçu AI_CHAT_REQUEST', message.payload);
 
     // Vérifier si on veut du streaming
     const { message: userInput, chatHistory = [], streamHandler = false, portId } = message.payload;
 
     // Si streaming demandé et un portId fourni
     if (streamHandler && portId) {
-      console.log(`[MCP Background] Mode streaming demandé avec portId: ${portId}`);
+      logger.debug(`Mode streaming demandé avec portId: ${portId}`);
 
       // Convertir l'historique du chat
-      const history = chatHistory.map((msg: { role: string; content: string }) =>
-        msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
-      );
+      const history = convertChatHistory(chatHistory);
 
       // Lancer le streaming en asynchrone
       executeStreamingAgentOrLLM(userInput, history, portId, !!agentExecutorInstance).catch(error => {
-        console.error('[MCP Background] Erreur lors du lancement du streaming:', error);
+        logger.error('Erreur lors du lancement du streaming:', error);
         // Essayer de notifier l'erreur via le port s'il existe encore
         const streamingPort = activeStreamingPorts.get(portId);
         if (streamingPort) {
@@ -451,55 +527,34 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       return true;
     }
 
-    // Mode non-streaming (code existant, inchangé)
+    // Mode non-streaming (appel direct)
     if (!agentExecutorInstance) {
-      console.error('[MCP Background] AgentExecutor non prêt pour AI_CHAT_REQUEST. Appel direct Ollama...');
+      logger.warn('AgentExecutor non prêt pour AI_CHAT_REQUEST. Appel direct Ollama...');
       // Fallback: Appel direct à Ollama sans outils si l'agent n'est pas prêt
-      aiAgentStorage
-        .get()
-        .then(settings => {
-          console.log('[MCP Background] Fallback Ollama - configuration chargée');
-          const llm = new ChatOllama({
-            baseUrl: settings.baseUrl || 'http://localhost:11434',
-            model: settings.selectedModel || 'llama3',
-            temperature: settings.temperature || 0.7,
-          });
-          const history = (message.payload.chatHistory || []).map((msg: { role: string; content: string }) =>
-            msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
-          );
-          console.log('[MCP Background] Fallback Ollama - appel à invoke avec historique:', history.length, 'messages');
+      createLLMInstance()
+        .then(llm => {
+          logger.debug('Fallback Ollama - configuration chargée');
+          const history = convertChatHistory(message.payload.chatHistory);
+          logger.debug('Fallback Ollama - appel à invoke avec historique:', history.length, 'messages');
           return llm.invoke([...history, new HumanMessage(message.payload.message)]);
         })
         .then(result => {
-          console.log('[MCP Background] Fallback Ollama réussi avec contenu de longueur:', result.content.length);
-          console.log(
-            "[MCP Background] Fallback : Tentative d'envoi de la réponse SUCCESS via sendResponse. Données:",
-            typeof result.content === 'string'
-              ? result.content.substring(0, 100) + (result.content.length > 100 ? '...' : '')
-              : JSON.stringify(result.content).substring(0, 100) + '...',
-          );
+          logger.debug('Fallback Ollama réussi avec contenu de longueur:', result.content.length);
           sendResponse({ success: true, data: result.content });
         })
         .catch((error: Error) => {
-          console.error('[MCP Background] Erreur appel direct Ollama:', error);
-          console.error("[MCP Background] Stack trace de l'erreur Ollama:", error.stack); // Loggue la stack trace
-          console.error(
-            "[MCP Background] Fallback : Tentative d'envoi de la réponse ERROR via sendResponse. Erreur:",
-            error.message,
-          );
+          logger.error('Erreur appel direct Ollama:', error);
           sendResponse({ success: false, error: "L'agent IA n'est pas prêt et l'appel direct a échoué." });
         });
       return true; // La réponse sera asynchrone
     }
 
     // --- Logique Agent Executor ---
-    const history = chatHistory.map((msg: { role: string; content: string }) =>
-      msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
-    );
+    const history = convertChatHistory(chatHistory);
 
-    console.log("[MCP Background] Préparation de l'invocation AgentExecutor...");
-    console.log(
-      '[MCP Background] Historique:',
+    logger.debug("Préparation de l'invocation AgentExecutor...");
+    logger.debug(
+      'Historique:',
       history.length,
       'messages, Entrée:',
       userInput.substring(0, 50) + (userInput.length > 50 ? '...' : ''),
@@ -509,35 +564,31 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
       .invoke({
         input: userInput,
         chat_history: history,
-        // Pas besoin de fournir 'tools' car le template ne l'utilise plus
       })
       .then(result => {
-        console.log('[MCP Background] AgentExecutor.invoke a RÉSOLU avec succès:', result);
+        logger.info('AgentExecutor.invoke a RÉSOLU avec succès');
         try {
           // Vérifie si result.output existe et est une chaîne
-          const output = typeof result?.output === 'string' ? result.output : JSON.stringify(result); // Fallback si output n'est pas string
-          console.log('[MCP Background] Envoi de la réponse SUCCESS via sendResponse, longueur:', output.length);
+          const output = typeof result?.output === 'string' ? result.output : JSON.stringify(result);
           sendResponse({ success: true, data: output });
         } catch (e) {
-          console.error('[MCP Background] Erreur DANS le .then() AVANT sendResponse:', e);
+          logger.error('Erreur DANS le .then() AVANT sendResponse:', e);
           sendResponse({ success: false, error: 'Erreur interne lors de la préparation de la réponse.' });
         }
       })
       .catch((error: Error) => {
-        console.error("[MCP Background] AgentExecutor.invoke a ÉCHOUÉ (REJETÉ) avec l'erreur:", error);
-        console.error("[MCP Background] Stack trace de l'erreur:", error.stack); // Loggue la stack trace
+        logger.error("AgentExecutor.invoke a ÉCHOUÉ (REJETÉ) avec l'erreur:", error);
         try {
-          console.log('[MCP Background] Envoi de la réponse ERROR via sendResponse:', error.message);
           sendResponse({
             success: false,
             error: error.message || "Erreur inconnue de l'agent",
           });
         } catch (e) {
-          console.error('[MCP Background] Erreur DANS le .catch() AVANT sendResponse:', e);
+          logger.error('Erreur DANS le .catch() AVANT sendResponse:', e);
           // Si sendResponse échoue ici, c'est probablement que le port est fermé
         }
       });
-    console.log('[MCP Background] Appel AgentExecutor.invoke lancé (asynchrone). Attente de résolution...');
+    logger.debug('Appel AgentExecutor.invoke lancé (asynchrone). Attente de résolution...');
 
     return true; // Réponse asynchrone
   }
@@ -552,7 +603,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         sendResponse({ success: true, tools: simplifiedToolsFromStorage });
       })
       .catch((error: Error) => {
-        console.error('[MCP Background] Erreur lecture stockage outils:', error);
+        logger.error('Erreur lecture stockage outils:', error);
         sendResponse({ success: false, error: error.message, tools: [] });
       });
     return true; // La lecture du stockage est asynchrone
@@ -570,38 +621,40 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 
   // --- Changement de configuration MCP ---
   if (message.type === 'MCP_CONFIG_CHANGED') {
-    console.log('[MCP Background] Configuration MCP changée, réinitialisation...');
+    logger.info('Configuration MCP changée, réinitialisation...');
     initializeOrReinitializeMcpClient()
       .then(success => {
         sendResponse({ success: success });
         // Notifier l'UI que les outils/status ont peut-être changé
-        chrome.runtime.sendMessage({ type: 'MCP_STATE_UPDATED' }).catch(console.warn);
+        chrome.runtime
+          .sendMessage({ type: 'MCP_STATE_UPDATED' })
+          .catch(err => logger.warn('Erreur notification MCP_STATE_UPDATED:', err));
       })
       .catch(error => {
-        console.error('[MCP Background] Erreur réinitialisation MCP:', error);
+        logger.error('Erreur réinitialisation MCP:', error);
         sendResponse({ success: false, error: error.message });
       });
     return true; // Asynchrone
   }
 
   // --- Message non géré ---
-  console.log('[MCP Background] Message non géré reçu:', message);
+  logger.debug('Message non géré reçu:', message);
   return false; // Indique que nous n'envoyons pas de réponse asynchrone
 });
 
 // --- Nettoyage ---
 chrome.runtime.onSuspend?.addListener(() => {
-  console.log('[MCP Background] Service worker suspendu. Nettoyage...');
+  logger.info('Service worker suspendu. Nettoyage...');
   if (mcpClient) {
-    mcpClient.close().catch(console.error);
+    mcpClient.close().catch(err => logger.error('Erreur fermeture client MCP:', err));
     mcpClient = null;
   }
 });
 
 // --- Démarrage Initial ---
-console.log('Background script chargé et prêt.');
+logger.info('Background script chargé et prêt.');
 initializeOrReinitializeMcpClient().then(success => {
-  console.log(`[MCP Background] Initialisation initiale MCP ${success ? 'réussie' : 'échouée'}.`);
+  logger.info(`Initialisation initiale MCP ${success ? 'réussie' : 'échouée'}.`);
 });
 
 // Note: L'initialisation d'Ollama direct via `aiAgent` est retirée car
