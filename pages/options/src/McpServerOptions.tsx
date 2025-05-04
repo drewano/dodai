@@ -205,189 +205,289 @@ export const McpServerOptions = () => {
   };
 
   return (
-    <div className="p-6 bg-white dark:bg-gray-800 rounded-lg shadow-sm">
-      <div className="flex justify-between items-center mb-6">
-        <h2 className="text-xl font-bold">Serveurs MCP (Model Context Protocol)</h2>
+    <div>
+      <div className="flex justify-between items-center p-5 border-b border-gray-800">
+        <h2 className="text-lg font-medium text-blue-400">Serveurs MCP (Model Context Protocol)</h2>
         <button
           onClick={handleAddServer}
-          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors">
+          className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center
+                    bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
+            <path
+              fillRule="evenodd"
+              d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+              clipRule="evenodd"
+            />
+          </svg>
           Ajouter un serveur
         </button>
       </div>
 
-      {/* Liste des serveurs configurés */}
-      {Object.keys(mcpServers).length === 0 ? (
-        <div className="text-center py-6 text-gray-500 dark:text-gray-400">
-          <p>Aucun serveur MCP configuré.</p>
-          <p className="text-sm mt-2">
-            Les serveurs MCP permettent d'étendre les capacités de l'agent avec des outils externes.
+      <div className="p-5">
+        {/* Liste des serveurs configurés */}
+        {Object.keys(mcpServers).length === 0 ? (
+          <div className="flex flex-col items-center justify-center py-8 px-4 rounded-lg border border-gray-800 bg-gray-800/30">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-12 w-12 text-gray-600 mb-4"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={1.5}
+                d="M5 12h14M12 5v14M9 3h6m-3-3v6m5 5h3a2 2 0 012 2v6a2 2 0 01-2 2h-3m-6 0H6a2 2 0 01-2-2v-6a2 2 0 012-2h3"
+              />
+            </svg>
+            <p className="text-gray-400 font-medium mb-2">Aucun serveur MCP configuré</p>
+            <p className="text-sm text-gray-500 text-center max-w-md">
+              Les serveurs MCP permettent d'étendre les capacités de l'agent avec des outils externes.
+            </p>
+          </div>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-gray-800 bg-gray-800/30">
+            <div className="overflow-x-auto">
+              <table className="w-full border-collapse">
+                <thead>
+                  <tr className="bg-gray-800/70">
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                      Nom
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                      URL
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                      En-têtes
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                      Statut
+                    </th>
+                    <th className="px-4 py-3 text-left text-xs font-medium text-gray-400 uppercase tracking-wider border-b border-gray-700">
+                      Actions
+                    </th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {Object.entries(mcpServers).map(([name, config], index) => (
+                    <tr
+                      key={name}
+                      className={`hover:bg-gray-800/40 transition-colors
+                        ${index !== Object.entries(mcpServers).length - 1 ? 'border-b border-gray-800' : ''}`}>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-300">{name}</td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 truncate max-w-[200px]">
+                        {config.url}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
+                        {config.headers && Object.keys(config.headers).length > 0 ? (
+                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900/40 text-blue-400 border border-blue-900/50">
+                            {Object.keys(config.headers).length} en-tête(s)
+                          </span>
+                        ) : (
+                          <span className="text-gray-500">Aucun</span>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
+                        {connectionStatus[name] ? (
+                          connectionStatus[name].connected ? (
+                            <div className="flex items-center">
+                              <div className="relative">
+                                <div className="h-2.5 w-2.5 bg-green-500 rounded-full"></div>
+                                <div
+                                  className="absolute inset-0 h-2.5 w-2.5 bg-green-500 rounded-full animate-ping opacity-75"
+                                  style={{ animationDuration: '2s' }}></div>
+                              </div>
+                              <span className="ml-2 text-green-400">Connecté</span>
+                            </div>
+                          ) : (
+                            <div>
+                              <div className="flex items-center">
+                                <div className="h-2.5 w-2.5 bg-red-500 rounded-full"></div>
+                                <span className="ml-2 text-red-400">Déconnecté</span>
+                              </div>
+                              {connectionStatus[name].errorMessage && (
+                                <div className="mt-1 text-xs text-red-400 max-w-xs break-words opacity-80">
+                                  {connectionStatus[name].errorMessage}
+                                </div>
+                              )}
+                            </div>
+                          )
+                        ) : (
+                          <div className="flex items-center">
+                            <div className="h-2.5 w-2.5 bg-gray-600 rounded-full"></div>
+                            <span className="ml-2 text-gray-500">Inconnu</span>
+                          </div>
+                        )}
+                      </td>
+                      <td className="px-4 py-3 whitespace-nowrap text-sm font-medium">
+                        <div className="flex gap-3">
+                          <button
+                            onClick={() => handleEditServer(name)}
+                            className="text-blue-400 hover:text-blue-300 transition-colors">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor">
+                              <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
+                            </svg>
+                          </button>
+                          <button
+                            onClick={() => handleDeleteServer(name)}
+                            className="text-red-400 hover:text-red-300 transition-colors">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor">
+                              <path
+                                fillRule="evenodd"
+                                d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Explication sur les serveurs MCP */}
+        <div className="mt-5 p-4 rounded-lg border border-blue-900/50 bg-blue-900/20 text-sm text-blue-300">
+          <h3 className="font-medium mb-2 flex items-center">
+            <svg
+              xmlns="http://www.w3.org/2000/svg"
+              className="h-4 w-4 mr-1.5"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+              />
+            </svg>
+            Qu'est-ce qu'un serveur MCP ?
+          </h3>
+          <p className="text-xs leading-relaxed">
+            Les serveurs MCP (Model Context Protocol) sont utilisés pour étendre les capacités de l'agent IA avec des
+            outils externes, tels que l'accès au système de fichiers, à des APIs, des bases de données, etc.
+          </p>
+          <p className="mt-2 text-xs leading-relaxed">
+            Pour qu'un serveur MCP soit utilisable par cette extension, il doit être accessible via un point de
+            terminaison SSE (Server-Sent Events) et mettre en œuvre le protocole MCP.
           </p>
         </div>
-      ) : (
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
-            <thead className="bg-gray-50 dark:bg-gray-700">
-              <tr>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
-                  Nom
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
-                  URL
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
-                  En-têtes
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
-                  Statut
-                </th>
-                <th
-                  scope="col"
-                  className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider dark:text-gray-300">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200 dark:bg-gray-800 dark:divide-gray-700">
-              {Object.entries(mcpServers).map(([name, config]) => (
-                <tr key={name} className="hover:bg-gray-50 dark:hover:bg-gray-700/50">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">
-                    {name}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">{config.url}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {config.headers && Object.keys(config.headers).length > 0 ? (
-                      <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
-                        {Object.keys(config.headers).length} en-tête(s)
-                      </span>
-                    ) : (
-                      <span className="text-gray-400 dark:text-gray-500">Aucun</span>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                    {connectionStatus[name] ? (
-                      connectionStatus[name].connected ? (
-                        <div className="flex items-center">
-                          <span className="h-3 w-3 bg-green-500 rounded-full mr-2"></span>
-                          <span className="text-green-600 dark:text-green-400">Connecté</span>
-                        </div>
-                      ) : (
-                        <div>
-                          <div className="flex items-center">
-                            <span className="h-3 w-3 bg-red-500 rounded-full mr-2"></span>
-                            <span className="text-red-600 dark:text-red-400">Déconnecté</span>
-                          </div>
-                          {connectionStatus[name].errorMessage && (
-                            <div className="mt-1 text-xs text-red-500 dark:text-red-400 max-w-xs break-words">
-                              {connectionStatus[name].errorMessage}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    ) : (
-                      <div className="flex items-center">
-                        <span className="h-3 w-3 bg-gray-300 dark:bg-gray-600 rounded-full mr-2"></span>
-                        <span className="text-gray-500 dark:text-gray-400">Inconnu</span>
-                      </div>
-                    )}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => handleEditServer(name)}
-                      className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 mr-4">
-                      Modifier
-                    </button>
-                    <button
-                      onClick={() => handleDeleteServer(name)}
-                      className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
-                      Supprimer
-                    </button>
-                  </td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
+      </div>
 
-      {/* Formulaire d'ajout/modification */}
+      {/* Formulaire modal d'ajout/modification */}
       {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl p-6 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-medium mb-4 dark:text-white">
-              {editingServer ? `Modifier le serveur "${editingServer}"` : 'Ajouter un serveur MCP'}
-            </h3>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-800 rounded-lg shadow-xl max-h-[90vh] w-full max-w-2xl overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800">
+              <h3 className="text-lg font-medium text-blue-400">
+                {editingServer ? `Modifier le serveur "${editingServer}"` : 'Ajouter un serveur MCP'}
+              </h3>
+              <button onClick={handleCancel} className="text-gray-400 hover:text-gray-300 transition-colors">
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                  <path
+                    fillRule="evenodd"
+                    d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+              </button>
+            </div>
 
-            {formError && (
-              <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-red-700 dark:bg-red-900/30 dark:text-red-300 dark:border-red-700 rounded-md">
-                <p>{formError}</p>
-              </div>
-            )}
+            <div className="p-5 overflow-y-auto max-h-[calc(90vh-64px)]">
+              {formError && (
+                <div className="mb-4 rounded-lg border border-red-900/50 bg-red-900/20 text-red-400 overflow-hidden">
+                  <div className="p-3 flex items-center">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-5 w-5 mr-3 flex-shrink-0 text-red-500"
+                      viewBox="0 0 20 20"
+                      fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    <p className="text-sm">{formError}</p>
+                  </div>
+                </div>
+              )}
 
-            <form onSubmit={handleSubmit}>
-              <div className="space-y-4">
-                {/* Champ Nom */}
-                <div>
-                  <label htmlFor="serverName" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+              <form onSubmit={handleSubmit} className="space-y-5">
+                <div className="space-y-1">
+                  <label htmlFor="serverName" className="block text-sm font-medium text-gray-300">
                     Nom du serveur
                   </label>
                   <input
                     type="text"
                     id="serverName"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                              disabled:opacity-60 disabled:cursor-not-allowed"
                     placeholder="my_filesystem, remote_api, etc."
                     value={formData.name}
                     onChange={e => handleFormChange('name', e.target.value)}
-                    disabled={!!editingServer} // Désactiver si on édite (le nom est la clé)
+                    disabled={!!editingServer}
                     required
                   />
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
+                  <p className="text-xs text-gray-500">
                     Un identifiant unique pour ce serveur, utilisé dans l'extension.
                   </p>
                 </div>
 
-                {/* Champ URL */}
-                <div>
-                  <label htmlFor="serverUrl" className="block text-sm font-medium text-gray-700 dark:text-gray-300">
+                <div className="space-y-1">
+                  <label htmlFor="serverUrl" className="block text-sm font-medium text-gray-300">
                     URL du serveur
                   </label>
                   <input
                     type="url"
                     id="serverUrl"
-                    className="mt-1 block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                     placeholder="http://localhost:8000/sse"
                     value={formData.url}
                     onChange={e => handleFormChange('url', e.target.value)}
                     required
                   />
-                  <p className="mt-1 text-sm text-gray-500 dark:text-gray-400">
-                    L'URL complète du point de terminaison SSE du serveur MCP.
-                  </p>
+                  <p className="text-xs text-gray-500">L'URL complète du point de terminaison SSE du serveur MCP.</p>
                 </div>
 
-                {/* En-têtes HTTP */}
-                <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300">
-                      En-têtes HTTP (optionnels)
-                    </label>
+                <div className="space-y-3">
+                  <div className="flex justify-between items-center">
+                    <label className="block text-sm font-medium text-gray-300">En-têtes HTTP (optionnels)</label>
                     <button
                       type="button"
                       onClick={handleAddHeader}
-                      className="px-2 py-1 bg-gray-100 hover:bg-gray-200 text-gray-700 text-xs rounded dark:bg-gray-700 dark:hover:bg-gray-600 dark:text-gray-300">
-                      + Ajouter un en-tête
+                      className="px-2 py-1 text-xs rounded-md bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50 transition-colors flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-3 w-3 mr-1"
+                        viewBox="0 0 20 20"
+                        fill="currentColor">
+                        <path
+                          fillRule="evenodd"
+                          d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                          clipRule="evenodd"
+                        />
+                      </svg>
+                      Ajouter
                     </button>
                   </div>
 
                   {formData.headers.length === 0 ? (
-                    <p className="text-sm text-gray-500 dark:text-gray-400 py-2">
+                    <p className="text-xs text-gray-500 py-2 px-3 rounded-md border border-gray-800 bg-gray-800/50">
                       Aucun en-tête défini. Les en-têtes sont utiles pour l'authentification (ex: Authorization: Bearer
                       token).
                     </p>
@@ -398,22 +498,34 @@ export const McpServerOptions = () => {
                           <input
                             type="text"
                             placeholder="Nom de l'en-tête"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            className="flex-1 py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                                      focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                             value={header.key}
                             onChange={e => handleHeaderChange(index, 'key', e.target.value)}
                           />
                           <input
                             type="text"
                             placeholder="Valeur"
-                            className="flex-1 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            className="flex-1 py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                                      focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
                             value={header.value}
                             onChange={e => handleHeaderChange(index, 'value', e.target.value)}
                           />
                           <button
                             type="button"
                             onClick={() => handleRemoveHeader(index)}
-                            className="px-2 py-1 bg-red-100 hover:bg-red-200 text-red-700 text-xs rounded dark:bg-red-900/30 dark:hover:bg-red-800/50 dark:text-red-300">
-                            Supprimer
+                            className="p-2 rounded-md bg-red-900/20 hover:bg-red-900/30 text-red-400 border border-red-900/50 transition-colors">
+                            <svg
+                              xmlns="http://www.w3.org/2000/svg"
+                              className="h-4 w-4"
+                              viewBox="0 0 20 20"
+                              fill="currentColor">
+                              <path
+                                fillRule="evenodd"
+                                d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                clipRule="evenodd"
+                              />
+                            </svg>
                           </button>
                         </div>
                       ))}
@@ -421,53 +533,44 @@ export const McpServerOptions = () => {
                   )}
                 </div>
 
-                {/* Option Node.js EventSource */}
                 <div className="flex items-center">
-                  <input
-                    type="checkbox"
-                    id="useNodeEventSource"
-                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                    checked={formData.useNodeEventSource}
-                    onChange={e => handleFormChange('useNodeEventSource', e.target.checked)}
-                  />
-                  <label htmlFor="useNodeEventSource" className="ml-2 block text-sm text-gray-700 dark:text-gray-300">
-                    Utiliser Node.js EventSource (améliore le support des en-têtes, mais peu utile dans les extensions
-                    Chrome)
+                  <div className="relative inline-flex h-5 w-10 items-center">
+                    <input
+                      type="checkbox"
+                      id="useNodeEventSource"
+                      checked={formData.useNodeEventSource}
+                      onChange={e => handleFormChange('useNodeEventSource', e.target.checked)}
+                      className="peer sr-only"
+                    />
+                    <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
+                    <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
+                  </div>
+                  <label htmlFor="useNodeEventSource" className="ml-3 block text-sm text-gray-300 select-none">
+                    Utiliser Node.js EventSource
                   </label>
                 </div>
-              </div>
+                <p className="text-xs text-gray-500 -mt-3">
+                  Améliore le support des en-têtes, mais peu utile dans les extensions Chrome.
+                </p>
 
-              {/* Boutons d'action */}
-              <div className="mt-6 flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={handleCancel}
-                  className="px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white dark:hover:bg-gray-600">
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                  {editingServer ? 'Mettre à jour' : 'Ajouter'}
-                </button>
-              </div>
-            </form>
+                <div className="flex justify-end space-x-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={handleCancel}
+                    className="px-4 py-2 rounded-md border border-gray-700 text-gray-300 text-sm font-medium bg-gray-800 hover:bg-gray-700 transition-colors">
+                    Annuler
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
+                    {editingServer ? 'Mettre à jour' : 'Ajouter'}
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
-
-      {/* Explication sur les serveurs MCP */}
-      <div className="mt-8 p-4 bg-blue-50 rounded-md text-sm text-blue-800 dark:bg-blue-900/30 dark:text-blue-200">
-        <h3 className="font-bold mb-2">Qu'est-ce qu'un serveur MCP ?</h3>
-        <p>
-          Les serveurs MCP (Model Context Protocol) sont utilisés pour étendre les capacités de l'agent IA avec des
-          outils externes, tels que l'accès au système de fichiers, à des APIs, des bases de données, etc.
-        </p>
-        <p className="mt-2">
-          Pour qu'un serveur MCP soit utilisable par cette extension, il doit être accessible via un point de
-          terminaison SSE (Server-Sent Events) et mettre en œuvre le protocole MCP.
-        </p>
-      </div>
     </div>
   );
 };
