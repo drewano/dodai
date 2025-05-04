@@ -205,6 +205,31 @@ async function initializeOrReinitializeMcpClient(): Promise<boolean> {
   }
 }
 
+// --- Écouteur de changements dans le stockage pour les paramètres de l'Agent AI ---
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes['ai-agent-settings']) {
+    console.log("[MCP Background] Changement détecté dans les paramètres de l'Agent AI:", changes['ai-agent-settings']);
+
+    const oldSettings = changes['ai-agent-settings'].oldValue || {};
+    const newSettings = changes['ai-agent-settings'].newValue || {};
+
+    // Vérifier si un des paramètres critiques a changé
+    const criticalParamsChanged =
+      oldSettings.selectedModel !== newSettings.selectedModel ||
+      oldSettings.temperature !== newSettings.temperature ||
+      oldSettings.baseUrl !== newSettings.baseUrl;
+
+    if (criticalParamsChanged) {
+      console.log("[MCP Background] Paramètres critiques changés, réinitialisation de l'Agent AI...");
+      initializeOrReinitializeMcpClient().then(success => {
+        console.log(
+          `[MCP Background] Réinitialisation Agent AI suite au changement de paramètres: ${success ? 'réussie' : 'échouée'}`,
+        );
+      });
+    }
+  }
+});
+
 // --- Listener de Messages Runtime ---
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
