@@ -23,6 +23,13 @@ let agentExecutorInstance: AgentExecutor | null = null;
 // État de connexion simplifié (pourrait être amélioré avec plus de détails)
 let mcpConnectionState: Record<string, { status: 'connected' | 'error' | 'unknown'; error?: string }> = {};
 
+// Stockage des ports de connexion pour le streaming
+type StreamingPort = {
+  port: chrome.runtime.Port;
+  startTime: number;
+};
+const activeStreamingPorts: Map<string, StreamingPort> = new Map();
+
 // --- Initialisation MCP et Agent ---
 
 /**
@@ -230,13 +237,170 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
   }
 });
 
+// --- Gestion du streaming ---
+
+/**
+ * Gère un port de connexion entrant pour le streaming.
+ * @param port Le port de connexion à gérer
+ */
+function handleStreamingConnection(port: chrome.runtime.Port) {
+  if (port.name.startsWith('ai_streaming_')) {
+    const portId = port.name;
+    console.log(`[MCP Background] Nouvelle connexion de streaming établie: ${portId}`);
+
+    // Stocker le port pour référence future
+    activeStreamingPorts.set(portId, {
+      port: port,
+      startTime: Date.now(),
+    });
+
+    // Configurer la déconnexion
+    port.onDisconnect.addListener(() => {
+      console.log(`[MCP Background] Port de streaming déconnecté: ${portId}`);
+      activeStreamingPorts.delete(portId);
+    });
+
+    // Gérer les messages de contrôle du port (demandes, annulations, etc.)
+    port.onMessage.addListener(message => {
+      if (message.type === 'CANCEL_STREAMING') {
+        console.log(`[MCP Background] Annulation de streaming reçue: ${portId}`);
+        // Logique d'annulation si nécessaire
+      }
+    });
+  }
+}
+
+/**
+ * Exécute un appel d'agent avec streaming, envoie les chunks au port de streaming.
+ * @param input Message de l'utilisateur
+ * @param history Historique du chat
+ * @param portId Identifiant du port de streaming
+ * @param useAgent Si true, utilise AgentExecutor. Sinon appel direct au LLM.
+ */
+async function executeStreamingAgentOrLLM(
+  input: string,
+  history: BaseMessage[],
+  portId: string,
+  useAgent: boolean = true,
+): Promise<void> {
+  const streamingPort = activeStreamingPorts.get(portId);
+  if (!streamingPort) {
+    console.error(`[MCP Background] Port de streaming non trouvé: ${portId}`);
+    return;
+  }
+
+  const { port } = streamingPort;
+
+  try {
+    // Notifier le début du streaming
+    port.postMessage({ type: 'STREAM_START' });
+
+    // Récupérer les paramètres de l'agent
+    const settings = await aiAgentStorage.get();
+    const llm = new ChatOllama({
+      baseUrl: settings.baseUrl || 'http://localhost:11434',
+      model: settings.selectedModel || 'llama3',
+      temperature: settings.temperature || 0.7,
+    });
+
+    if (useAgent && agentExecutorInstance) {
+      // Utiliser l'AgentExecutor avec streaming
+      console.log('[MCP Background] Démarrage du streaming via AgentExecutor...');
+
+      const streamIterator = await agentExecutorInstance.stream({
+        input: input,
+        chat_history: history,
+      });
+
+      for await (const chunk of streamIterator) {
+        // Seuls les chunks avec output sont importants pour le streaming de texte
+        if (chunk.output) {
+          port.postMessage({
+            type: 'STREAM_CHUNK',
+            chunk: chunk.output,
+          });
+        }
+        // Le client pourrait être intéressé par les tool_calls en cours
+        else if (chunk.steps) {
+          // Optionnel: envoyer des infos sur l'invocation d'outils
+          // port.postMessage({ type: 'TOOL_USAGE', data: chunk.steps });
+        }
+      }
+    } else {
+      // Fallback: Appel direct au LLM avec streaming
+      console.log('[MCP Background] Fallback: Démarrage du streaming via LLM direct...');
+
+      // Nouveau stream avec l'historique complet + le message utilisateur
+      const streamIterator = await llm.stream([...history, new HumanMessage(input)]);
+
+      for await (const chunk of streamIterator) {
+        if (typeof chunk.content === 'string') {
+          port.postMessage({
+            type: 'STREAM_CHUNK',
+            chunk: chunk.content,
+          });
+        }
+      }
+    }
+
+    // Notifier la fin du streaming
+    port.postMessage({ type: 'STREAM_END', success: true });
+  } catch (error: any) {
+    console.error('[MCP Background] Erreur pendant le streaming:', error);
+
+    // Envoyer l'erreur au client
+    port.postMessage({
+      type: 'STREAM_ERROR',
+      error: error.message || 'Erreur inconnue pendant le streaming',
+    });
+
+    // Notifier la fin (avec erreur)
+    port.postMessage({ type: 'STREAM_END', success: false });
+  }
+}
+
 // --- Listener de Messages Runtime ---
+
+// Ajout du listener pour les connexions de streaming
+chrome.runtime.onConnect.addListener(handleStreamingConnection);
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   // --- Requête de Chat avec Agent (et potentiellement outils MCP) ---
   if (message.type === 'AI_CHAT_REQUEST') {
     console.log('[MCP Background] Reçu AI_CHAT_REQUEST', message.payload);
 
+    // Vérifier si on veut du streaming
+    const { message: userInput, chatHistory = [], streamHandler = false, portId } = message.payload;
+
+    // Si streaming demandé et un portId fourni
+    if (streamHandler && portId) {
+      console.log(`[MCP Background] Mode streaming demandé avec portId: ${portId}`);
+
+      // Convertir l'historique du chat
+      const history = chatHistory.map((msg: { role: string; content: string }) =>
+        msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
+      );
+
+      // Lancer le streaming en asynchrone
+      executeStreamingAgentOrLLM(userInput, history, portId, !!agentExecutorInstance).catch(error => {
+        console.error('[MCP Background] Erreur lors du lancement du streaming:', error);
+        // Essayer de notifier l'erreur via le port s'il existe encore
+        const streamingPort = activeStreamingPorts.get(portId);
+        if (streamingPort) {
+          streamingPort.port.postMessage({
+            type: 'STREAM_ERROR',
+            error: error.message || 'Erreur lors du lancement du streaming',
+          });
+          streamingPort.port.postMessage({ type: 'STREAM_END', success: false });
+        }
+      });
+
+      // Répondre immédiatement que le streaming a été lancé
+      sendResponse({ success: true, streaming: true });
+      return true;
+    }
+
+    // Mode non-streaming (code existant, inchangé)
     if (!agentExecutorInstance) {
       console.error('[MCP Background] AgentExecutor non prêt pour AI_CHAT_REQUEST. Appel direct Ollama...');
       // Fallback: Appel direct à Ollama sans outils si l'agent n'est pas prêt
@@ -278,7 +442,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     }
 
     // --- Logique Agent Executor ---
-    const { message: userInput, chatHistory = [] } = message.payload;
     const history = chatHistory.map((msg: { role: string; content: string }) =>
       msg.role === 'user' ? new HumanMessage(msg.content) : new AIMessage(msg.content),
     );

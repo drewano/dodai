@@ -27,6 +27,9 @@ interface Message {
   reasoning?: string | null; // Stocke le raisonnement si présent
 }
 
+// Variables globales pour le streaming
+let streamingPort: chrome.runtime.Port | null = null;
+
 // Fonction utilitaire pour extraire le raisonnement entre balises <think>...</think>
 const extractReasoning = (content: string): { reasoning: string | null; cleanContent: string } => {
   const thinkPattern = /<think>([\s\S]*?)<\/think>/;
@@ -188,6 +191,9 @@ const SidePanel = () => {
   const thinkContentBuffer = useRef<string>('');
   const thinkDepth = useRef<number>(0);
 
+  // Nouvel état pour gérer le portId de streaming
+  const streamingPortId = useRef<string | null>(null);
+
   // Charger les conversations lors du premier rendu
   useEffect(() => {
     // Si aucune conversation active et que l'historique existe
@@ -270,7 +276,7 @@ const SidePanel = () => {
         const messagesToSave: ChatMessage[] = messages.map(msg => ({
           role: msg.role,
           content: msg.content,
-          reasoning: msg.reasoning || null,
+          reasoning: msg.reasoning || null, // Assurer que le raisonnement est bien stocké
           timestamp: Date.now(),
         }));
 
@@ -487,7 +493,192 @@ const SidePanel = () => {
     return { visibleContent: token, reasoningContent: '' };
   };
 
-  // Modifions le gestionnaire de soumission pour sauvegarder les messages
+  // Gère la réception des chunks de streaming depuis le background
+  const handleStreamChunk = (chunk: string) => {
+    // Traiter le chunk avec la fonction processStreamToken
+    const { visibleContent, reasoningContent } = processStreamToken(chunk);
+
+    // Mettre à jour le message en streaming
+    setMessages(prev => {
+      const newMessages = [...prev];
+      const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+
+      if (streamingMessageIndex !== -1) {
+        // Mise à jour du message existant
+        const currentMessage = newMessages[streamingMessageIndex];
+
+        // Mettre à jour le raisonnement
+        let updatedReasoning = currentMessage.reasoning || '';
+        if (reasoningContent) {
+          updatedReasoning += reasoningContent;
+        }
+
+        // Si on quitte un bloc think et qu'on a du contenu dans le buffer, l'utiliser comme raisonnement
+        if (thinkDepth.current === 0 && thinkContentBuffer.current !== '') {
+          // Extraire le contenu du buffer
+          const { reasoning } = extractReasoning(thinkContentBuffer.current);
+          if (reasoning) {
+            updatedReasoning = reasoning;
+            // Ne pas réinitialiser thinkContentBuffer ici car il peut contenir plusieurs blocs
+          }
+        }
+
+        newMessages[streamingMessageIndex] = {
+          ...currentMessage,
+          content: currentMessage.content + visibleContent,
+          reasoning: updatedReasoning,
+          isStreaming: true,
+        };
+      }
+
+      return newMessages;
+    });
+  };
+
+  // Gère la fin du streaming et finalise le message
+  const handleStreamEnd = (success: boolean) => {
+    if (success) {
+      // Finaliser le message en streaming
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+
+        if (streamingMessageIndex !== -1) {
+          const currentMessage = newMessages[streamingMessageIndex];
+
+          // Traiter une dernière fois pour extraire tout raisonnement
+          let finalReasoning = currentMessage.reasoning || '';
+          if (thinkContentBuffer.current !== '') {
+            const { reasoning } = extractReasoning(thinkContentBuffer.current);
+            if (reasoning) {
+              finalReasoning = reasoning;
+            }
+          }
+
+          // Enlever le marqueur de streaming et finaliser le contenu
+          newMessages[streamingMessageIndex] = {
+            ...currentMessage,
+            isStreaming: false,
+            reasoning: finalReasoning,
+          };
+        }
+
+        return newMessages;
+      });
+    } else {
+      // En cas d'erreur, laisser le message avec une indication d'erreur
+      console.error('Streaming ended with error');
+    }
+
+    // Nettoyer les variables de streaming
+    isInThinkMode.current = false;
+    thinkContentBuffer.current = '';
+    thinkDepth.current = 0;
+
+    // Fermer et nettoyer le port
+    cleanupStreamingConnection();
+
+    // Marquer comme non chargement
+    setIsLoading(false);
+  };
+
+  // Gère les erreurs de streaming
+  const handleStreamError = (error: string) => {
+    console.error('Stream error:', error);
+
+    // Mettre à jour le message en streaming avec l'erreur
+    setMessages(prev => {
+      const newMessages = [...prev];
+      const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+
+      if (streamingMessageIndex !== -1) {
+        newMessages[streamingMessageIndex] = {
+          role: 'system',
+          content: `Erreur: ${error}`,
+          isStreaming: false,
+        };
+      } else {
+        // Ajouter un nouveau message d'erreur si aucun n'est en streaming
+        newMessages.push({
+          role: 'system',
+          content: `Erreur: ${error}`,
+          isStreaming: false,
+        });
+      }
+
+      return newMessages;
+    });
+
+    // Nettoyer le streaming
+    cleanupStreamingConnection();
+    setIsLoading(false);
+  };
+
+  // Initialise une connexion de streaming
+  const initStreamingConnection = () => {
+    // Générer un ID unique pour ce port
+    const uniquePortId = `ai_streaming_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    streamingPortId.current = uniquePortId;
+
+    // Créer le port
+    const port = chrome.runtime.connect({ name: uniquePortId });
+    streamingPort = port;
+
+    // Configurer les listeners
+    port.onMessage.addListener(message => {
+      switch (message.type) {
+        case 'STREAM_START':
+          console.log('[SidePanel] Début du streaming');
+          break;
+
+        case 'STREAM_CHUNK':
+          handleStreamChunk(message.chunk);
+          break;
+
+        case 'STREAM_END':
+          console.log('[SidePanel] Fin du streaming, success:', message.success);
+          handleStreamEnd(message.success);
+          break;
+
+        case 'STREAM_ERROR':
+          handleStreamError(message.error);
+          break;
+
+        default:
+          console.log('[SidePanel] Message de streaming inconnu:', message);
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      console.log('[SidePanel] Port de streaming déconnecté');
+      if (isLoading) {
+        // Si toujours en chargement, c'est une déconnexion inattendue
+        handleStreamError('Connexion perdue avec le background');
+      }
+      streamingPort = null;
+      streamingPortId.current = null;
+    });
+
+    return uniquePortId;
+  };
+
+  // Nettoie la connexion de streaming
+  const cleanupStreamingConnection = () => {
+    if (streamingPort) {
+      try {
+        streamingPort.disconnect();
+      } catch (e) {
+        console.warn('[SidePanel] Erreur lors de la déconnexion du port:', e);
+      }
+      streamingPort = null;
+      streamingPortId.current = null;
+    }
+
+    // Sauvegarder la conversation après la fin du streaming
+    saveCurrentMessages().catch(console.error);
+  };
+
+  // Modifions le gestionnaire de soumission pour utiliser le streaming
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
@@ -581,13 +772,15 @@ const SidePanel = () => {
     ]);
 
     try {
-      // Préparer le payload avec le message et l'historique
+      // Initialiser le streaming
+      const portId = initStreamingConnection();
+
+      // Préparer le payload avec le message, l'historique et les infos de streaming
       const requestPayload = {
         message: input,
         chatHistory: messages.filter(m => m.role !== 'system'),
         streamHandler: true, // Indique au background qu'on veut utiliser le streaming
-        // Remarque: Nous ne pouvons pas passer directement de callbacks via sendMessage,
-        // mais nous allons les déplacer dans le gestionnaire de réponse ci-dessous
+        portId: portId, // ID du port pour que le background puisse envoyer les chunks
       };
 
       // Envoyer la requête au background script
@@ -620,59 +813,32 @@ const SidePanel = () => {
             });
 
             setIsLoading(false);
+            cleanupStreamingConnection();
             return;
           }
 
-          // Traiter la réponse du background script
-          if (response && response.success) {
-            console.log(
-              "[SidePanel] Réponse SUCCESS reçue, mise à jour de l'UI avec:",
-              typeof response.data === 'string' ? response.data.substring(0, 50) + '...' : response.data,
-            );
+          // Vérifier si le streaming a bien été lancé
+          if (!response || !response.success) {
+            console.error('[SidePanel] Echec du lancement du streaming:', response?.error);
 
-            // Remplacer le message "en streaming" par la réponse finale
-            setMessages(prev => {
-              const newMessages = [...prev];
-              const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
-              if (streamingMessageIndex !== -1) {
-                newMessages[streamingMessageIndex] = {
-                  role: 'assistant',
-                  content: response.data,
-                };
-              } else {
-                // Ajouter un nouveau message si aucun n'est en streaming
-                newMessages.push({
-                  role: 'assistant',
-                  content: response.data,
-                });
-              }
-              return newMessages;
-            });
-          } else {
-            console.error('[SidePanel] Réponse ERROR reçue du background:', response?.error);
-
-            // Remplacer le message en streaming avec l'erreur
+            // Mettre à jour le message en streaming avec l'erreur
             setMessages(prev => {
               const newMessages = [...prev];
               const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
               if (streamingMessageIndex !== -1) {
                 newMessages[streamingMessageIndex] = {
                   role: 'system',
-                  content: `Erreur de l'agent: ${response?.error || 'Inconnue'}`,
+                  content: `Erreur: ${response?.error || 'Erreur inconnue'}`,
                 };
-              } else {
-                // Ajouter un nouveau message si aucun n'est en streaming
-                newMessages.push({
-                  role: 'system',
-                  content: `Erreur de l'agent: ${response?.error || 'Inconnue'}`,
-                });
               }
               return newMessages;
             });
+
+            setIsLoading(false);
+            cleanupStreamingConnection();
           }
 
-          console.log('[SidePanel] Fin du traitement du callback, setIsLoading(false)');
-          setIsLoading(false);
+          // Si streaming démarré avec succès, la suite se fera via les messages du port
         },
       );
     } catch (error) {
@@ -699,6 +865,7 @@ const SidePanel = () => {
       });
 
       setIsLoading(false);
+      cleanupStreamingConnection();
 
       // Réinitialiser les variables de suivi du raisonnement
       isInThinkMode.current = false;
@@ -724,6 +891,7 @@ const SidePanel = () => {
   // Rendu d'un message avec prise en charge du raisonnement
   const renderMessage = (message: Message, index: number) => {
     const hasReasoning = message.reasoning && message.reasoning.length > 0;
+    const isCurrentlyInThinkMode = message.isStreaming && isInThinkMode.current;
 
     return (
       <div key={index} className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-1.5`}>
@@ -736,7 +904,7 @@ const SidePanel = () => {
                 : 'bg-gray-600 text-gray-300 mx-auto text-xs rounded-full'
           }`}>
           {/* Indicateur de raisonnement en cours */}
-          {message.isStreaming && isInThinkMode.current && (
+          {isCurrentlyInThinkMode && (
             <div className="mb-1 text-xs text-blue-400 flex items-center">
               <span className="inline-block w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-1"></span>
               Thinking...
@@ -793,6 +961,13 @@ const SidePanel = () => {
     // Ferme le panneau latéral
     chrome.runtime.sendMessage({ action: 'closeSidePanel' });
   };
+
+  // Nettoyage des connexions de streaming à la fermeture
+  useEffect(() => {
+    return () => {
+      cleanupStreamingConnection();
+    };
+  }, []);
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col bg-gray-900 text-white">
