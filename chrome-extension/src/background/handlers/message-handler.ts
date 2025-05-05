@@ -1,5 +1,13 @@
 import logger from '../logger';
-import { convertChatHistory, MessageType } from '../types';
+import {
+  convertChatHistory,
+  MessageType,
+  ChatResponse,
+  AgentStatusResponse,
+  AvailableModelsResponse,
+  McpToolsResponse,
+  McpConnectionStatusResponse,
+} from '../types';
 import { stateService } from '../services/state-service';
 import { agentService } from '../services/agent-service';
 import { mcpService } from '../services/mcp-service';
@@ -16,6 +24,9 @@ export class MessageHandler {
    */
   private messageHandlers: Record<string, (message: any, sender: chrome.runtime.MessageSender) => Promise<any>> = {
     [MessageType.AI_CHAT_REQUEST]: this.handleAiChatRequest.bind(this),
+    [MessageType.CHAT_WITH_TOOLS]: this.handleChatWithTools.bind(this),
+    [MessageType.CHECK_AGENT_STATUS]: this.handleCheckAgentStatus.bind(this),
+    [MessageType.GET_AVAILABLE_MODELS]: this.handleGetAvailableModels.bind(this),
     [MessageType.GET_MCP_TOOLS]: this.handleGetMcpTools.bind(this),
     [MessageType.GET_MCP_CONNECTION_STATUS]: this.handleGetMcpConnectionStatus.bind(this),
     [MessageType.MCP_CONFIG_CHANGED]: this.handleMcpConfigChanged.bind(this),
@@ -44,9 +55,35 @@ export class MessageHandler {
   }
 
   /**
+   * Gestionnaire pour vérifier si l'agent est prêt
+   */
+  private async handleCheckAgentStatus(): Promise<AgentStatusResponse> {
+    try {
+      const isReady = await agentService.isAgentReady();
+      return { success: true, isReady };
+    } catch (error: any) {
+      logger.error("Erreur lors de la vérification de l'état de l'agent:", error);
+      return { success: false, isReady: false, error: error.message };
+    }
+  }
+
+  /**
+   * Gestionnaire pour obtenir les modèles disponibles
+   */
+  private async handleGetAvailableModels(message: any): Promise<AvailableModelsResponse> {
+    try {
+      const models = await agentService.getAvailableModels(message.baseUrl);
+      return { success: true, models };
+    } catch (error: any) {
+      logger.error('Erreur lors de la récupération des modèles disponibles:', error);
+      return { success: false, models: [], error: error.message };
+    }
+  }
+
+  /**
    * Gestionnaire pour les requêtes de chat avec l'agent AI
    */
-  private async handleAiChatRequest(message: any): Promise<any> {
+  private async handleAiChatRequest(message: any): Promise<ChatResponse> {
     logger.debug('Reçu AI_CHAT_REQUEST', message.payload);
 
     // Vérifier si on veut du streaming
@@ -83,8 +120,13 @@ export class MessageHandler {
 
       // Utiliser l'agent ou fallback au LLM direct selon l'état
       if (stateService.isReady()) {
-        const output = await agentService.invokeAgent(userInput, history);
-        return { success: true, data: output };
+        const result = await agentService.invokeAgent(userInput, history);
+        return {
+          success: true,
+          data: result.response,
+          toolUsed: result.toolUsed,
+          error: result.error,
+        };
       } else {
         const output = await agentService.invokeLLM(userInput, history);
         return { success: true, data: output };
@@ -99,9 +141,46 @@ export class MessageHandler {
   }
 
   /**
+   * Gestionnaire pour les requêtes de chat avec outils
+   */
+  private async handleChatWithTools(message: any): Promise<ChatResponse> {
+    try {
+      logger.debug('Reçu CHAT_WITH_TOOLS', { query: message.query });
+
+      // Vérifier d'abord si l'agent est prêt
+      const isReady = await agentService.isAgentReady();
+      if (!isReady) {
+        return {
+          success: false,
+          error: "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        };
+      }
+
+      // Convertir l'historique du chat
+      const history = convertChatHistory(message.history || []);
+
+      // Appeler l'agent avec les outils
+      const result = await agentService.invokeAgent(message.query, history);
+
+      return {
+        success: true,
+        data: result.response,
+        toolUsed: result.toolUsed,
+        error: result.error,
+      };
+    } catch (error: any) {
+      logger.error('Erreur lors du chat avec outils:', error);
+      return {
+        success: false,
+        error: error.message || 'Erreur inconnue lors du chat avec outils',
+      };
+    }
+  }
+
+  /**
    * Gestionnaire pour obtenir la liste des outils MCP
    */
-  private async handleGetMcpTools(): Promise<any> {
+  private async handleGetMcpTools(): Promise<McpToolsResponse> {
     try {
       const tools = await mcpLoadedToolsStorage.get();
       return { success: true, tools };
@@ -114,7 +193,7 @@ export class MessageHandler {
   /**
    * Gestionnaire pour obtenir l'état des connexions MCP
    */
-  private async handleGetMcpConnectionStatus(): Promise<any> {
+  private async handleGetMcpConnectionStatus(): Promise<McpConnectionStatusResponse> {
     return {
       success: true,
       connectionState: stateService.getMcpConnectionState(),

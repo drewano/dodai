@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { aiAgent } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '@extension/shared/lib/services/ai-agent';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
 import type { McpConnectionsState } from '@extension/shared/lib/services/ai-agent';
@@ -41,41 +41,50 @@ export const AIAgentChat = () => {
   useEffect(() => {
     const checkAgentAndTools = async () => {
       try {
-        const ready = await aiAgent.isReady();
-        setIsReady(ready);
+        // Vérifier l'état de l'agent
+        const statusResponse = await chrome.runtime.sendMessage({
+          type: MessageType.CHECK_AGENT_STATUS,
+        });
 
-        if (ready) {
-          setConnectionError(null);
+        if (statusResponse && statusResponse.success) {
+          setIsReady(statusResponse.isReady);
 
-          // Récupérer les outils MCP disponibles
-          try {
-            const response = await chrome.runtime.sendMessage({
-              type: 'GET_MCP_TOOLS',
-            });
+          if (statusResponse.isReady) {
+            setConnectionError(null);
 
-            if (response.success) {
-              setMcpTools(response.tools || []);
+            // Récupérer les outils MCP disponibles
+            try {
+              const toolsResponse = await chrome.runtime.sendMessage({
+                type: MessageType.GET_MCP_TOOLS,
+              });
+
+              if (toolsResponse && toolsResponse.success) {
+                setMcpTools(toolsResponse.tools || []);
+              }
+            } catch (toolsError) {
+              console.error('Erreur lors de la récupération des outils MCP:', toolsError);
             }
-          } catch (toolsError) {
-            console.error('Erreur lors de la récupération des outils MCP:', toolsError);
-          }
 
-          // Récupérer l'état des connexions MCP
-          try {
-            const statusResponse = await chrome.runtime.sendMessage({
-              type: 'GET_MCP_CONNECTION_STATUS',
-            });
+            // Récupérer l'état des connexions MCP
+            try {
+              const connectionsResponse = await chrome.runtime.sendMessage({
+                type: MessageType.GET_MCP_CONNECTION_STATUS,
+              });
 
-            if (statusResponse.success) {
-              setConnectionStatus(statusResponse.connectionState || {});
+              if (connectionsResponse && connectionsResponse.success) {
+                setConnectionStatus(connectionsResponse.connectionState || {});
+              }
+            } catch (statusError) {
+              console.error('Erreur lors de la récupération du statut des connexions MCP:', statusError);
             }
-          } catch (statusError) {
-            console.error('Erreur lors de la récupération du statut des connexions MCP:', statusError);
+          } else {
+            setConnectionError(
+              "L'agent IA n'est pas disponible. Vérifiez qu'Ollama est en cours d'exécution et qu'un modèle est installé.",
+            );
           }
         } else {
-          setConnectionError(
-            "L'agent IA n'est pas disponible. Vérifiez qu'Ollama est en cours d'exécution et qu'un modèle est installé.",
-          );
+          setIsReady(false);
+          setConnectionError(statusResponse?.error || "Impossible de vérifier l'état de l'agent IA.");
         }
       } catch (error) {
         console.error('Error checking agent status:', error);
@@ -126,7 +135,7 @@ export const AIAgentChat = () => {
       // Envoyer la demande au background script
       chrome.runtime.sendMessage(
         {
-          type: 'AI_CHAT_REQUEST',
+          type: MessageType.AI_CHAT_REQUEST,
           payload: requestPayload,
         },
         response => {

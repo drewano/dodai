@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
 import { t } from '@extension/i18n';
-import { aiAgent } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '@extension/shared/lib/services/ai-agent';
 
 interface OllamaModelInfo {
   id: string;
@@ -27,20 +27,36 @@ export const AIAgentOptions = () => {
     setError(null);
 
     try {
-      // Use the AI agent to check if the server is running
-      const isReady = await aiAgent.isReady();
-      setIsServerRunning(isReady);
+      // Vérifier si l'agent est prêt via le background script
+      const statusResponse = await chrome.runtime.sendMessage({
+        type: MessageType.CHECK_AGENT_STATUS,
+      });
 
-      if (isReady) {
-        // Use the AI agent to get available models
-        const models = await aiAgent.getAvailableModels();
-        setAvailableModels(models);
+      if (statusResponse && statusResponse.success) {
+        setIsServerRunning(statusResponse.isReady);
 
-        if (models.length === 0) {
-          setError('Aucun modèle n\'est installé. Installez un modèle avec la commande "ollama pull llama3".');
+        if (statusResponse.isReady) {
+          // Récupérer les modèles disponibles via le background script
+          const modelsResponse = await chrome.runtime.sendMessage({
+            type: MessageType.GET_AVAILABLE_MODELS,
+            baseUrl: settings.baseUrl,
+          });
+
+          if (modelsResponse && modelsResponse.success) {
+            setAvailableModels(modelsResponse.models || []);
+
+            if (modelsResponse.models.length === 0) {
+              setError('Aucun modèle n\'est installé. Installez un modèle avec la commande "ollama pull llama3".');
+            }
+          } else {
+            setError('Erreur lors de la récupération des modèles: ' + (modelsResponse?.error || 'Erreur inconnue'));
+          }
+        } else {
+          setError("Ollama n'est pas en cours d'exécution. Veuillez démarrer le serveur Ollama.");
         }
       } else {
-        setError("Ollama n'est pas en cours d'exécution. Veuillez démarrer le serveur Ollama.");
+        setIsServerRunning(false);
+        setError("Impossible de vérifier l'état d'Ollama. " + (statusResponse?.error || 'Erreur inconnue'));
       }
     } catch (err) {
       console.error('Error checking Ollama server:', err);

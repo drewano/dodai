@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { aiAgentStorage } from '@extension/storage';
-import { aiAgent } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '@extension/shared/lib/services/ai-agent';
 
 /**
  * Hook qui gère la sélection des modèles
@@ -28,23 +28,21 @@ export function useModelSelection() {
 
     setLoadingModels(true);
     try {
-      // L'API correcte d'Ollama pour obtenir les modèles
-      const response = await fetch(`${baseUrl}/api/tags`);
-      if (!response.ok) {
-        throw new Error(`Erreur HTTP: ${response.status}`);
-      }
+      // Utiliser le message runtime pour obtenir les modèles
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.GET_AVAILABLE_MODELS,
+        baseUrl,
+      });
 
-      const data = await response.json();
-      // La structure de la réponse d'Ollama : { models: [{ name: "llama3", ... }, ...] }
-      if (data && Array.isArray(data.models)) {
+      if (response && response.success && Array.isArray(response.models)) {
         // Extraire juste les noms des modèles
-        const modelNames = data.models.map((model: any) => model.name);
+        const modelNames = response.models.map((model: any) => model.name);
         if (modelNames.length > 0) {
           setAvailableModels(modelNames);
         }
       } else {
         // Fallback si la structure n'est pas comme attendu
-        console.warn('Format de réponse Ollama inattendu:', data);
+        console.warn('Format de réponse inattendu:', response);
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des modèles:', error);
@@ -60,8 +58,14 @@ export function useModelSelection() {
       await aiAgentStorage.updateModel(model);
       setShowModelDropdown(false);
 
-      // Forcer le rechargement immédiat des paramètres
-      await aiAgent.loadSettings();
+      // Notifier le background script que les paramètres ont changé
+      try {
+        await chrome.runtime.sendMessage({
+          type: MessageType.MCP_CONFIG_CHANGED,
+        });
+      } catch (notifyError) {
+        console.error('Erreur lors de la notification du changement de modèle:', notifyError);
+      }
 
       return {
         success: true,

@@ -110,6 +110,17 @@ export class StreamingService {
     const { port } = streamingPortData;
 
     try {
+      // Vérifier d'abord si l'agent est prêt
+      const ready = await agentService.isAgentReady();
+      if (!ready) {
+        port.postMessage({
+          type: StreamEventType.STREAM_ERROR,
+          error: "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        });
+        port.postMessage({ type: StreamEventType.STREAM_END, success: false });
+        return;
+      }
+
       // Notifier le début du streaming
       port.postMessage({ type: StreamEventType.STREAM_START });
 

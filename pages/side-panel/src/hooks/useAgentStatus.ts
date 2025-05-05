@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { aiAgent } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '@extension/shared/lib/services/ai-agent';
 
 /**
  * Hook qui gère l'état de la connexion à l'agent IA
@@ -11,14 +11,22 @@ export function useAgentStatus() {
   // Vérifie si l'agent est prêt
   const checkAgentStatus = useCallback(async () => {
     try {
-      const ready = await aiAgent.isReady();
-      setIsReady(ready);
-      if (ready) {
-        setConnectionError(null);
+      const response = await chrome.runtime.sendMessage({
+        type: MessageType.CHECK_AGENT_STATUS,
+      });
+
+      if (response && response.success) {
+        setIsReady(response.isReady);
+        if (response.isReady) {
+          setConnectionError(null);
+        } else {
+          setConnectionError(
+            "L'agent IA n'est pas disponible. Vérifiez qu'Ollama est en cours d'exécution et qu'un modèle est installé.",
+          );
+        }
       } else {
-        setConnectionError(
-          "L'agent IA n'est pas disponible. Vérifiez qu'Ollama est en cours d'exécution et qu'un modèle est installé.",
-        );
+        setIsReady(false);
+        setConnectionError(response?.error || "Impossible de vérifier l'état de l'agent IA.");
       }
     } catch (error) {
       console.error('Error checking agent status:', error);
