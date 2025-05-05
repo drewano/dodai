@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { Message } from '../types';
 import { useMarkdownProcessing } from './useMarkdownProcessing';
+import { StreamEventType, MessageType } from '../../../../chrome-extension/src/background/types';
 
 interface UseStreamingConnectionOptions {
   onStreamEnd: (success: boolean) => void;
@@ -188,20 +189,20 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
     (port: chrome.runtime.Port, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
       port.onMessage.addListener(message => {
         switch (message.type) {
-          case 'STREAM_START':
+          case StreamEventType.STREAM_START:
             console.log('[SidePanel] Début du streaming');
             break;
 
-          case 'STREAM_CHUNK':
+          case StreamEventType.STREAM_CHUNK:
             handleStreamChunk(message.chunk, setMessages);
             break;
 
-          case 'STREAM_END':
+          case StreamEventType.STREAM_END:
             console.log('[SidePanel] Fin du streaming, success:', message.success);
             handleStreamEnd(message.success, setMessages);
             break;
 
-          case 'STREAM_ERROR':
+          case StreamEventType.STREAM_ERROR:
             onStreamError(message.error);
             break;
 
@@ -254,7 +255,7 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
       // Envoyer la requête au background script
       chrome.runtime.sendMessage(
         {
-          type: 'AI_CHAT_REQUEST',
+          type: MessageType.AI_CHAT_REQUEST,
           payload: requestPayload,
         },
         response => {

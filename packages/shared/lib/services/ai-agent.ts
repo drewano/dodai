@@ -1,35 +1,5 @@
 import { BaseMessage } from '@langchain/core/messages';
 
-/**
- * Types de messages runtime utilisés dans l'extension
- * Doit rester synchronisé avec l'enum dans background/types/index.ts
- */
-export enum MessageType {
-  // Requêtes IA existantes
-  AI_CHAT_REQUEST = 'AI_CHAT_REQUEST',
-  CHAT_WITH_TOOLS = 'CHAT_WITH_TOOLS',
-
-  // Nouveaux types de messages pour la gestion de l'agent IA
-  CHECK_AGENT_STATUS = 'CHECK_AGENT_STATUS',
-  GET_AVAILABLE_MODELS = 'GET_AVAILABLE_MODELS',
-
-  // Types de messages pour MCP
-  GET_MCP_TOOLS = 'GET_MCP_TOOLS',
-  GET_MCP_CONNECTION_STATUS = 'GET_MCP_CONNECTION_STATUS',
-  MCP_CONFIG_CHANGED = 'MCP_CONFIG_CHANGED',
-  MCP_STATE_UPDATED = 'MCP_STATE_UPDATED',
-}
-
-// Types pour l'état d'une connexion MCP
-export type McpConnectionStatus = {
-  connected: boolean;
-  errorMessage?: string;
-  lastUpdated: number;
-};
-
-// Types pour l'état de toutes les connexions MCP
-export type McpConnectionsState = Record<string, McpConnectionStatus>;
-
 // Type pour représenter un outil MCP simplifié
 export type McpTool = {
   name: string;
@@ -47,7 +17,7 @@ export class AIAgent {
   async isReady(): Promise<boolean> {
     try {
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.CHECK_AGENT_STATUS,
+        type: 'CHECK_AGENT_STATUS',
       });
 
       if (response && response.success) {
@@ -67,7 +37,7 @@ export class AIAgent {
   async getAvailableModels(baseUrl?: string): Promise<any[]> {
     try {
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.GET_AVAILABLE_MODELS,
+        type: 'GET_AVAILABLE_MODELS',
         baseUrl,
       });
 
@@ -95,7 +65,7 @@ export class AIAgent {
       }
 
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.AI_CHAT_REQUEST,
+        type: 'AI_CHAT_REQUEST',
         payload: {
           message,
           chatHistory: [],
@@ -145,7 +115,7 @@ export class AIAgent {
 
       // Send to background script
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.CHAT_WITH_TOOLS,
+        type: 'CHAT_WITH_TOOLS',
         query: message,
         history: serializedHistory,
       });
@@ -168,10 +138,12 @@ export class AIAgent {
   /**
    * Récupère l'état des connexions MCP
    */
-  async getMcpConnectionsState(): Promise<McpConnectionsState> {
+  async getMcpConnectionsState(): Promise<
+    Record<string, { status: 'connected' | 'error' | 'unknown'; error?: string }>
+  > {
     try {
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.GET_MCP_CONNECTION_STATUS,
+        type: 'GET_MCP_CONNECTION_STATUS',
       });
 
       if (response && response.success) {
@@ -191,7 +163,7 @@ export class AIAgent {
   async getMcpTools(): Promise<McpTool[]> {
     try {
       const response = await chrome.runtime.sendMessage({
-        type: MessageType.GET_MCP_TOOLS,
+        type: 'GET_MCP_TOOLS',
       });
 
       if (response && response.success) {

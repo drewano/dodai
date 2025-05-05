@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MessageType } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '../../../../chrome-extension/src/background/types';
 
 /**
  * Hook qui gère l'état de la connexion à l'agent IA

@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageType } from '@extension/shared/lib/services/ai-agent';
+import { MessageType, McpConnectionsState } from '../../../chrome-extension/src/background/types';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
-import type { McpConnectionsState } from '@extension/shared/lib/services/ai-agent';
 
 interface Message {
   role: 'user' | 'assistant' | 'system';
@@ -189,7 +188,7 @@ export const AIAgentChat = () => {
   };
 
   // Décider si on doit afficher l'indicateur d'infos d'outils
-  const hasToolsConnected = Object.values(connectionStatus).some(status => status.connected);
+  const hasToolsConnected = Object.values(connectionStatus).some(status => status.status === 'connected');
 
   return (
     <div className="flex flex-col h-full bg-gradient-to-br from-gray-50 to-gray-100 dark:from-gray-800 dark:to-gray-900">

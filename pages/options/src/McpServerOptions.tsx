@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStorage } from '@extension/shared';
 import { mcpConfigStorage, type McpServerConfigEntry, type McpServersConfig } from '@extension/storage';
-import type { McpConnectionsState } from '@extension/shared/lib/services/ai-agent';
+import { McpConnectionsState } from '../../../chrome-extension/src/background/types';
 
 interface ServerFormData {
   name: string;
@@ -289,7 +289,7 @@ export const McpServerOptions = () => {
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
                         {connectionStatus[name] ? (
-                          connectionStatus[name].connected ? (
+                          connectionStatus[name].status === 'connected' ? (
                             <div className="flex items-center">
                               <div className="relative">
                                 <div className="h-2.5 w-2.5 bg-green-500 rounded-full"></div>
@@ -305,9 +305,9 @@ export const McpServerOptions = () => {
                                 <div className="h-2.5 w-2.5 bg-red-500 rounded-full"></div>
                                 <span className="ml-2 text-red-400">Déconnecté</span>
                               </div>
-                              {connectionStatus[name].errorMessage && (
+                              {connectionStatus[name].error && (
                                 <div className="mt-1 text-xs text-red-400 max-w-xs break-words opacity-80">
-                                  {connectionStatus[name].errorMessage}
+                                  {connectionStatus[name].error}
                                 </div>
                               )}
                             </div>

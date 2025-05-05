@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { aiAgentStorage } from '@extension/storage';
-import { MessageType } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '../../../../chrome-extension/src/background/types';
 
 /**
  * Hook qui gère la sélection des modèles

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
 import { t } from '@extension/i18n';
-import { MessageType } from '@extension/shared/lib/services/ai-agent';
+import { MessageType } from '../../../chrome-extension/src/background/types';
 
 interface OllamaModelInfo {
   id: string;
