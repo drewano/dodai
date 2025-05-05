@@ -96,6 +96,10 @@ export const AIAgentOptions = () => {
     aiAgentStorage.toggleEnabled();
   };
 
+  const handleContextSizeChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    aiAgentStorage.updateContextSize(parseInt(e.target.value, 10));
+  };
+
   const handleRefresh = () => {
     setIsLoading(true);
     checkOllamaServer();
@@ -323,6 +327,28 @@ export const AIAgentOptions = () => {
               disabled={!settings.isEnabled}
             />
             <p className="text-xs text-gray-500">URL du serveur Ollama (par défaut: http://localhost:11434)</p>
+          </div>
+
+          <div className="space-y-2">
+            <label htmlFor="context-size" className="block text-sm font-medium text-gray-300">
+              Taille du Contexte (num_ctx)
+            </label>
+            <input
+              id="context-size"
+              type="number"
+              min="1024"
+              step="1024"
+              value={settings.contextSize}
+              onChange={handleContextSizeChange}
+              className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                        focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                        disabled:opacity-60 disabled:cursor-not-allowed"
+              disabled={!isServerRunning || !settings.isEnabled}
+            />
+            <p className="text-xs text-gray-500">
+              Nombre maximum de tokens que le modèle peut traiter (paramètre num_ctx d'Ollama). Une valeur plus élevée
+              permet de traiter des conversations plus longues, mais utilise plus de mémoire.
+            </p>
           </div>
         </div>
       </div>

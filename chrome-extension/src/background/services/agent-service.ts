@@ -26,6 +26,7 @@ export class AgentService {
       baseUrl: settings.baseUrl || 'http://localhost:11434',
       model: settings.selectedModel || 'llama3',
       temperature: settings.temperature || 0.7,
+      numCtx: settings.contextSize || 4096,
     });
   }
 

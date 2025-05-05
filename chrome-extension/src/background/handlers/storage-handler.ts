@@ -46,7 +46,8 @@ export class StorageHandler {
     const criticalParamsChanged =
       oldSettings.selectedModel !== newSettings.selectedModel ||
       oldSettings.temperature !== newSettings.temperature ||
-      oldSettings.baseUrl !== newSettings.baseUrl;
+      oldSettings.baseUrl !== newSettings.baseUrl ||
+      oldSettings.contextSize !== newSettings.contextSize;
 
     if (criticalParamsChanged) {
       logger.info("Paramètres critiques changés, réinitialisation de l'Agent AI...");
