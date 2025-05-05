@@ -1,7 +1,31 @@
-import { BaseMessage, StreamEventType } from '../types';
-import logger from '../logger';
+import type { BaseMessage } from '../types';
+import { StreamEventType } from '../types';
+import { logger } from '../logger';
 import { stateService } from './state-service';
 import { agentService } from './agent-service';
+
+/**
+ * Interface pour représenter un chunk de streaming de l'agent
+ */
+interface AgentStreamingChunk {
+  output?: string;
+  generations?: Array<
+    Array<{
+      text?: string;
+      message?: {
+        content?: string;
+      };
+    }>
+  >;
+  tokens?: string;
+  steps?: Array<{
+    action?: {
+      tool: string;
+      toolInput: Record<string, unknown>;
+    };
+    observation?: string;
+  }>;
+}
 
 /**
  * Service pour gérer le streaming des réponses LLM
@@ -41,7 +65,10 @@ export class StreamingService {
    * @param fullTrace Référence au trace log à mettre à jour
    * @returns Le contenu formaté à envoyer à l'UI
    */
-  processAgentStreamingChunk(chunk: any, fullTrace: string): { chunkToSend: string; updatedTrace: string } {
+  processAgentStreamingChunk(
+    chunk: AgentStreamingChunk,
+    fullTrace: string,
+  ): { chunkToSend: string; updatedTrace: string } {
     let chunkToSend = '';
     let traceUpdate = '';
 
@@ -184,13 +211,14 @@ export class StreamingService {
 
       // Notifier la fin du streaming
       port.postMessage({ type: StreamEventType.STREAM_END, success: true });
-    } catch (error: any) {
+    } catch (error: unknown) {
+      const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue pendant le streaming';
       logger.error('Erreur pendant le streaming:', error);
 
       // Envoyer l'erreur au client
       port.postMessage({
         type: StreamEventType.STREAM_ERROR,
-        error: error.message || 'Erreur inconnue pendant le streaming',
+        error: errorMessage,
       });
 
       // Notifier la fin (avec erreur)

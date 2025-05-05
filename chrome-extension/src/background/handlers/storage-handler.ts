@@ -1,4 +1,4 @@
-import logger from '../logger';
+import { logger } from '../logger';
 import { mcpService } from '../services/mcp-service';
 
 /**

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useStorage } from '@extension/shared';
-import { mcpConfigStorage, type McpServerConfigEntry, type McpServersConfig } from '@extension/storage';
-import { McpConnectionsState } from '../../../chrome-extension/src/background/types';
+import { mcpConfigStorage, type McpServerConfigEntry } from '@extension/storage';
+import type { McpConnectionsState } from '../../../chrome-extension/src/background/types';
 
 interface ServerFormData {
   name: string;
@@ -95,7 +95,7 @@ export const McpServerOptions = () => {
   };
 
   // Gérer les changements dans le formulaire
-  const handleFormChange = (field: keyof ServerFormData, value: any) => {
+  const handleFormChange = (field: keyof ServerFormData, value: unknown) => {
     setFormData({ ...formData, [field]: value });
   };
 
@@ -140,7 +140,7 @@ export const McpServerOptions = () => {
     try {
       // Vérification de l'URL
       new URL(formData.url);
-    } catch (error) {
+    } catch {
       setFormError('URL invalide. Veuillez entrer une URL complète (ex: http://localhost:8000/sse)');
       return;
     }
@@ -466,9 +466,12 @@ export const McpServerOptions = () => {
 
                 <div className="space-y-3">
                   <div className="flex justify-between items-center">
-                    <label className="block text-sm font-medium text-gray-300">En-têtes HTTP (optionnels)</label>
+                    <label htmlFor="headersSection" className="block text-sm font-medium text-gray-300">
+                      En-têtes HTTP (optionnels)
+                    </label>
                     <button
                       type="button"
+                      id="headersSection"
                       onClick={handleAddHeader}
                       className="px-2 py-1 text-xs rounded-md bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50 transition-colors flex items-center">
                       <svg

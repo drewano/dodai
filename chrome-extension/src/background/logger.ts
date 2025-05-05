@@ -21,7 +21,7 @@ const LOG_LEVEL_VALUES: Record<LogLevel, number> = {
 };
 
 // Configuration par défaut - ajustable via des fonctions
-let config: LoggerConfig = {
+const config: LoggerConfig = {
   minLevel: process.env.NODE_ENV === 'production' ? 'info' : 'debug',
   prefix: '[MCP Background]',
   enabled: true,
@@ -30,28 +30,28 @@ let config: LoggerConfig = {
 /**
  * Enregistre un message de débogage (niveau le plus détaillé)
  */
-export function debug(message: string, ...args: any[]): void {
+export function debug(message: string, ...args: unknown[]): void {
   logWithLevel('debug', message, ...args);
 }
 
 /**
  * Enregistre un message d'information (opérations normales)
  */
-export function info(message: string, ...args: any[]): void {
+export function info(message: string, ...args: unknown[]): void {
   logWithLevel('info', message, ...args);
 }
 
 /**
  * Enregistre un avertissement (problème potentiel mais non bloquant)
  */
-export function warn(message: string, ...args: any[]): void {
+export function warn(message: string, ...args: unknown[]): void {
   logWithLevel('warn', message, ...args);
 }
 
 /**
  * Enregistre une erreur (problème sérieux nécessitant attention)
  */
-export function error(message: string, ...args: any[]): void {
+export function error(message: string, ...args: unknown[]): void {
   logWithLevel('error', message, ...args);
 }
 
@@ -79,7 +79,7 @@ export function setPrefix(prefix: string): void {
 /**
  * Fonction interne pour effectuer le log avec le niveau spécifié
  */
-function logWithLevel(level: LogLevel, message: string, ...args: any[]): void {
+function logWithLevel(level: LogLevel, message: string, ...args: unknown[]): void {
   if (!config.enabled || LOG_LEVEL_VALUES[level] < LOG_LEVEL_VALUES[config.minLevel]) {
     return;
   }

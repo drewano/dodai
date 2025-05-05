@@ -1,5 +1,3 @@
-import { ChatMessage, ChatConversation } from '@extension/storage';
-
 export type TabType = 'chat' | 'tools' | 'memory';
 
 export interface Message {

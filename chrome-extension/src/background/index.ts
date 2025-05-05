@@ -1,5 +1,5 @@
 import 'webextension-polyfill';
-import logger from './logger';
+import { logger } from './logger';
 import { messageHandler } from './handlers/message-handler';
 import { storageHandler } from './handlers/storage-handler';
 import { mcpService } from './services/mcp-service';

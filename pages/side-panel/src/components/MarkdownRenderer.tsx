@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
@@ -45,7 +45,7 @@ export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) =
           // Style pour les blocs de code
           code: props => {
             const { children, className } = props;
-            // @ts-ignore - inline est une propriété valide de react-markdown pour code
+            // @ts-expect-error - inline est une propriété valide de react-markdown pour code
             const isInline = props.inline;
 
             if (isInline) {

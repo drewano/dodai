@@ -1,5 +1,5 @@
-import React from 'react';
-import { ChatConversation } from '@extension/storage';
+import type React from 'react';
+import type { ChatConversation } from '@extension/storage';
 
 interface ChatHistorySidebarProps {
   chatHistory: ChatConversation[];
@@ -19,7 +19,6 @@ export const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = ({
   createNewConversation,
   loadConversation,
   deleteConversation,
-  onClose,
 }) => {
   return (
     <div className="absolute left-0 top-[137px] bottom-0 w-64 bg-gray-800 border-r border-gray-700 shadow-lg z-10 overflow-y-auto p-3">

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Message } from '../types';
+import type React from 'react';
+import type { Message } from '../types';
 import { MarkdownRenderer } from './MarkdownRenderer';
 import { ThinkingIcon } from './ThinkingIcon';
 import { useMarkdownProcessing } from '../hooks/useMarkdownProcessing';

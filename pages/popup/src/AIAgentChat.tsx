@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
-import { MessageType, McpConnectionsState } from '../../../chrome-extension/src/background/types';
+import type { McpConnectionsState } from '../../../chrome-extension/src/background/types';
+import { MessageType } from '../../../chrome-extension/src/background/types';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
 

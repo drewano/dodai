@@ -1,7 +1,7 @@
-import logger from '../logger';
+import { logger } from '../logger';
 import type { GlobalState, McpConnectionState, McpConnectionsState, StreamingPort } from '../types';
-import { MultiServerMCPClient } from '@langchain/mcp-adapters';
-import { AgentExecutor } from 'langchain/agents';
+import type { MultiServerMCPClient } from '@langchain/mcp-adapters';
+import type { AgentExecutor } from 'langchain/agents';
 import type { StructuredToolInterface } from '@langchain/core/tools';
 
 /**

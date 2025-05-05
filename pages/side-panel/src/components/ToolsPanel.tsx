@@ -1,5 +1,5 @@
-import React from 'react';
-import { McpToolInfo } from '@extension/storage';
+import type React from 'react';
+import type { McpToolInfo } from '@extension/storage';
 
 interface ToolsPanelProps {
   loadedTools: McpToolInfo[] | null;

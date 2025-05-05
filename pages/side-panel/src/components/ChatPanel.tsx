@@ -1,9 +1,10 @@
-import React from 'react';
-import { Message } from '../types';
+import type React from 'react';
+import type { Message } from '../types';
 import { ChatMessage } from './ChatMessage';
 import { ChatInput } from './ChatInput';
 import { ModelSelector } from './ModelSelector';
 import { ChatHistorySidebar } from './ChatHistorySidebar';
+import type { ChatConversation } from '@extension/storage';
 
 interface ChatPanelProps {
   // Données de chat
@@ -21,7 +22,7 @@ interface ChatPanelProps {
   showModelDropdown: boolean;
   modelDropdownRef: React.RefObject<HTMLDivElement | null>;
   // Chat history
-  chatHistory: any[];
+  chatHistory: ChatConversation[];
   activeConversationId: string | null;
   // Callbacks
   setInput: (value: string) => void;

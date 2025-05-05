@@ -1,7 +1,6 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
-import { t } from '@extension/i18n';
 import { MessageType } from '../../../chrome-extension/src/background/types';
 
 interface OllamaModelInfo {
@@ -22,7 +21,7 @@ export const AIAgentOptions = () => {
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
 
-  const checkOllamaServer = async () => {
+  const checkOllamaServer = useCallback(async () => {
     setIsRefreshing(true);
     setError(null);
 
@@ -66,7 +65,7 @@ export const AIAgentOptions = () => {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  };
+  }, [settings.baseUrl]);
 
   useEffect(() => {
     checkOllamaServer();
@@ -79,7 +78,7 @@ export const AIAgentOptions = () => {
     }, 10000);
 
     return () => clearInterval(interval);
-  }, []);
+  }, [checkOllamaServer, isRefreshing]);
 
   const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     aiAgentStorage.updateModel(e.target.value);
@@ -260,8 +259,11 @@ export const AIAgentOptions = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-300">Modèle</label>
+            <label htmlFor="model-select" className="block text-sm font-medium text-gray-300">
+              Modèle
+            </label>
             <select
+              id="model-select"
               value={settings.selectedModel}
               onChange={handleModelChange}
               className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
@@ -307,8 +309,11 @@ export const AIAgentOptions = () => {
           </div>
 
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-300">URL du serveur Ollama</label>
+            <label htmlFor="server-url" className="block text-sm font-medium text-gray-300">
+              URL du serveur Ollama
+            </label>
             <input
+              id="server-url"
               type="text"
               value={settings.baseUrl}
               onChange={handleBaseUrlChange}

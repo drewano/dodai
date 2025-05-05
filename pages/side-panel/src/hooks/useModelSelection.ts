@@ -2,6 +2,11 @@ import { useState, useRef, useEffect, useCallback } from 'react';
 import { aiAgentStorage } from '@extension/storage';
 import { MessageType } from '../../../../chrome-extension/src/background/types';
 
+// Define the model interface
+interface OllamaModel {
+  name: string;
+}
+
 /**
  * Hook qui gère la sélection des modèles
  */
@@ -36,7 +41,7 @@ export function useModelSelection() {
 
       if (response && response.success && Array.isArray(response.models)) {
         // Extraire juste les noms des modèles
-        const modelNames = response.models.map((model: any) => model.name);
+        const modelNames = response.models.map((model: OllamaModel) => model.name);
         if (modelNames.length > 0) {
           setAvailableModels(modelNames);
         }

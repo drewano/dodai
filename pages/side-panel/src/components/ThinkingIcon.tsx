@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 /**
  * Icône pour le bouton d'affichage du raisonnement

@@ -1,4 +1,4 @@
-import React from 'react';
+import type React from 'react';
 
 /**
  * Composant pour le panneau de mémoire (fonctionnalité en développement)

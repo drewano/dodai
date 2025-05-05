@@ -1,6 +1,5 @@
 import '@src/Options.css';
 import { withErrorBoundary, withSuspense } from '@extension/shared';
-import { t } from '@extension/i18n';
 import { AIAgentOptions } from './AIAgentOptions';
 import { McpServerOptions } from './McpServerOptions';
 

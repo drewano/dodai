@@ -1,4 +1,4 @@
-import { ReasoningInfo } from '../types';
+import type { ReasoningInfo } from '../types';
 
 /**
  * Hook qui fournit des utilitaires pour traiter le contenu Markdown et extraire le raisonnement

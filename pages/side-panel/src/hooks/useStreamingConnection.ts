@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import { Message } from '../types';
+import type { Message } from '../types';
 import { useMarkdownProcessing } from './useMarkdownProcessing';
 import { StreamEventType, MessageType } from '../../../../chrome-extension/src/background/types';
 

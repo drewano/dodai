@@ -1,11 +1,10 @@
 import '@src/SidePanel.css';
 import { useState } from 'react';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
-import { aiAgentStorage, exampleThemeStorage, mcpLoadedToolsStorage } from '@extension/storage';
-import { t } from '@extension/i18n';
+import { aiAgentStorage, mcpLoadedToolsStorage } from '@extension/storage';
 
 // Types et composants
-import { TabType } from './types';
+import type { TabType } from './types';
 import { TabNavigation } from './components/TabNavigation';
 import { ChatPanel } from './components/ChatPanel';
 import { ToolsPanel } from './components/ToolsPanel';
@@ -18,16 +17,14 @@ import { useChatHistory } from './hooks/useChatHistory';
 import { useModelSelection } from './hooks/useModelSelection';
 
 const SidePanel = () => {
-  const theme = useStorage(exampleThemeStorage);
   const settings = useStorage(aiAgentStorage);
   const loadedTools = useStorage(mcpLoadedToolsStorage);
-  const isLight = false; // Toujours utiliser le thème sombre
 
   // État pour l'onglet actif
   const [activeTab, setActiveTab] = useState<TabType>('chat');
 
   // Hook pour le statut de l'agent IA
-  const { isReady, connectionError } = useAgentStatus();
+  const { isReady } = useAgentStatus();
 
   // Hook pour la gestion de l'historique des conversations
   const {
@@ -40,9 +37,6 @@ const SidePanel = () => {
     loadConversation,
     renameCurrentConversation,
     deleteConversation,
-    saveCurrentMessages,
-    addMessageToConversation,
-    extractConversationName,
   } = useChatHistory();
 
   // Hook pour la sélection du modèle
@@ -51,31 +45,18 @@ const SidePanel = () => {
     loadingModels,
     showModelDropdown,
     modelDropdownRef,
-    fetchAvailableModels,
     handleModelChange,
     toggleModelDropdown,
   } = useModelSelection();
 
   // Hook pour la gestion du chat
-  const {
-    messages,
-    input,
-    isLoading,
-    showReasoning,
-    messagesEndRef,
-    setMessages,
-    setInput,
-    setShowReasoning,
-    handleSubmit,
-  } = useChat({
-    isReady,
-    selectedModel: settings.selectedModel || 'llama3',
-  });
+  const { messages, input, isLoading, showReasoning, messagesEndRef, setInput, setShowReasoning, handleSubmit } =
+    useChat({
+      isReady,
+      selectedModel: settings.selectedModel || 'llama3',
+    });
 
   // Fonction pour fermer le panneau latéral
-  const handleClosePanel = () => {
-    chrome.runtime.sendMessage({ action: 'closeSidePanel' });
-  };
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col bg-gray-900 text-white">

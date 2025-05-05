@@ -1,10 +1,9 @@
-import { AIMessage, HumanMessage, BaseMessage } from '@langchain/core/messages';
+import type { BaseMessage } from '@langchain/core/messages';
+import { AIMessage, HumanMessage } from '@langchain/core/messages';
 import type { StructuredToolInterface } from '@langchain/core/tools';
-import { AgentExecutor } from 'langchain/agents';
-import { ChatOllama } from '@langchain/ollama';
-import { MultiServerMCPClient } from '@langchain/mcp-adapters';
-import type { Connection } from '@langchain/mcp-adapters';
-import { AIAgentSettings, McpServersConfig, McpToolInfo } from '@extension/storage';
+import type { AgentExecutor } from 'langchain/agents';
+import type { ChatOllama } from '@langchain/ollama';
+import type { MultiServerMCPClient, Connection } from '@langchain/mcp-adapters';
 
 /**
  * Message du chat formaté pour l'UI

@@ -1,7 +1,8 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useStorage } from '@extension/shared';
-import { chatHistoryStorage, ChatMessage, ChatConversation } from '@extension/storage';
-import { Message } from '../types';
+import type { ChatMessage, ChatConversation } from '@extension/storage';
+import { chatHistoryStorage } from '@extension/storage';
+import type { Message } from '../types';
 
 /**
  * Hook qui gère l'historique des conversations

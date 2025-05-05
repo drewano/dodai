@@ -49,7 +49,7 @@ export class OllamaService {
     try {
       const response = await fetch(`${this.baseUrl}/api/version`);
       return response.ok;
-    } catch (error) {
+    } catch {
       return false;
     }
   }

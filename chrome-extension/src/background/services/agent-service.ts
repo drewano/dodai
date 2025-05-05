@@ -1,10 +1,13 @@
-import { BaseMessage } from '../types';
+import type { BaseMessage } from '../types';
 import { ChatOllama } from '@langchain/ollama';
 import { AgentExecutor, createToolCallingAgent } from 'langchain/agents';
 import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { aiAgentStorage } from '@extension/storage';
-import logger from '../logger';
+import loggerImport from '../logger';
 import { stateService } from './state-service';
+
+// Use renamed import
+const logger = loggerImport;
 
 /**
  * Service pour gérer l'agent LLM et ses paramètres
@@ -235,11 +238,11 @@ export class AgentService {
       try {
         const response = await this.invokeLLM(input, history);
         return { response, toolUsed: false };
-      } catch (error: any) {
+      } catch (error: unknown) {
         return {
           response: "Désolé, je n'ai pas pu générer de réponse. Veuillez réessayer.",
           toolUsed: false,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         };
       }
     }
@@ -261,7 +264,7 @@ export class AgentService {
         response: typeof result.output === 'string' ? result.output : JSON.stringify(result),
         toolUsed,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Erreur lors de l'invocation de AgentExecutor:", error);
 
       // Tenter de faire un fallback sur l'appel LLM direct
@@ -271,14 +274,14 @@ export class AgentService {
         return {
           response,
           toolUsed: false,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         };
-      } catch (fallbackError: any) {
+      } catch {
         // Si même le fallback échoue, retourner une erreur plus générique
         return {
           response: 'Désolé, une erreur est survenue lors du traitement de votre demande.',
           toolUsed: false,
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         };
       }
     }

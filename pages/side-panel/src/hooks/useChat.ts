@@ -1,5 +1,5 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import { Message } from '../types';
+import type { Message } from '../types';
 import { useStreamingConnection } from './useStreamingConnection';
 import { useChatHistory } from './useChatHistory';
 
@@ -19,22 +19,14 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
   const [showReasoning, setShowReasoning] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const {
-    activeConversationId,
-    addMessageToConversation,
-    saveCurrentMessages,
-    createNewConversation,
-    extractConversationName,
-  } = useChatHistory();
+  const { activeConversationId, addMessageToConversation, saveCurrentMessages, createNewConversation } =
+    useChatHistory();
 
   // Gestion des callbacks pour le streaming
-  const handleStreamEnd = useCallback(
-    (success: boolean) => {
-      // Sauvegarder la conversation après la fin du streaming
-      saveCurrentMessages(messages).catch(console.error);
-    },
-    [messages, saveCurrentMessages],
-  );
+  const handleStreamEnd = useCallback(() => {
+    // Sauvegarder la conversation après la fin du streaming
+    saveCurrentMessages(messages).catch(console.error);
+  }, [messages, saveCurrentMessages]);
 
   const handleStreamError = useCallback((error: string) => {
     console.error('Stream error:', error);
@@ -116,7 +108,6 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
 
       // Si c'est le premier message et qu'il n'y a pas de conversation active, créer une nouvelle
       if (!activeConversationId) {
-        const newName = extractConversationName(input);
         await createNewConversation("Bonjour! Comment puis-je vous aider aujourd'hui?", selectedModel);
         await addMessageToConversation(userMessage);
       } else {
@@ -177,7 +168,6 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
       messages,
       createNewConversation,
       addMessageToConversation,
-      extractConversationName,
     ],
   );
 

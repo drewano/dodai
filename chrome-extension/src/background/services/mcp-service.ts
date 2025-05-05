@@ -1,7 +1,7 @@
 import { MultiServerMCPClient } from '@langchain/mcp-adapters';
 import type { Connection } from '@langchain/mcp-adapters';
 import { mcpConfigStorage, mcpLoadedToolsStorage, type McpServersConfig, type McpToolInfo } from '@extension/storage';
-import logger from '../logger';
+import { logger } from '../logger';
 import { stateService } from './state-service';
 import type { McpClientInitResult, McpConnectionsState } from '../types';
 import { agentService } from './agent-service';
@@ -190,7 +190,7 @@ export class McpService {
       }
 
       return true;
-    } catch (error: any) {
+    } catch (error: unknown) {
       logger.error("Erreur majeure lors de l'initialisation du client MCP:", error);
       stateService.setMcpClient(null);
       stateService.setLoadedTools([]);
