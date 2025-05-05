@@ -19,25 +19,42 @@ export const ChatHistorySidebar: React.FC<ChatHistorySidebarProps> = ({
   createNewConversation,
   loadConversation,
   deleteConversation,
+  onClose,
 }) => {
   return (
     <div className="absolute left-0 top-[137px] bottom-0 w-64 bg-gray-800 border-r border-gray-700 shadow-lg z-10 overflow-y-auto p-3">
       <div className="flex justify-between items-center mb-3">
         <h3 className="text-sm font-medium text-gray-300">Historique des conversations</h3>
-        <button
-          className="p-1 text-gray-400 hover:text-blue-400 rounded-full hover:bg-gray-800/50"
-          onClick={createNewConversation}
-          title="Nouvelle conversation">
-          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-            <path
-              d="M12 5v14M5 12h14"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
+        <div className="flex">
+          <button
+            className="p-1 mr-1 text-gray-400 hover:text-blue-400 rounded-full hover:bg-gray-800/50"
+            onClick={onClose}
+            title="Fermer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M18 6L6 18M6 6l12 12"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+          <button
+            className="p-1 text-gray-400 hover:text-blue-400 rounded-full hover:bg-gray-800/50"
+            onClick={createNewConversation}
+            title="Nouvelle conversation">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path
+                d="M12 5v14M5 12h14"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+            </svg>
+          </button>
+        </div>
       </div>
 
       <div className="space-y-2">

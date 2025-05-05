@@ -46,12 +46,14 @@ export function useChatHistory() {
         setCurrentChatName('Nouvelle conversation');
         setShowChatHistory(false);
         return {
+          success: true,
           id: newId,
           initialMessages: [{ role: 'assistant', content: welcomeMessage }] as Message[],
+          model,
         };
       } catch (error) {
         console.error("Erreur lors de la création d'une nouvelle conversation:", error);
-        return { id: null, initialMessages: [] };
+        return { success: false, id: null, initialMessages: [], model: null };
       }
     },
     [],
@@ -69,12 +71,12 @@ export function useChatHistory() {
         const storedMessages: Message[] = conversation.messages.map(msg => ({
           role: msg.role,
           content: msg.content,
-          reasoning: msg.reasoning || null,
+          reasoning: msg.reasoning || undefined,
           isStreaming: false,
         }));
 
         setShowChatHistory(false);
-        return { success: true, messages: storedMessages, model: conversation.model };
+        return { success: true, messages: storedMessages, model: conversation.model || 'llama3' };
       }
       return { success: false, messages: [], model: null };
     } catch (error) {
@@ -102,15 +104,26 @@ export function useChatHistory() {
   );
 
   // Fonction pour supprimer une conversation
-  const deleteConversation = useCallback(async (id: string) => {
-    try {
-      await chatHistoryStorage.deleteConversation(id);
-      return true;
-    } catch (error) {
-      console.error('Erreur lors de la suppression de la conversation:', error);
-      return false;
-    }
-  }, []);
+  const deleteConversation = useCallback(
+    async (id: string) => {
+      try {
+        await chatHistoryStorage.deleteConversation(id);
+
+        // Si c'était la conversation active, réinitialiser
+        if (id === activeConversationId) {
+          setActiveConversationId(null);
+          setCurrentChatName('Nouvelle conversation');
+          return { isActive: true };
+        }
+
+        return { isActive: false };
+      } catch (error) {
+        console.error('Erreur lors de la suppression de la conversation:', error);
+        return { isActive: false, error: error instanceof Error ? error.message : 'Erreur inconnue' };
+      }
+    },
+    [activeConversationId],
+  );
 
   // Fonction pour sauvegarder les messages de la conversation actuelle
   const saveCurrentMessages = useCallback(

@@ -1,5 +1,5 @@
 import '@src/SidePanel.css';
-import { useState } from 'react';
+import { useState, useCallback } from 'react';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { aiAgentStorage, mcpLoadedToolsStorage } from '@extension/storage';
 
@@ -50,13 +50,61 @@ const SidePanel = () => {
   } = useModelSelection();
 
   // Hook pour la gestion du chat
-  const { messages, input, isLoading, showReasoning, messagesEndRef, setInput, setShowReasoning, handleSubmit } =
-    useChat({
-      isReady,
-      selectedModel: settings.selectedModel || 'llama3',
-    });
+  const {
+    messages,
+    input,
+    isLoading,
+    showReasoning,
+    messagesEndRef,
+    setInput,
+    setShowReasoning,
+    handleSubmit,
+    resetOrLoadMessages,
+  } = useChat({
+    isReady,
+    selectedModel: settings.selectedModel || 'llama3',
+    activeConversationId,
+  });
 
-  // Fonction pour fermer le panneau latéral
+  // Gestionnaires pour les actions liées aux conversations
+  const handleCreateNewConversation = useCallback(async () => {
+    const result = await createNewConversation(
+      "Bonjour! Comment puis-je vous aider aujourd'hui?",
+      settings.selectedModel || 'llama3',
+    );
+
+    if (result.success && result.initialMessages) {
+      resetOrLoadMessages(result.initialMessages);
+    }
+  }, [createNewConversation, settings.selectedModel, resetOrLoadMessages]);
+
+  const handleLoadConversation = useCallback(
+    async (id: string) => {
+      const result = await loadConversation(id);
+
+      if (result.success && result.messages) {
+        resetOrLoadMessages(result.messages);
+
+        // Mise à jour du modèle si nécessaire
+        if (result.model && result.model !== settings.selectedModel) {
+          handleModelChange(result.model);
+        }
+      }
+    },
+    [loadConversation, resetOrLoadMessages, handleModelChange, settings.selectedModel],
+  );
+
+  const handleDeleteConversation = useCallback(
+    async (id: string) => {
+      const result = await deleteConversation(id);
+
+      // Si la conversation supprimée était active, créer une nouvelle conversation
+      if (result.isActive) {
+        handleCreateNewConversation();
+      }
+    },
+    [deleteConversation, handleCreateNewConversation],
+  );
 
   return (
     <div className="fixed inset-0 w-full h-full flex flex-col bg-gray-900 text-white">
@@ -113,14 +161,9 @@ const SidePanel = () => {
             handleSubmit={handleSubmit}
             setShowReasoning={setShowReasoning}
             setShowChatHistory={setShowChatHistory}
-            createNewConversation={() =>
-              createNewConversation(
-                "Bonjour! Comment puis-je vous aider aujourd'hui?",
-                settings.selectedModel || 'llama3',
-              )
-            }
-            loadConversation={loadConversation}
-            deleteConversation={deleteConversation}
+            createNewConversation={handleCreateNewConversation}
+            loadConversation={handleLoadConversation}
+            deleteConversation={handleDeleteConversation}
             renameCurrentConversation={renameCurrentConversation}
             toggleModelDropdown={() => toggleModelDropdown(settings.baseUrl)}
             handleModelChange={handleModelChange}

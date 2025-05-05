@@ -178,8 +178,10 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
       // Fermer et nettoyer le port
       cleanupStreamingConnection();
 
-      // Appeler le callback onStreamEnd
-      onStreamEnd(success);
+      // Appeler le callback onStreamEnd après un court délai pour s'assurer que les états sont à jour
+      setTimeout(() => {
+        onStreamEnd(success);
+      }, 100);
     },
     [cleanupStreamingConnection, extractReasoning, onStreamEnd],
   );

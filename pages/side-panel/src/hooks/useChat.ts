@@ -6,27 +6,43 @@ import { useChatHistory } from './useChatHistory';
 interface UseChatOptions {
   isReady: boolean;
   selectedModel: string;
+  activeConversationId: string | null;
 }
 
 /**
  * Hook qui gère la fonctionnalité du chat
  */
-export function useChat({ isReady, selectedModel }: UseChatOptions) {
+export function useChat({ isReady, selectedModel, activeConversationId }: UseChatOptions) {
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: "Bonjour! Comment puis-je vous aider aujourd'hui ?" },
   ]);
   const [input, setInput] = useState('');
   const [showReasoning, setShowReasoning] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  // Référence pour stocker la dernière valeur des messages
+  const messagesRef = useRef<Message[]>(messages);
 
-  const { activeConversationId, addMessageToConversation, saveCurrentMessages, createNewConversation } =
-    useChatHistory();
+  const { addMessageToConversation, saveCurrentMessages, createNewConversation } = useChatHistory();
+
+  // Mettre à jour la référence lorsque les messages changent
+  useEffect(() => {
+    messagesRef.current = messages;
+  }, [messages]);
 
   // Gestion des callbacks pour le streaming
-  const handleStreamEnd = useCallback(() => {
-    // Sauvegarder la conversation après la fin du streaming
-    saveCurrentMessages(messages).catch(console.error);
-  }, [messages, saveCurrentMessages]);
+  const handleStreamEnd = useCallback(
+    (success: boolean = true) => {
+      // Sauvegarder la conversation après la fin du streaming
+      // Utiliser messagesRef.current pour accéder aux messages les plus récents
+      if (activeConversationId && success) {
+        console.log('[SidePanel] Sauvegarde des messages à la fin du streaming:', messagesRef.current);
+        saveCurrentMessages(messagesRef.current).catch(error => {
+          console.error('[SidePanel] Erreur lors de la sauvegarde des messages:', error);
+        });
+      }
+    },
+    [saveCurrentMessages, activeConversationId],
+  );
 
   const handleStreamError = useCallback((error: string) => {
     console.error('Stream error:', error);
@@ -67,6 +83,11 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [messages, isLoading, showReasoning]);
+
+  // Fonction pour réinitialiser les messages avec un message de bienvenue ou charger des messages existants
+  const resetOrLoadMessages = useCallback((newMessages: Message[]) => {
+    setMessages(newMessages);
+  }, []);
 
   // Fonction pour traiter la soumission du message
   const handleSubmit = useCallback(
@@ -130,7 +151,7 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
 
       try {
         // Démarrer le streaming
-        await startStreaming(input, messages, setMessages);
+        await startStreaming(input, messagesRef.current, setMessages);
       } catch (error) {
         console.error('Error starting stream:', error);
 
@@ -165,7 +186,6 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
       selectedModel,
       cleanupStreamingConnection,
       startStreaming,
-      messages,
       createNewConversation,
       addMessageToConversation,
     ],
@@ -181,5 +201,6 @@ export function useChat({ isReady, selectedModel }: UseChatOptions) {
     setInput,
     setShowReasoning,
     handleSubmit,
+    resetOrLoadMessages,
   };
 }
