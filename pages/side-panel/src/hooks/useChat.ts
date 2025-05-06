@@ -18,6 +18,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
   ]);
   const [input, setInput] = useState('');
   const [showReasoning, setShowReasoning] = useState<boolean>(false);
+  const [isFetchingPageContent, setIsFetchingPageContent] = useState<boolean>(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   // Référence pour stocker la dernière valeur des messages
   const messagesRef = useRef<Message[]>(messages);
@@ -82,7 +83,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
     if (messagesEndRef.current) {
       messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
     }
-  }, [messages, isLoading, showReasoning]);
+  }, [messages, isLoading, showReasoning, isFetchingPageContent]);
 
   // Fonction pour réinitialiser les messages avec un message de bienvenue ou charger des messages existants
   const resetOrLoadMessages = useCallback((newMessages: Message[]) => {
@@ -96,7 +97,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
         e.preventDefault();
       }
 
-      if (!input.trim() || isLoading) return;
+      if (!input.trim() || isLoading || isFetchingPageContent) return;
 
       // Si agent is not ready, show a message directly without making API call
       if (!isReady) {
@@ -138,14 +139,15 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
 
       setInput('');
 
-      // Ajouter un message vide pour l'assistant qui sera rempli progressivement
+      // Afficher un message indiquant que nous récupérons le contenu de la page
+      setIsFetchingPageContent(true);
       setMessages(prev => [
         ...prev,
         {
-          role: 'assistant',
-          content: '',
-          reasoning: '',
+          role: 'system',
+          content: 'Récupération du contenu de la page en cours...',
           isStreaming: true,
+          isTemporary: true, // Marquer comme temporaire pour le remplacer plus tard
         },
       ]);
 
@@ -176,11 +178,14 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
         });
 
         cleanupStreamingConnection();
+      } finally {
+        setIsFetchingPageContent(false);
       }
     },
     [
       input,
       isLoading,
+      isFetchingPageContent,
       isReady,
       activeConversationId,
       selectedModel,
@@ -195,6 +200,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
     messages,
     input,
     isLoading,
+    isFetchingPageContent,
     showReasoning,
     messagesEndRef,
     setMessages,

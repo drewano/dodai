@@ -4,6 +4,7 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   isStreaming?: boolean;
+  isTemporary?: boolean;
   reasoning?: string | null;
 }
 

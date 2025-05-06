@@ -121,12 +121,14 @@ export class StreamingService {
    * @param history Historique du chat
    * @param portId Identifiant du port de streaming
    * @param useAgent Si true, utilise AgentExecutor. Sinon appel direct au LLM.
+   * @param pageContent Contenu optionnel de la page web active
    */
   async executeStreamingAgentOrLLM(
     input: string,
     history: BaseMessage[],
     portId: string,
     useAgent: boolean = true,
+    pageContent?: string,
   ): Promise<void> {
     const streamingPortData = stateService.getStreamingPort(portId);
     if (!streamingPortData) {
@@ -162,6 +164,7 @@ export class StreamingService {
         const streamIterator = await agentExecutor.stream({
           input: input,
           chat_history: history,
+          page_content: pageContent || '',
         });
 
         // Pour le débogage et l'analyse
@@ -196,8 +199,14 @@ export class StreamingService {
         // Fallback: Appel direct au LLM avec streaming
         logger.info('Fallback: Démarrage du streaming via LLM direct...');
 
+        // Préparer le prompt avec le contenu de la page si disponible
+        let userPrompt = input;
+        if (pageContent) {
+          userPrompt = `Voici le contenu de la page web que je consulte actuellement:\n\n${pageContent}\n\nMa question est: ${input}`;
+        }
+
         // Nouveau stream avec l'historique complet + le message utilisateur
-        const streamIterator = await llm.stream([...history, { type: 'human', content: input }]);
+        const streamIterator = await llm.stream([...history, { type: 'human', content: userPrompt }]);
 
         for await (const chunk of streamIterator) {
           if (typeof chunk.content === 'string') {

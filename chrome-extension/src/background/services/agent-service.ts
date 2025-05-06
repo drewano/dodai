@@ -37,11 +37,16 @@ export class AgentService {
     return ChatPromptTemplate.fromMessages([
       [
         'system',
-        "You are a helpful AI assistant. You have access to tools provided by external MCP servers. Use these tools ONLY when necessary to answer the user's query. Think step-by-step if you need to use a tool.",
+        "You are a helpful AI assistant. You have access to tools provided by external MCP servers. Use these tools ONLY when necessary to answer the user's query. Think step-by-step if you need to use a tool.\n\n" +
+          'If page_content is provided, it contains the content of the current web page the user is viewing. ' +
+          'Use this content to provide context-aware responses when the user asks about the page. ' +
+          "If the user's query is related to the page content, use that information to provide a more accurate answer.",
       ],
       ['placeholder', '{chat_history}'],
       ['human', '{input}'],
       ['placeholder', '{agent_scratchpad}'],
+      // Si du contenu de page est fourni, l'ajouter ici en tant que contexte
+      ['placeholder', '{page_content}'],
     ]);
   }
 
@@ -205,13 +210,22 @@ export class AgentService {
 
   /**
    * Appelle directement le LLM sans outils (fallback)
+   * @param input Message de l'utilisateur
+   * @param history Historique du chat
+   * @param pageContent Contenu optionnel de la page web active
    */
-  async invokeLLM(input: string, history: BaseMessage[] = []): Promise<string> {
+  async invokeLLM(input: string, history: BaseMessage[] = [], pageContent?: string): Promise<string> {
     try {
       const llm = await this.createLLMInstance();
       logger.debug('Appel direct LLM - configuration chargée');
 
-      const response = await llm.invoke([...history, { type: 'human', content: input }]);
+      // Préparer le message utilisateur avec le contenu de la page si disponible
+      let userPrompt = input;
+      if (pageContent) {
+        userPrompt = `Voici le contenu de la page web que je consulte actuellement:\n\n${pageContent}\n\nMa question est: ${input}`;
+      }
+
+      const response = await llm.invoke([...history, { type: 'human', content: userPrompt }]);
 
       if (typeof response.content === 'string') {
         return response.content;
@@ -227,17 +241,21 @@ export class AgentService {
 
   /**
    * Appelle l'AgentExecutor avec les outils MCP
+   * @param input Message de l'utilisateur
+   * @param history Historique du chat
+   * @param pageContent Contenu optionnel de la page web active
    */
   async invokeAgent(
     input: string,
     history: BaseMessage[] = [],
+    pageContent?: string,
   ): Promise<{ response: string; toolUsed: boolean; error?: string }> {
     const agentExecutor = stateService.getAgentExecutor();
 
     if (!agentExecutor) {
       logger.warn('AgentExecutor non disponible, fallback sur appel LLM direct');
       try {
-        const response = await this.invokeLLM(input, history);
+        const response = await this.invokeLLM(input, history, pageContent);
         return { response, toolUsed: false };
       } catch (error: unknown) {
         return {
@@ -249,38 +267,34 @@ export class AgentService {
     }
 
     try {
-      logger.debug('Invocation de AgentExecutor avec historique de', history.length, 'messages');
-
+      logger.debug('Invocation AgentExecutor avec outils MCP');
       const result = await agentExecutor.invoke({
         input,
         chat_history: history,
+        page_content: pageContent || '',
       });
 
-      logger.info('AgentExecutor.invoke a réussi');
+      const response = typeof result.output === 'string' ? result.output : JSON.stringify(result.output);
+      const toolUsed = Boolean(result.intermediateSteps && result.intermediateSteps.length > 0);
 
-      // Détecter si des outils ont été utilisés
-      const toolUsed = result.intermediateSteps && result.intermediateSteps.length > 0;
-
-      return {
-        response: typeof result.output === 'string' ? result.output : JSON.stringify(result),
-        toolUsed,
-      };
+      logger.debug(`Réponse de l'agent obtenue, outils utilisés: ${toolUsed}`);
+      return { response, toolUsed };
     } catch (error: unknown) {
-      logger.error("Erreur lors de l'invocation de AgentExecutor:", error);
+      logger.error("Erreur lors de l'appel à l'agent:", error);
 
-      // Tenter de faire un fallback sur l'appel LLM direct
+      // Fallback sur appel LLM direct en cas d'erreur
       try {
-        logger.info('Tentative de fallback sur invokeLLM après erreur');
-        const response = await this.invokeLLM(input, history);
+        logger.info("Fallback sur appel LLM direct suite à l'erreur de l'agent");
+        const response = await this.invokeLLM(input, history, pageContent);
         return {
           response,
           toolUsed: false,
           error: error instanceof Error ? error.message : String(error),
         };
-      } catch {
-        // Si même le fallback échoue, retourner une erreur plus générique
+      } catch (secondError: unknown) {
+        logger.error('Échec du fallback LLM:', secondError);
         return {
-          response: 'Désolé, une erreur est survenue lors du traitement de votre demande.',
+          response: "Désolé, je n'ai pas pu générer de réponse. Veuillez réessayer.",
           toolUsed: false,
           error: error instanceof Error ? error.message : String(error),
         };

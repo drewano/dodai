@@ -14,6 +14,7 @@ interface ChatPanelProps {
   showReasoning: boolean;
   showChatHistory: boolean;
   isLoading: boolean;
+  isFetchingPageContent?: boolean;
   isReady: boolean;
   // Données de modèle
   selectedModel: string;
@@ -49,6 +50,7 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
   showReasoning,
   showChatHistory,
   isLoading,
+  isFetchingPageContent = false,
   isReady,
   selectedModel,
   availableModels,
@@ -160,23 +162,31 @@ export const ChatPanel: React.FC<ChatPanelProps> = ({
           input={input}
           setInput={setInput}
           handleSubmit={handleSubmit}
-          isLoading={isLoading}
+          isLoading={isLoading || isFetchingPageContent}
           isEnabled={isEnabled}
           isReady={isReady}
         />
         <div className="flex justify-between items-center text-xs mt-1">
-          <ModelSelector
-            selectedModel={selectedModel}
-            availableModels={availableModels}
-            loadingModels={loadingModels}
-            showModelDropdown={showModelDropdown}
-            isLoading={isLoading}
-            isEnabled={isEnabled}
-            isReady={isReady}
-            modelDropdownRef={modelDropdownRef}
-            toggleModelDropdown={toggleModelDropdown}
-            handleModelChange={handleModelChange}
-          />
+          <div className="flex items-center space-x-2">
+            <ModelSelector
+              selectedModel={selectedModel}
+              availableModels={availableModels}
+              loadingModels={loadingModels}
+              showModelDropdown={showModelDropdown}
+              isLoading={isLoading || isFetchingPageContent}
+              isEnabled={isEnabled}
+              isReady={isReady}
+              modelDropdownRef={modelDropdownRef}
+              toggleModelDropdown={toggleModelDropdown}
+              handleModelChange={handleModelChange}
+            />
+            {isFetchingPageContent && (
+              <span className="text-blue-300 flex items-center">
+                <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse"></span>
+                Récupération du contenu de la page...
+              </span>
+            )}
+          </div>
 
           {!isReady && (
             <span className="text-red-400 flex items-center">

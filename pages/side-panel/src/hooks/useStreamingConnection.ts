@@ -246,43 +246,65 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
       // Configurer les écouteurs de port
       setupPortListeners(port, setMessages);
 
+      // Remplacer le message temporaire "Récupération du contenu de la page..." par un message d'assistant en streaming
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const tempMessageIndex = newMessages.findIndex(m => m.isStreaming && m.isTemporary);
+
+        if (tempMessageIndex !== -1) {
+          newMessages[tempMessageIndex] = {
+            role: 'assistant',
+            content: '',
+            reasoning: '',
+            isStreaming: true,
+          };
+        }
+
+        return newMessages;
+      });
+
       // Préparer le payload avec le message, l'historique et les infos de streaming
       const requestPayload = {
-        message: input,
-        chatHistory: messages.filter(m => m.role !== 'system'),
-        streamHandler: true, // Indique au background qu'on veut utiliser le streaming
-        portId: portId, // ID du port pour que le background puisse envoyer les chunks
+        type: MessageType.AI_CHAT_REQUEST,
+        payload: {
+          message: input,
+          chatHistory: messages
+            // Filtrer pour garder seulement les messages utilisateur et assistant
+            .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+            // Convertir au format attendu par le background
+            .map(msg => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+          streamHandler: true,
+          portId,
+          // Note: Le contenu de la page sera récupéré côté background
+          // On n'a pas besoin de l'envoyer ici
+        },
       };
 
-      // Envoyer la requête au background script
-      chrome.runtime.sendMessage(
-        {
-          type: MessageType.AI_CHAT_REQUEST,
-          payload: requestPayload,
-        },
-        response => {
-          console.log('[SidePanel] Callback sendMessage reçu avec la réponse:', response);
+      // Envoyer la requête au background
+      chrome.runtime.sendMessage(requestPayload, response => {
+        if (chrome.runtime.lastError) {
+          console.error("[SidePanel] Erreur lors de l'envoi du message:", chrome.runtime.lastError);
+          onStreamError(chrome.runtime.lastError.message || 'Erreur de communication avec le background');
+          cleanupStreamingConnection();
+          return;
+        }
 
-          // Vérifier s'il y a une erreur de communication
-          const runtimeError = chrome.runtime.lastError;
-          if (runtimeError) {
-            const errorMessage = runtimeError.message || 'Communication avec le background impossible';
-            console.error('[SidePanel] Erreur de communication détectée:', errorMessage);
-            onStreamError(errorMessage);
-            return;
-          }
+        if (!response || !response.success) {
+          const errorMsg = response?.error || 'Erreur inconnue lors du lancement du streaming';
+          onStreamError(errorMsg);
+          cleanupStreamingConnection();
+          return;
+        }
 
-          // Vérifier si le streaming a bien été lancé
-          if (!response || !response.success) {
-            console.error('[SidePanel] Echec du lancement du streaming:', response?.error);
-            onStreamError(response?.error || 'Erreur inconnue');
-          }
-        },
-      );
+        console.log('[SidePanel] Requête de streaming envoyée avec succès');
+      });
 
       return true;
     },
-    [initStreamingConnection, onStreamError, setupPortListeners],
+    [cleanupStreamingConnection, initStreamingConnection, onStreamError, setupPortListeners],
   );
 
   return {

@@ -54,6 +54,7 @@ const SidePanel = () => {
     messages,
     input,
     isLoading,
+    isFetchingPageContent,
     showReasoning,
     messagesEndRef,
     setInput,
@@ -149,6 +150,7 @@ const SidePanel = () => {
             showReasoning={showReasoning}
             showChatHistory={showChatHistory}
             isLoading={isLoading}
+            isFetchingPageContent={isFetchingPageContent}
             isReady={isReady}
             selectedModel={settings.selectedModel || 'llama3'}
             availableModels={availableModels}

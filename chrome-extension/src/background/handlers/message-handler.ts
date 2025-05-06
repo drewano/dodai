@@ -102,7 +102,13 @@ export class MessageHandler {
     logger.debug('Reçu AI_CHAT_REQUEST', message.payload);
 
     // Vérifier si on veut du streaming
-    const { message: userInput, chatHistory = [], streamHandler = false, portId } = message.payload;
+    const {
+      message: userInput,
+      chatHistory = [],
+      streamHandler = false,
+      portId,
+      pageContent: providedPageContent,
+    } = message.payload;
 
     // Si streaming demandé et un portId fourni
     if (streamHandler && portId) {
@@ -111,19 +117,35 @@ export class MessageHandler {
       // Convertir l'historique du chat
       const history = convertChatHistory(chatHistory);
 
-      // Lancer le streaming en asynchrone
-      streamingService.executeStreamingAgentOrLLM(userInput, history, portId, stateService.isReady()).catch(error => {
-        logger.error('Erreur lors du lancement du streaming:', error);
-        // Essayer de notifier l'erreur via le port s'il existe encore
-        const streamingPort = stateService.getStreamingPort(portId);
-        if (streamingPort) {
-          streamingPort.port.postMessage({
-            type: 'STREAM_ERROR',
-            error: error instanceof Error ? error.message : 'Erreur lors du lancement du streaming',
-          });
-          streamingPort.port.postMessage({ type: 'STREAM_END', success: false });
+      // Récupérer le contenu de la page active si non fourni
+      let pageContent = providedPageContent;
+      if (!pageContent) {
+        try {
+          pageContent = await this.fetchCurrentPageContent();
+          logger.debug(
+            'Contenu de la page récupéré pour le streaming:',
+            pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun',
+          );
+        } catch (error) {
+          logger.warn('Erreur lors de la récupération du contenu de la page pour le streaming:', error);
         }
-      });
+      }
+
+      // Lancer le streaming en asynchrone
+      streamingService
+        .executeStreamingAgentOrLLM(userInput, history, portId, stateService.isReady(), pageContent)
+        .catch(error => {
+          logger.error('Erreur lors du lancement du streaming:', error);
+          // Essayer de notifier l'erreur via le port s'il existe encore
+          const streamingPort = stateService.getStreamingPort(portId);
+          if (streamingPort) {
+            streamingPort.port.postMessage({
+              type: 'STREAM_ERROR',
+              error: error instanceof Error ? error.message : 'Erreur lors du lancement du streaming',
+            });
+            streamingPort.port.postMessage({ type: 'STREAM_END', success: false });
+          }
+        });
 
       // Répondre immédiatement que le streaming a été lancé
       return { success: true, streaming: true };
@@ -133,9 +155,20 @@ export class MessageHandler {
     try {
       const history = convertChatHistory(chatHistory);
 
+      // Récupérer le contenu de la page active si non fourni
+      let pageContent = providedPageContent;
+      if (!pageContent) {
+        try {
+          pageContent = await this.fetchCurrentPageContent();
+          logger.debug('Contenu de la page récupéré:', pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun');
+        } catch (error) {
+          logger.warn('Erreur lors de la récupération du contenu de la page:', error);
+        }
+      }
+
       // Utiliser l'agent ou fallback au LLM direct selon l'état
       if (stateService.isReady()) {
-        const result = await agentService.invokeAgent(userInput, history);
+        const result = await agentService.invokeAgent(userInput, history, pageContent);
         return {
           success: true,
           data: result.response,
@@ -143,7 +176,7 @@ export class MessageHandler {
           error: result.error,
         };
       } else {
-        const output = await agentService.invokeLLM(userInput, history);
+        const output = await agentService.invokeLLM(userInput, history, pageContent);
         return { success: true, data: output };
       }
     } catch (error: unknown) {
@@ -152,6 +185,69 @@ export class MessageHandler {
         success: false,
         error: error instanceof Error ? error.message : "Erreur inconnue lors de l'appel à l'agent",
       };
+    }
+  }
+
+  /**
+   * Récupère le contenu de la page active dans l'onglet actuel
+   */
+  private async fetchCurrentPageContent(): Promise<string | undefined> {
+    try {
+      // Récupérer l'onglet actif
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      if (!tabs || tabs.length === 0 || !tabs[0].id) {
+        logger.warn('Aucun onglet actif trouvé');
+        return undefined;
+      }
+
+      const tabId = tabs[0].id;
+
+      // Vérifier si on peut exécuter du script sur cet onglet
+      if (
+        !tabs[0].url ||
+        tabs[0].url.startsWith('chrome://') ||
+        tabs[0].url.startsWith('edge://') ||
+        tabs[0].url.startsWith('brave://') ||
+        tabs[0].url.startsWith('about:')
+      ) {
+        logger.warn(`Impossible d'exécuter du script sur cet onglet: ${tabs[0].url}`);
+        return undefined;
+      }
+
+      // Injecter et exécuter le script pour récupérer le contenu
+      const results = await chrome.scripting.executeScript({
+        target: { tabId },
+        func: () => {
+          // Récupérer le texte visible de la page
+          const title = document.title || '';
+          const url = window.location.href || '';
+          const bodyText = document.body ? document.body.innerText : '';
+
+          // Limiter la taille du contenu (50000 caractères max)
+          const maxLength = 50000;
+          const trimmedText =
+            bodyText.length > maxLength ? bodyText.substring(0, maxLength) + '... [contenu tronqué]' : bodyText;
+
+          return {
+            title,
+            url,
+            content: trimmedText,
+          };
+        },
+      });
+
+      if (!results || results.length === 0 || !results[0].result) {
+        logger.warn('Aucun résultat retourné par le script injecté');
+        return undefined;
+      }
+
+      const { title, url, content } = results[0].result;
+
+      // Formater le contenu avec le titre et l'URL
+      return `[Titre de la page: ${title}]\n[URL: ${url}]\n\n${content}`;
+    } catch (error) {
+      logger.error('Erreur lors de la récupération du contenu de la page:', error);
+      return undefined;
     }
   }
 
@@ -171,11 +267,23 @@ export class MessageHandler {
         };
       }
 
+      // Récupérer le contenu de la page active
+      let pageContent: string | undefined;
+      try {
+        pageContent = await this.fetchCurrentPageContent();
+        logger.debug(
+          'Contenu de la page récupéré pour CHAT_WITH_TOOLS:',
+          pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun',
+        );
+      } catch (error) {
+        logger.warn('Erreur lors de la récupération du contenu de la page pour CHAT_WITH_TOOLS:', error);
+      }
+
       // Convertir l'historique du chat
       const history = convertChatHistory(message.history || []);
 
       // Appeler l'agent avec les outils
-      const result = await agentService.invokeAgent(message.query, history);
+      const result = await agentService.invokeAgent(message.query, history, pageContent);
 
       return {
         success: true,

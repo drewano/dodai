@@ -136,6 +136,7 @@ export interface AIChatRequestMessage extends BaseRuntimeMessage {
     chatHistory?: ChatHistoryMessage[];
     streamHandler?: boolean;
     portId?: string;
+    pageContent?: string;
   };
 }
 
