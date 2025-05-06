@@ -9,13 +9,22 @@ import type {
   AIChatRequestMessage,
   GetAvailableModelsMessage,
   ChatWithToolsMessage,
+  SummarizePageMessage,
+  SummarizePageResponse,
+  ListKeyPointsMessage,
+  ListKeyPointsResponse,
+  CustomPagePromptMessage,
+  CustomPagePromptResponse,
 } from '../types';
 import { convertChatHistory, MessageType } from '../types';
 import { stateService } from '../services/state-service';
 import { agentService } from '../services/agent-service';
 import { mcpService } from '../services/mcp-service';
 import { streamingService } from '../services/streaming-service';
-import { mcpLoadedToolsStorage } from '@extension/storage';
+import { mcpLoadedToolsStorage, notesStorage } from '@extension/storage';
+
+// Désactiver la vérification des variables non utilisées qui commencent par '_'
+/* eslint-disable @typescript-eslint/no-unused-vars */
 
 const logger = loggerModule.default;
 
@@ -41,6 +50,12 @@ export class MessageHandler {
     [MessageType.GET_MCP_TOOLS]: this.handleGetMcpTools.bind(this),
     [MessageType.GET_MCP_CONNECTION_STATUS]: this.handleGetMcpConnectionStatus.bind(this),
     [MessageType.MCP_CONFIG_CHANGED]: this.handleMcpConfigChanged.bind(this),
+    [MessageType.SUMMARIZE_PAGE_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleSummarizePage(message as SummarizePageMessage),
+    [MessageType.LIST_KEY_POINTS_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleListKeyPoints(message as ListKeyPointsMessage),
+    [MessageType.CUSTOM_PAGE_PROMPT_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleCustomPagePrompt(message as CustomPagePromptMessage),
   };
 
   /**
@@ -70,9 +85,126 @@ export class MessageHandler {
   }
 
   /**
+   * Gestionnaire pour la requête de résumé de page
+   */
+  private async handleSummarizePage(message: SummarizePageMessage): Promise<SummarizePageResponse> {
+    try {
+      logger.debug('Traitement de la requête de résumé de page');
+
+      // Récupérer le contenu de la page active
+      const pageContent = await this.fetchCurrentPageContent();
+
+      if (!pageContent) {
+        return {
+          success: false,
+          error: 'Impossible de récupérer le contenu de la page. Assurez-vous que la page est accessible.',
+        };
+      }
+
+      // Extraire le titre et l'URL de la page depuis le contenu formaté
+      const titleMatch = pageContent.match(/\[Titre de la page: (.*?)\]/);
+      const urlMatch = pageContent.match(/\[URL: (.*?)\]/);
+
+      const pageTitle = titleMatch ? titleMatch[1] : 'Page web';
+      const pageUrl = urlMatch ? urlMatch[1] : '';
+
+      // Construire le prompt pour l'LLM
+      const prompt = `Fais un résumé concis du texte suivant : \n\n${pageContent}`;
+
+      // Appeler l'LLM pour obtenir le résumé
+      const summary = await agentService.invokeLLM(prompt);
+
+      if (!summary) {
+        return {
+          success: false,
+          error: 'Impossible de générer un résumé pour cette page.',
+        };
+      }
+
+      // Sauvegarder le résumé dans les notes
+      const noteTitle = `Résumé de ${pageTitle}`;
+      await notesStorage.addNote({
+        title: noteTitle,
+        content: summary,
+        sourceUrl: pageUrl,
+      });
+
+      return {
+        success: true,
+        summary,
+      };
+    } catch (error) {
+      logger.error('Erreur lors du résumé de la page:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Une erreur s'est produite lors du résumé de la page.",
+      };
+    }
+  }
+
+  /**
+   * Gestionnaire pour la requête de liste des points clés
+   */
+  private async handleListKeyPoints(message: ListKeyPointsMessage): Promise<ListKeyPointsResponse> {
+    try {
+      logger.debug('Traitement de la requête de liste des points clés');
+
+      // Récupérer le contenu de la page active
+      const pageContent = await this.fetchCurrentPageContent();
+
+      if (!pageContent) {
+        return {
+          success: false,
+          error: 'Impossible de récupérer le contenu de la page. Assurez-vous que la page est accessible.',
+        };
+      }
+
+      // Extraire le titre et l'URL de la page depuis le contenu formaté
+      const titleMatch = pageContent.match(/\[Titre de la page: (.*?)\]/);
+      const urlMatch = pageContent.match(/\[URL: (.*?)\]/);
+
+      const pageTitle = titleMatch ? titleMatch[1] : 'Page web';
+      const pageUrl = urlMatch ? urlMatch[1] : '';
+
+      // Construire le prompt pour l'LLM
+      const prompt = `Liste les points clés importants du texte suivant sous forme de puces (bullet points) : \n\n${pageContent}`;
+
+      // Appeler l'LLM pour obtenir les points clés
+      const keyPoints = await agentService.invokeLLM(prompt);
+
+      if (!keyPoints) {
+        return {
+          success: false,
+          error: 'Impossible de générer la liste des points clés pour cette page.',
+        };
+      }
+
+      // Sauvegarder les points clés dans les notes
+      const noteTitle = `Points clés de ${pageTitle}`;
+      await notesStorage.addNote({
+        title: noteTitle,
+        content: keyPoints,
+        sourceUrl: pageUrl,
+      });
+
+      return {
+        success: true,
+        keyPoints,
+      };
+    } catch (error) {
+      logger.error('Erreur lors de la génération des points clés:', error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Une erreur s'est produite lors de l'extraction des points clés.",
+      };
+    }
+  }
+
+  /**
    * Gestionnaire pour vérifier si l'agent est prêt
    */
-  private async handleCheckAgentStatus(): Promise<AgentStatusResponse> {
+  private async handleCheckAgentStatus(_message: BaseRuntimeMessage): Promise<AgentStatusResponse> {
     try {
       const isReady = await agentService.isAgentReady();
       return { success: true, isReady };
@@ -303,20 +435,20 @@ export class MessageHandler {
   /**
    * Gestionnaire pour obtenir la liste des outils MCP
    */
-  private async handleGetMcpTools(): Promise<McpToolsResponse> {
+  private async handleGetMcpTools(_message: BaseRuntimeMessage): Promise<McpToolsResponse> {
     try {
       const tools = await mcpLoadedToolsStorage.get();
       return { success: true, tools };
     } catch (error: unknown) {
       logger.error('Erreur lors de la récupération des outils MCP:', error);
-      return { success: false, error: error instanceof Error ? error.message : String(error), tools: [] };
+      return { success: false, tools: [], error: error instanceof Error ? error.message : String(error) };
     }
   }
 
   /**
    * Gestionnaire pour obtenir l'état des connexions MCP
    */
-  private async handleGetMcpConnectionStatus(): Promise<McpConnectionStatusResponse> {
+  private async handleGetMcpConnectionStatus(_message: BaseRuntimeMessage): Promise<McpConnectionStatusResponse> {
     return {
       success: true,
       connectionState: stateService.getMcpConnectionState(),
@@ -326,7 +458,7 @@ export class MessageHandler {
   /**
    * Gestionnaire pour les changements de configuration MCP
    */
-  private async handleMcpConfigChanged(): Promise<{ success: boolean; error?: string }> {
+  private async handleMcpConfigChanged(_message: BaseRuntimeMessage): Promise<{ success: boolean; error?: string }> {
     logger.info('Configuration MCP changée, réinitialisation...');
 
     try {
@@ -339,6 +471,79 @@ export class MessageHandler {
     } catch (error: unknown) {
       logger.error('Erreur lors de la réinitialisation MCP:', error);
       return { success: false, error: error instanceof Error ? error.message : String(error) };
+    }
+  }
+
+  /**
+   * Gestionnaire pour la requête de prompt personnalisé
+   */
+  private async handleCustomPagePrompt(message: CustomPagePromptMessage): Promise<CustomPagePromptResponse> {
+    try {
+      logger.debug('Traitement de la requête de prompt personnalisé', { userPrompt: message.userPrompt });
+
+      // Vérifier que le prompt n'est pas vide
+      if (!message.userPrompt || message.userPrompt.trim().length === 0) {
+        return {
+          success: false,
+          error: 'Le prompt ne peut pas être vide.',
+        };
+      }
+
+      // Récupérer le contenu de la page active
+      const pageContent = await this.fetchCurrentPageContent();
+
+      if (!pageContent) {
+        return {
+          success: false,
+          error: 'Impossible de récupérer le contenu de la page. Assurez-vous que la page est accessible.',
+        };
+      }
+
+      // Extraire le titre et l'URL de la page depuis le contenu formaté
+      const titleMatch = pageContent.match(/\[Titre de la page: (.*?)\]/);
+      const urlMatch = pageContent.match(/\[URL: (.*?)\]/);
+
+      const pageTitle = titleMatch ? titleMatch[1] : 'Page web';
+      const pageUrl = urlMatch ? urlMatch[1] : '';
+
+      // Construire le prompt combiné pour l'LLM
+      const prompt = `En te basant sur le contenu de la page web suivant : \n\n${pageContent}\n\nRéponds à la question/instruction suivante : \n\n${message.userPrompt}`;
+
+      // Appeler l'LLM pour obtenir le résultat
+      const result = await agentService.invokeLLM(prompt);
+
+      if (!result) {
+        return {
+          success: false,
+          error: 'Impossible de générer une réponse pour ce prompt.',
+        };
+      }
+
+      // Créer un titre à partir du prompt utilisateur (tronqué si nécessaire)
+      const maxTitleLength = 50;
+      const promptPreview =
+        message.userPrompt.length > maxTitleLength
+          ? `${message.userPrompt.substring(0, maxTitleLength)}...`
+          : message.userPrompt;
+
+      // Sauvegarder le résultat dans les notes
+      const noteTitle = `${promptPreview} - ${pageTitle}`;
+      await notesStorage.addNote({
+        title: noteTitle,
+        content: `**Prompt:** ${message.userPrompt}\n\n**Réponse:**\n${result}`,
+        sourceUrl: pageUrl,
+      });
+
+      return {
+        success: true,
+        result,
+      };
+    } catch (error) {
+      logger.error('Erreur lors du traitement du prompt personnalisé:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Une erreur s'est produite lors du traitement du prompt.",
+      };
     }
   }
 }

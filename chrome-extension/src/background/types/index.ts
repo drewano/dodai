@@ -81,6 +81,15 @@ export enum MessageType {
   GET_MCP_CONNECTION_STATUS = 'GET_MCP_CONNECTION_STATUS',
   MCP_CONFIG_CHANGED = 'MCP_CONFIG_CHANGED',
   MCP_STATE_UPDATED = 'MCP_STATE_UPDATED',
+
+  // Nouveau type de message pour la fonctionnalité de résumé de page
+  SUMMARIZE_PAGE_REQUEST = 'SUMMARIZE_PAGE_REQUEST',
+
+  // Nouveau type de message pour lister les points clés
+  LIST_KEY_POINTS_REQUEST = 'LIST_KEY_POINTS_REQUEST',
+
+  // Nouveau type de message pour prompt personnalisé
+  CUSTOM_PAGE_PROMPT_REQUEST = 'CUSTOM_PAGE_PROMPT_REQUEST',
 }
 
 /**
@@ -101,6 +110,43 @@ export enum StreamEventType {
 // Interface de base pour les messages
 export interface BaseRuntimeMessage {
   type: MessageType;
+}
+
+// Message pour la requête de résumé de page
+export interface SummarizePageMessage extends BaseRuntimeMessage {
+  type: MessageType.SUMMARIZE_PAGE_REQUEST;
+}
+
+// Réponse pour le résumé de page
+export interface SummarizePageResponse {
+  success: boolean;
+  summary?: string;
+  error?: string;
+}
+
+// Message pour la requête de liste des points clés
+export interface ListKeyPointsMessage extends BaseRuntimeMessage {
+  type: MessageType.LIST_KEY_POINTS_REQUEST;
+}
+
+// Réponse pour la liste des points clés
+export interface ListKeyPointsResponse {
+  success: boolean;
+  keyPoints?: string;
+  error?: string;
+}
+
+// Message pour la requête de prompt personnalisé
+export interface CustomPagePromptMessage extends BaseRuntimeMessage {
+  type: MessageType.CUSTOM_PAGE_PROMPT_REQUEST;
+  userPrompt: string;
+}
+
+// Réponse pour le prompt personnalisé
+export interface CustomPagePromptResponse {
+  success: boolean;
+  result?: string;
+  error?: string;
 }
 
 // Message pour vérifier le statut de l'agent
