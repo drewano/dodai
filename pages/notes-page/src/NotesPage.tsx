@@ -202,7 +202,11 @@ const NotesPage = () => {
     const newNoteTitle = `Nouvelle Note (${timestamp})`;
     const newNoteContent = '';
 
+    // Générer un ID unique pour la note
+    const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
+
     const newNoteId = await notesStorage.addNote({
+      id: tempId,
       title: newNoteTitle,
       content: newNoteContent,
       tags: [],
