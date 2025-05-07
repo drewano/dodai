@@ -2,6 +2,7 @@ import '@src/Options.css';
 import { withErrorBoundary, withSuspense } from '@extension/shared';
 import { AIAgentOptions } from './AIAgentOptions';
 import { McpServerOptions } from './McpServerOptions';
+import { NotesOptions } from './NotesOptions';
 
 const Options = () => {
   return (
@@ -33,6 +34,10 @@ const Options = () => {
 
             <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-800/50 shadow-lg">
               <McpServerOptions />
+            </div>
+
+            <div className="overflow-hidden rounded-xl border border-gray-800 bg-gray-800/50 shadow-lg">
+              <NotesOptions />
             </div>
           </section>
         </div>

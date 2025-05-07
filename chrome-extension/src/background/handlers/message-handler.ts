@@ -85,6 +85,51 @@ export class MessageHandler {
   }
 
   /**
+   * Génère des tags pour une note à partir de son contenu via l'IA
+   */
+  async generateTagsWithAI(content: string, title: string, url?: string): Promise<string[]> {
+    try {
+      // Construit un prompt pour extraire des tags pertinents
+      const prompt = `Extrais 3-5 mots-clés pertinents (tags) à partir du texte suivant et de son titre/URL. 
+      Ne propose que des mots simples ou des expressions très courtes (1-3 mots maximum).
+      Retourne uniquement une liste JSON de chaînes de caractères, sans commentaires ni explications.
+      
+      Titre: ${title}
+      ${url ? `URL: ${url}` : ''}
+      
+      Contenu:
+      ${content.substring(0, 1500)}${content.length > 1500 ? '...' : ''}`;
+
+      // Appeler l'LLM pour obtenir les tags
+      const response = await agentService.invokeLLM(prompt);
+
+      // Tentative d'extraction du JSON depuis la réponse
+      try {
+        // Si la réponse contient du texte avant ou après le JSON, on essaie de l'extraire
+        const jsonMatch = response.match(/\[.*?\]/s);
+        if (jsonMatch) {
+          const tags = JSON.parse(jsonMatch[0]);
+          return Array.isArray(tags) ? tags.filter(tag => typeof tag === 'string').slice(0, 10) : [];
+        }
+        // Sinon, on essaie de parser directement
+        const tags = JSON.parse(response);
+        return Array.isArray(tags) ? tags.filter(tag => typeof tag === 'string').slice(0, 10) : [];
+      } catch (parseError) {
+        // Si le parsing échoue, on essaie de fallback sur une extraction basique
+        logger.warn('Échec du parsing JSON des tags:', parseError);
+        const tagMatches = response.match(/["']([^"']+)["']/g);
+        if (tagMatches) {
+          return tagMatches.map(tag => tag.replace(/["']/g, '')).slice(0, 10);
+        }
+        return [];
+      }
+    } catch (error) {
+      logger.error('Erreur lors de la génération des tags avec IA:', error);
+      return [];
+    }
+  }
+
+  /**
    * Gestionnaire pour la requête de résumé de page
    */
   private async handleSummarizePage(message: SummarizePageMessage): Promise<SummarizePageResponse> {
@@ -121,12 +166,20 @@ export class MessageHandler {
         };
       }
 
-      // Sauvegarder le résumé dans les notes
+      // Générer des tags à partir du résumé et des méta-informations
       const noteTitle = `Résumé de ${pageTitle}`;
+      const tags = await this.generateTagsWithAI(summary, noteTitle, pageUrl);
+
+      // Générer un ID temporaire
+      const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+
+      // Sauvegarder le résumé dans les notes avec les tags
       await notesStorage.addNote({
+        id: tempId,
         title: noteTitle,
         content: summary,
         sourceUrl: pageUrl,
+        tags: tags,
       });
 
       return {
@@ -179,12 +232,20 @@ export class MessageHandler {
         };
       }
 
-      // Sauvegarder les points clés dans les notes
+      // Générer des tags à partir des points clés et des méta-informations
       const noteTitle = `Points clés de ${pageTitle}`;
+      const tags = await this.generateTagsWithAI(keyPoints, noteTitle, pageUrl);
+
+      // Générer un ID temporaire
+      const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+
+      // Sauvegarder les points clés dans les notes avec les tags
       await notesStorage.addNote({
+        id: tempId,
         title: noteTitle,
         content: keyPoints,
         sourceUrl: pageUrl,
+        tags: tags,
       });
 
       return {
@@ -526,12 +587,21 @@ export class MessageHandler {
           ? `${message.userPrompt.substring(0, maxTitleLength)}...`
           : message.userPrompt;
 
-      // Sauvegarder le résultat dans les notes
+      // Générer des tags à partir du résultat et des méta-informations
       const noteTitle = `${promptPreview} - ${pageTitle}`;
+      const noteContent = `**Prompt:** ${message.userPrompt}\n\n**Réponse:**\n${result}`;
+      const tags = await this.generateTagsWithAI(noteContent, noteTitle, pageUrl);
+
+      // Générer un ID temporaire
+      const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+
+      // Sauvegarder le résultat dans les notes avec les tags
       await notesStorage.addNote({
+        id: tempId,
         title: noteTitle,
-        content: `**Prompt:** ${message.userPrompt}\n\n**Réponse:**\n${result}`,
+        content: noteContent,
         sourceUrl: pageUrl,
+        tags: tags,
       });
 
       return {

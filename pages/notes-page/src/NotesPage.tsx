@@ -1,6 +1,6 @@
-import { withErrorBoundary, withSuspense, useStorage } from '@extension/shared';
+import { withErrorBoundary, withSuspense, useStorage, exportNoteToMarkdown } from '@extension/shared';
 import { notesStorage, type NoteEntry } from '@extension/storage';
-import { useEffect, useState, useRef } from 'react';
+import { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import ReactMarkdown from 'react-markdown';
@@ -8,36 +8,105 @@ import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
 
+// Options de tri disponibles
+type SortOption = 'updatedAt_desc' | 'updatedAt_asc' | 'createdAt_desc' | 'createdAt_asc' | 'title_asc' | 'title_desc';
+
 const NotesPage = () => {
   const notes = useStorage(notesStorage);
   const [selectedNote, setSelectedNote] = useState<NoteEntry | null>(null);
   const [editedTitle, setEditedTitle] = useState<string>('');
   const [editedContent, setEditedContent] = useState<string>('');
+  const [editedTags, setEditedTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState<string>('');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [showPreview, setShowPreview] = useState<boolean>(false);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [sortOption, setSortOption] = useState<SortOption>('updatedAt_desc');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const SCRATCHPAD_ID = '@Scratchpad';
 
-  // Trier les notes par date de mise à jour (plus récent en premier)
-  const sortedNotes = notes ? [...notes].sort((a, b) => b.updatedAt - a.updatedAt) : [];
+  // Récupérer tous les tags uniques de toutes les notes
+  const allTags = useMemo(() => {
+    if (!notes) return [];
+    const tagSet = new Set<string>();
+    notes.forEach(note => {
+      if (note.tags && note.tags.length > 0) {
+        note.tags.forEach(tag => tagSet.add(tag));
+      }
+    });
+    return Array.from(tagSet).sort();
+  }, [notes]);
+
+  // Filtrer les notes en fonction du tag actif et les trier selon l'option choisie
+  const filteredAndSortedNotes = useMemo(() => {
+    if (!notes) return [];
+
+    // Filtrer par tag si un tag est actif
+    let filteredNotes = notes;
+    if (activeTag) {
+      filteredNotes = notes.filter(note => note.tags && note.tags.includes(activeTag));
+    }
+
+    // Exclure le scratchpad de la liste normale des notes
+    const regularNotes = filteredNotes.filter(note => note.id !== SCRATCHPAD_ID);
+
+    // Trier les notes selon l'option sélectionnée
+    return [...regularNotes].sort((a, b) => {
+      switch (sortOption) {
+        case 'updatedAt_desc':
+          return b.updatedAt - a.updatedAt;
+        case 'updatedAt_asc':
+          return a.updatedAt - b.updatedAt;
+        case 'createdAt_desc':
+          return b.createdAt - a.createdAt;
+        case 'createdAt_asc':
+          return a.createdAt - b.createdAt;
+        case 'title_asc':
+          return a.title.localeCompare(b.title);
+        case 'title_desc':
+          return b.title.localeCompare(a.title);
+        default:
+          return b.updatedAt - a.updatedAt;
+      }
+    });
+  }, [notes, activeTag, sortOption, SCRATCHPAD_ID]);
+
+  // Récupérer le scratchpad s'il existe
+  const scratchpad = useMemo(() => {
+    if (!notes) return null;
+    return notes.find(note => note.id === SCRATCHPAD_ID);
+  }, [notes, SCRATCHPAD_ID]);
+
+  // Gérer la sélection d'une note
+  const handleSelectNote = useCallback((note: NoteEntry) => {
+    setSelectedNote(note);
+    setIsEditing(false);
+    setShowPreview(false);
+  }, []);
+
+  // Vérifier si le Scratchpad doit être ouvert directement (via l'URL)
+  useEffect(() => {
+    const searchParams = new URLSearchParams(window.location.search);
+    const openScratchpad = searchParams.get('scratchpad') === 'true';
+
+    if (openScratchpad && scratchpad && (!selectedNote || selectedNote.id !== SCRATCHPAD_ID)) {
+      handleSelectNote(scratchpad);
+    }
+  }, [scratchpad, selectedNote, SCRATCHPAD_ID, handleSelectNote]);
 
   // Mettre à jour le formulaire d'édition quand une note est sélectionnée
   useEffect(() => {
     if (selectedNote) {
       setEditedTitle(selectedNote.title);
       setEditedContent(selectedNote.content);
+      setEditedTags(selectedNote.tags || []);
     } else {
       setEditedTitle('');
       setEditedContent('');
+      setEditedTags([]);
       setIsEditing(false);
     }
   }, [selectedNote]);
-
-  // Gérer la sélection d'une note
-  const handleSelectNote = (note: NoteEntry) => {
-    setSelectedNote(note);
-    setIsEditing(false);
-    setShowPreview(false);
-  };
 
   // Supprimer la note sélectionnée
   const handleDeleteNote = async () => {
@@ -55,10 +124,16 @@ const NotesPage = () => {
 
   // Sauvegarder les modifications
   const handleSaveChanges = async () => {
-    if (selectedNote && (editedTitle !== selectedNote.title || editedContent !== selectedNote.content)) {
+    if (
+      selectedNote &&
+      (editedTitle !== selectedNote.title ||
+        editedContent !== selectedNote.content ||
+        !arraysEqual(editedTags, selectedNote.tags || []))
+    ) {
       await notesStorage.updateNote(selectedNote.id, {
         title: editedTitle,
         content: editedContent,
+        tags: editedTags,
       });
       setIsEditing(false);
     } else {
@@ -71,8 +146,54 @@ const NotesPage = () => {
     if (selectedNote) {
       setEditedTitle(selectedNote.title);
       setEditedContent(selectedNote.content);
+      setEditedTags(selectedNote.tags || []);
     }
     setIsEditing(false);
+  };
+
+  // Ajouter un tag depuis l'input
+  const handleAddTag = () => {
+    const trimmedTag = tagInput.trim();
+    if (trimmedTag && !editedTags.includes(trimmedTag)) {
+      setEditedTags([...editedTags, trimmedTag]);
+      setTagInput('');
+    }
+  };
+
+  // Supprimer un tag
+  const handleRemoveTag = (tagToRemove: string) => {
+    setEditedTags(editedTags.filter(tag => tag !== tagToRemove));
+  };
+
+  // Gérer l'appui sur entrée dans l'input de tag
+  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
+  // Filtrer les notes par tag
+  const handleTagFilter = (tag: string) => {
+    setActiveTag(activeTag === tag ? null : tag);
+  };
+
+  // Réinitialiser le filtre de tag
+  const clearTagFilter = () => {
+    setActiveTag(null);
+  };
+
+  // Changer l'option de tri
+  const handleSortChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    setSortOption(e.target.value as SortOption);
+  };
+
+  // Utilitaire pour comparer deux tableaux
+  const arraysEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, idx) => val === sortedB[idx]);
   };
 
   // Créer une nouvelle note
@@ -84,6 +205,7 @@ const NotesPage = () => {
     const newNoteId = await notesStorage.addNote({
       title: newNoteTitle,
       content: newNoteContent,
+      tags: [],
     });
 
     // Récupérer la nouvelle note pour la sélectionner
@@ -192,6 +314,39 @@ const NotesPage = () => {
     }, 0);
   };
 
+  // Fonction spéciale pour vider le scratchpad
+  const handleClearScratchpad = async () => {
+    if (
+      scratchpad &&
+      window.confirm('Êtes-vous sûr de vouloir vider le contenu du Scratchpad ? Cette action est irréversible.')
+    ) {
+      await notesStorage.updateNote(SCRATCHPAD_ID, {
+        content:
+          '# 📥 Scratchpad\n\nUtilisez cette note comme collecteur rapide pour vos idées et captures web.\n\n---\n\n',
+      });
+
+      // Si le scratchpad est sélectionné, mettre à jour l'affichage
+      if (selectedNote && selectedNote.id === SCRATCHPAD_ID) {
+        const updatedScratchpad = await notesStorage.getNote(SCRATCHPAD_ID);
+        if (updatedScratchpad) {
+          setSelectedNote(updatedScratchpad);
+        }
+      }
+    }
+  };
+
+  // Exporter une note individuelle en Markdown
+  const handleExportNote = async () => {
+    if (selectedNote) {
+      try {
+        await exportNoteToMarkdown(selectedNote);
+      } catch (error) {
+        console.error("Erreur lors de l'export de la note:", error);
+        alert("Erreur lors de l'export de la note en Markdown.");
+      }
+    }
+  };
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       {/* Header */}
@@ -206,8 +361,48 @@ const NotesPage = () => {
 
       {/* Main Content */}
       <main className="container mx-auto px-4 py-6 max-w-5xl">
+        {/* Liste de tags pour filtrage */}
+        {allTags.length > 0 && (
+          <div className="mb-6 overflow-x-auto">
+            <div className="flex items-center space-x-2 pb-2">
+              <h3 className="text-sm font-medium text-gray-400">Filtrer par tag:</h3>
+              {activeTag && (
+                <button
+                  onClick={clearTagFilter}
+                  className="text-xs px-2 py-1 text-gray-300 bg-gray-700 hover:bg-gray-600 rounded-md flex items-center"
+                  title="Effacer le filtre">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-3 w-3 mr-1"
+                    viewBox="0 0 20 20"
+                    fill="currentColor">
+                    <path
+                      fillRule="evenodd"
+                      d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                      clipRule="evenodd"
+                    />
+                  </svg>
+                  Effacer
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {allTags.map(tag => (
+                <button
+                  key={tag}
+                  onClick={() => handleTagFilter(tag)}
+                  className={`text-xs px-2 py-1 rounded-full ${
+                    activeTag === tag ? 'bg-blue-600 text-white' : 'bg-gray-700 text-gray-300 hover:bg-gray-600'
+                  }`}>
+                  #{tag}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-          {/* Liste des notes */}
+          {/* Liste des notes avec options de tri */}
           <section className="md:col-span-1 bg-gray-800 rounded-lg p-4 h-[calc(100vh-150px)] overflow-y-auto">
             <div className="flex justify-between items-center mb-4">
               <h2 className="text-xl font-semibold text-blue-400">Mes Notes</h2>
@@ -225,18 +420,95 @@ const NotesPage = () => {
               </button>
             </div>
 
-            {sortedNotes.length === 0 ? (
+            {/* Options de tri */}
+            <div className="flex justify-end mb-3">
+              <select
+                value={sortOption}
+                onChange={handleSortChange}
+                className="text-xs px-2 py-1 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none">
+                <option value="updatedAt_desc">Modifié récemment</option>
+                <option value="updatedAt_asc">Modifié anciennement</option>
+                <option value="createdAt_desc">Créé récemment</option>
+                <option value="createdAt_asc">Créé anciennement</option>
+                <option value="title_asc">Titre (A-Z)</option>
+                <option value="title_desc">Titre (Z-A)</option>
+              </select>
+            </div>
+
+            {/* Scratchpad toujours affiché en premier */}
+            {scratchpad && (
+              <div
+                className={`mb-4 p-3 rounded-md cursor-pointer bg-gradient-to-r from-blue-900 to-gray-800 border border-blue-500 hover:bg-blue-800 transition ${
+                  selectedNote?.id === SCRATCHPAD_ID ? 'border-l-4 border-blue-400' : ''
+                }`}
+                onClick={() => handleSelectNote(scratchpad)}
+                onKeyDown={e => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    handleSelectNote(scratchpad);
+                  }
+                }}
+                tabIndex={0}
+                role="button"
+                aria-pressed={selectedNote?.id === SCRATCHPAD_ID}>
+                <div className="flex justify-between items-center">
+                  <h3 className="font-bold flex items-center">
+                    <span className="mr-2">📥</span>
+                    Scratchpad
+                  </h3>
+                  {selectedNote?.id === SCRATCHPAD_ID && (
+                    <button
+                      onClick={e => {
+                        e.stopPropagation();
+                        handleClearScratchpad();
+                      }}
+                      className="text-xs px-2 py-1 bg-gray-700 hover:bg-red-700 rounded text-gray-300 hover:text-white transition"
+                      title="Vider le Scratchpad">
+                      Vider
+                    </button>
+                  )}
+                </div>
+                <p className="text-gray-300 text-sm mt-1 truncate">Capturez rapidement des contenus web et des idées</p>
+                <div className="flex items-center mt-2 text-xs text-blue-300">
+                  <span className="mr-1">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-3 w-3 inline"
+                      viewBox="0 0 20 20"
+                      fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </span>
+                  {formatDate(scratchpad.updatedAt)}
+                </div>
+              </div>
+            )}
+
+            {filteredAndSortedNotes.length === 0 && !scratchpad ? (
               <div className="text-center py-8">
-                <p className="text-gray-400 italic mb-4">Aucune note pour le moment</p>
-                <button
-                  onClick={handleCreateNewNote}
-                  className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-white transition">
-                  Créer ma première note
-                </button>
+                <p className="text-gray-400 italic mb-4">
+                  {activeTag ? `Aucune note avec le tag #${activeTag}` : 'Aucune note pour le moment'}
+                </p>
+                {activeTag ? (
+                  <button
+                    onClick={clearTagFilter}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-white transition">
+                    Effacer le filtre
+                  </button>
+                ) : (
+                  <button
+                    onClick={handleCreateNewNote}
+                    className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-md text-white transition">
+                    Créer ma première note
+                  </button>
+                )}
               </div>
             ) : (
               <div className="space-y-2">
-                {sortedNotes.map(note => (
+                {filteredAndSortedNotes.map(note => (
                   <div
                     key={note.id}
                     className={`p-3 rounded-md cursor-pointer hover:bg-gray-700 transition ${
@@ -256,6 +528,17 @@ const NotesPage = () => {
                       {note.content.substring(0, 60)}
                       {note.content.length > 60 ? '...' : ''}
                     </p>
+                    {/* Affichage des tags dans la carte de note */}
+                    {note.tags && note.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-1 mt-1">
+                        {note.tags.slice(0, 3).map(tag => (
+                          <span key={tag} className="text-xs bg-gray-600 text-blue-300 px-1.5 py-0.5 rounded">
+                            #{tag}
+                          </span>
+                        ))}
+                        {note.tags.length > 3 && <span className="text-xs text-gray-400">+{note.tags.length - 3}</span>}
+                      </div>
+                    )}
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-xs text-gray-500">{formatDate(note.updatedAt)}</span>
                       {note.sourceUrl && <span className="text-xs text-blue-400">Source web</span>}
@@ -376,58 +659,29 @@ const NotesPage = () => {
                           </svg>
                           <span>Annuler</span>
                         </button>
+                        <button
+                          onClick={handleExportNote}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors">
+                          Exporter en MD
+                        </button>
                       </>
                     ) : (
                       <>
                         <button
                           onClick={handleEditMode}
-                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 rounded text-white text-sm transition flex items-center gap-1">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                            />
-                          </svg>
-                          <span>Modifier</span>
+                          className="px-3 py-1 bg-blue-600 hover:bg-blue-700 text-white rounded text-sm transition-colors">
+                          Modifier
+                        </button>
+                        <button
+                          onClick={handleExportNote}
+                          className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors">
+                          Exporter en MD
                         </button>
                         <button
                           onClick={handleDeleteNote}
-                          className="px-3 py-1 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition flex items-center gap-1">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            fill="none"
-                            viewBox="0 0 24 24"
-                            stroke="currentColor">
-                            <path
-                              strokeLinecap="round"
-                              strokeLinejoin="round"
-                              strokeWidth={2}
-                              d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                            />
-                          </svg>
-                          <span>Supprimer</span>
+                          className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">
+                          Supprimer
                         </button>
-
-                        {/* TODO: Emplacement pour un futur bouton d'assistance IA */}
-                        {/* 
-                        <button
-                          onClick={() => {/* Appel futur au service d'IA */
-                        /*}}
-                          className="px-3 py-1 bg-purple-600 hover:bg-purple-700 rounded text-white text-sm transition flex items-center gap-1">
-                          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                          </svg>
-                          <span>Améliorer avec IA</span>
-                        </button>
-                        */}
                       </>
                     )}
                   </div>
@@ -448,10 +702,71 @@ const NotesPage = () => {
                         className="w-full px-3 py-2 bg-gray-700 border border-gray-600 rounded-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
                       />
                     </div>
+
+                    {/* Éditeur de tags */}
+                    <div>
+                      <label htmlFor="tags" className="block text-sm font-medium text-gray-400 mb-1">
+                        Tags
+                      </label>
+                      <div className="flex flex-wrap gap-2 mb-2">
+                        {editedTags.map(tag => (
+                          <div
+                            key={tag}
+                            className="flex items-center bg-gray-700 text-white px-2 py-1 rounded-full text-sm">
+                            #{tag}
+                            <button
+                              onClick={() => handleRemoveTag(tag)}
+                              className="ml-1 text-gray-400 hover:text-white"
+                              aria-label="Supprimer ce tag">
+                              <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                className="h-3.5 w-3.5"
+                                viewBox="0 0 20 20"
+                                fill="currentColor">
+                                <path
+                                  fillRule="evenodd"
+                                  d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z"
+                                  clipRule="evenodd"
+                                />
+                              </svg>
+                            </button>
+                          </div>
+                        ))}
+                      </div>
+                      <div className="flex">
+                        <input
+                          type="text"
+                          id="tags"
+                          value={tagInput}
+                          onChange={e => setTagInput(e.target.value)}
+                          onKeyDown={handleTagInputKeyDown}
+                          placeholder="Ajouter un tag..."
+                          className="flex-1 px-3 py-2 bg-gray-700 border border-gray-600 rounded-l-md text-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        />
+                        <button
+                          onClick={handleAddTag}
+                          disabled={!tagInput.trim()}
+                          className="px-3 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded-r-md text-white">
+                          Ajouter
+                        </button>
+                      </div>
+                      <p className="text-xs text-gray-400 mt-1">Appuyez sur Entrée pour ajouter rapidement un tag</p>
+                    </div>
+
                     {showPreview ? (
                       <div className="flex-1 overflow-auto">
                         <div className="p-4 bg-gray-700 border border-gray-600 rounded-md h-full overflow-y-auto">
                           <h3 className="text-lg font-semibold text-blue-400 mb-2">Aperçu</h3>
+                          {/* Preview des tags */}
+                          {editedTags.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mb-3">
+                              {editedTags.map(tag => (
+                                <span key={tag} className="bg-gray-600 text-blue-300 px-2 py-1 rounded-full text-sm">
+                                  #{tag}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                           <div className="prose prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none">
                             <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
                               {editedContent}
@@ -616,6 +931,18 @@ const NotesPage = () => {
                       <span>Modifié {formatDate(selectedNote.updatedAt)}</span>
                       <span>Créé {formatDate(selectedNote.createdAt)}</span>
                     </div>
+
+                    {/* Affichage des tags en mode lecture */}
+                    {selectedNote.tags && selectedNote.tags.length > 0 && (
+                      <div className="flex flex-wrap gap-2 py-2">
+                        {selectedNote.tags.map(tag => (
+                          <span key={tag} className="bg-gray-700 text-blue-300 px-2 py-1 rounded-full text-sm">
+                            #{tag}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+
                     {selectedNote.sourceUrl && (
                       <div className="py-2 px-3 bg-gray-700 rounded text-sm">
                         <span className="text-gray-400">Source: </span>

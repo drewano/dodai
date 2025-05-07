@@ -5,6 +5,7 @@ import { storageHandler } from './handlers/storage-handler';
 import { mcpService } from './services/mcp-service';
 import { streamingService } from './services/streaming-service';
 import { stateService } from './services/state-service';
+import { contextMenuHandler } from './handlers/context-menu-handler';
 
 // --- Initialisation des écouteurs d'événements ---
 
@@ -24,6 +25,9 @@ function setupEventListeners(): void {
 
   // Initialise le gestionnaire de stockage pour réagir aux changements
   storageHandler.initialize();
+
+  // Initialise les menus contextuels
+  contextMenuHandler.initialize();
 
   // Nettoyage lors de la suspension du service worker
   chrome.runtime.onSuspend?.addListener(() => {
