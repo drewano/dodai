@@ -233,6 +233,8 @@ function parseMarkdownToNote(content: string, filename: string): NoteEntry | nul
       tags,
       createdAt: now,
       updatedAt: now,
+      type: 'note',
+      parentId: null,
     };
   } catch (error) {
     console.error('Erreur lors du parsing du fichier Markdown:', error);

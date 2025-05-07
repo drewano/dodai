@@ -16,10 +16,33 @@ import NoteDetail from './components/NoteDetail';
 
 const NotesPage = () => {
   // Use the hooks to manage state and logic
-  const { notes, allTags, scratchpad, addNote, updateNote, deleteNote, getNote, clearScratchpad } = useNotes();
+  const {
+    notes,
+    allTags,
+    scratchpad,
+    getChildrenOf,
+    addNote,
+    updateNote,
+    deleteNote,
+    getNote,
+    clearScratchpad,
+    createFolder,
+    moveNoteToFolder,
+    moveFolder,
+    createFolderFromNotes,
+  } = useNotes();
 
-  const { activeTag, sortOption, filteredAndSortedNotes, handleTagFilter, clearTagFilter, setSortOption } =
-    useFilterAndSort(notes);
+  const {
+    activeTag,
+    sortOption,
+    currentFolderId,
+    folderPath,
+    filteredAndSortedNotes,
+    handleTagFilter,
+    clearTagFilter,
+    navigateToFolder,
+    setSortOption,
+  } = useFilterAndSort(notes);
 
   const { selectedNote, handleSelectNote, handleCreateNewNote } = useNoteSelection(notes, getNote, addNote);
 
@@ -92,6 +115,20 @@ const NotesPage = () => {
     [setTagInput],
   );
 
+  // Créer un nouveau dossier
+  const handleCreateFolder = useCallback(
+    async (parentId: string | null, title: string) => {
+      try {
+        const folderId = await createFolder(parentId, title);
+        return folderId;
+      } catch (error) {
+        console.error('Erreur lors de la création du dossier', error);
+        return null;
+      }
+    },
+    [createFolder],
+  );
+
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100">
       {/* Header */}
@@ -107,15 +144,23 @@ const NotesPage = () => {
           <NoteList
             notes={filteredAndSortedNotes}
             scratchpad={scratchpad || null}
+            currentFolderId={currentFolderId}
+            folderPath={folderPath}
             selectedNoteId={selectedNote?.id || null}
             sortOption={sortOption}
             onSelectNote={handleSelectNote}
             onCreateNote={handleCreateNewNote}
+            onCreateFolder={handleCreateFolder}
+            onNavigateToFolder={navigateToFolder}
             onClearScratchpad={async () => {
               const result = await clearScratchpad();
               return result || null;
             }}
+            onMoveNoteToFolder={moveNoteToFolder}
+            onMoveFolder={moveFolder}
+            onCreateFolderFromNotes={createFolderFromNotes}
             onSortChange={handleSortChange}
+            getChildrenOf={getChildrenOf}
           />
 
           {/* Note detail */}

@@ -6,5 +6,5 @@ export * from './impl/mcp-config-storage.js';
 export * from './impl/chat-history-storage.js';
 export * from './impl/mcp-loaded-tools-storage.js';
 // Exporter spécifiquement les types et valeurs de notes-storage
-export type { NoteEntry, NotesStorageType } from './impl/notes-storage.js';
+export type { NoteEntry, NotesStorageType, FolderEntry, EntryType } from './impl/notes-storage.js';
 export { notesStorage } from './impl/notes-storage.js';

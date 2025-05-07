@@ -13,10 +13,13 @@ export type SortOption =
 export function useFilterAndSort(notes: NoteEntry[] | null) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [sortOption, setSortOption] = useState<SortOption>('updatedAt_desc');
+  const [currentFolderId, setCurrentFolderId] = useState<string | null>(null);
 
   // Handle tag filtering
   const handleTagFilter = (tag: string) => {
     setActiveTag(activeTag === tag ? null : tag);
+    // Revenir à la racine lors du filtrage par tag
+    setCurrentFolderId(null);
   };
 
   // Clear tag filter
@@ -24,14 +27,47 @@ export function useFilterAndSort(notes: NoteEntry[] | null) {
     setActiveTag(null);
   };
 
+  // Naviguer vers un dossier
+  const navigateToFolder = (folderId: string | null) => {
+    setCurrentFolderId(folderId);
+    // Désactiver le filtre par tag lors de la navigation dans les dossiers
+    setActiveTag(null);
+  };
+
+  // Obtenir le chemin complet du dossier actuel (pour afficher une navigation en fil d'Ariane)
+  const folderPath = useMemo(() => {
+    if (!notes || !currentFolderId) return [];
+
+    const path: NoteEntry[] = [];
+    let currentId = currentFolderId;
+
+    while (currentId) {
+      const folder = notes.find(note => note.id === currentId);
+      if (!folder) break;
+
+      path.unshift(folder);
+      currentId = folder.parentId;
+    }
+
+    return path;
+  }, [notes, currentFolderId]);
+
   // Apply filtering and sorting
   const filteredAndSortedNotes = useMemo(() => {
     if (!notes) return [];
 
-    // Filter by tag if a tag is active
+    // Filtrer d'abord par tag si un tag est actif
     let filteredNotes = notes;
     if (activeTag) {
       filteredNotes = notes.filter(note => note.tags && note.tags.includes(activeTag));
+    }
+    // Sinon filtrer par dossier courant
+    else if (currentFolderId !== null) {
+      filteredNotes = notes.filter(note => note.parentId === currentFolderId);
+    }
+    // Sinon afficher tous les éléments de niveau racine
+    else {
+      filteredNotes = notes.filter(note => note.parentId === null);
     }
 
     // Exclude the scratchpad from the regular notes list
@@ -39,6 +75,11 @@ export function useFilterAndSort(notes: NoteEntry[] | null) {
 
     // Sort the notes according to the selected option
     return [...regularNotes].sort((a, b) => {
+      // Les dossiers d'abord, puis tri selon l'option sélectionnée
+      if (a.type === 'folder' && b.type !== 'folder') return -1;
+      if (a.type !== 'folder' && b.type === 'folder') return 1;
+
+      // Si les deux sont des dossiers ou des notes, utiliser le tri sélectionné
       switch (sortOption) {
         case 'updatedAt_desc':
           return b.updatedAt - a.updatedAt;
@@ -56,14 +97,17 @@ export function useFilterAndSort(notes: NoteEntry[] | null) {
           return b.updatedAt - a.updatedAt;
       }
     });
-  }, [notes, activeTag, sortOption]);
+  }, [notes, activeTag, sortOption, currentFolderId]);
 
   return {
     activeTag,
     sortOption,
+    currentFolderId,
+    folderPath,
     filteredAndSortedNotes,
     handleTagFilter,
     clearTagFilter,
+    navigateToFolder,
     setSortOption,
   };
 }

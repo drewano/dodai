@@ -25,12 +25,48 @@ export function useNotes() {
     return notes.find(note => note.id === SCRATCHPAD_ID);
   }, [notes]);
 
+  // Récupère toutes les notes racine (sans parentId)
+  const rootEntries = useMemo(() => {
+    if (!notes) return [];
+    return notes
+      .filter(note => note.id !== SCRATCHPAD_ID && note.parentId === null)
+      .sort((a, b) => {
+        // Les dossiers d'abord, puis tri par orderIndex ou par date de mise à jour
+        if (a.type === 'folder' && b.type !== 'folder') return -1;
+        if (a.type !== 'folder' && b.type === 'folder') return 1;
+
+        if (a.orderIndex !== undefined && b.orderIndex !== undefined) {
+          return a.orderIndex - b.orderIndex;
+        }
+
+        return b.updatedAt - a.updatedAt;
+      });
+  }, [notes]);
+
+  // Récupère les enfants d'un dossier
+  const getChildrenOf = (folderId: string) => {
+    if (!notes) return [];
+    return notes
+      .filter(note => note.parentId === folderId)
+      .sort((a, b) => {
+        // Les dossiers d'abord, puis tri par orderIndex ou par date de mise à jour
+        if (a.type === 'folder' && b.type !== 'folder') return -1;
+        if (a.type !== 'folder' && b.type === 'folder') return 1;
+
+        if (a.orderIndex !== undefined && b.orderIndex !== undefined) {
+          return a.orderIndex - b.orderIndex;
+        }
+
+        return b.updatedAt - a.updatedAt;
+      });
+  };
+
   // Core CRUD operations wrapped from storage
-  const addNote = async (noteData: Omit<NoteEntry, 'createdAt' | 'updatedAt'>) => {
+  const addNote = async (noteData: Omit<NoteEntry, 'createdAt' | 'updatedAt' | 'type'>) => {
     return await notesStorage.addNote(noteData);
   };
 
-  const updateNote = async (id: string, updates: Partial<Omit<NoteEntry, 'id'>>) => {
+  const updateNote = async (id: string, updates: Partial<Omit<NoteEntry, 'id' | 'type'>>) => {
     await notesStorage.updateNote(id, updates);
   };
 
@@ -40,6 +76,27 @@ export function useNotes() {
 
   const getNote = async (id: string) => {
     return await notesStorage.getNote(id);
+  };
+
+  // Fonctions pour la gestion des dossiers
+  const createFolder = async (parentId: string | null, title: string) => {
+    return await notesStorage.createFolder(parentId, title);
+  };
+
+  const moveNoteToFolder = async (noteId: string, targetFolderId: string | null) => {
+    await notesStorage.moveNoteToFolder(noteId, targetFolderId);
+  };
+
+  const moveFolder = async (folderId: string, targetFolderId: string | null) => {
+    await notesStorage.moveFolder(folderId, targetFolderId);
+  };
+
+  const getNotesInFolder = async (folderId: string | null) => {
+    return await notesStorage.getNotesInFolder(folderId);
+  };
+
+  const reorderNote = async (noteId: string, newOrderIndex: number) => {
+    await notesStorage.reorderNote(noteId, newOrderIndex);
   };
 
   const clearScratchpad = async () => {
@@ -53,14 +110,35 @@ export function useNotes() {
     return null;
   };
 
+  // Créer un nouveau dossier à partir de deux notes
+  const createFolderFromNotes = async (noteAId: string, noteBId: string, folderTitle: string) => {
+    // Créer un nouveau dossier
+    const folderId = await createFolder(null, folderTitle);
+
+    // Déplacer les deux notes dans ce dossier
+    await moveNoteToFolder(noteAId, folderId);
+    await moveNoteToFolder(noteBId, folderId);
+
+    return folderId;
+  };
+
   return {
     notes,
     allTags,
     scratchpad,
+    rootEntries,
+    getChildrenOf,
     addNote,
     updateNote,
     deleteNote,
     getNote,
     clearScratchpad,
+    // Fonctions de gestion des dossiers
+    createFolder,
+    moveNoteToFolder,
+    moveFolder,
+    getNotesInFolder,
+    reorderNote,
+    createFolderFromNotes,
   };
 }
