@@ -6,6 +6,14 @@ export interface Message {
   isStreaming?: boolean;
   isTemporary?: boolean;
   reasoning?: string | null;
+  sourceDocuments?: RagSourceDocument[];
+}
+
+export interface RagSourceDocument {
+  id: string;
+  title: string;
+  contentSnippet: string;
+  sourceUrl?: string;
 }
 
 export interface StreamingState {

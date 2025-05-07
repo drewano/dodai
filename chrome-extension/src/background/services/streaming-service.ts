@@ -36,7 +36,7 @@ export class StreamingService {
    * @param port Le port de connexion à gérer
    */
   handleStreamingConnection(port: chrome.runtime.Port): void {
-    if (port.name.startsWith('ai_streaming_')) {
+    if (port.name.startsWith('ai_streaming_') || port.name.startsWith('rag_streaming_')) {
       const portId = port.name;
       logger.debug(`Nouvelle connexion de streaming établie: ${portId}`);
 

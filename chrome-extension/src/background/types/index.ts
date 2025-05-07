@@ -90,6 +90,9 @@ export enum MessageType {
 
   // Nouveau type de message pour prompt personnalisé
   CUSTOM_PAGE_PROMPT_REQUEST = 'CUSTOM_PAGE_PROMPT_REQUEST',
+
+  // Message type for RAG chat
+  RAG_CHAT_REQUEST = 'RAG_CHAT_REQUEST',
 }
 
 /**
@@ -244,3 +247,40 @@ export function convertChatHistory(chatHistory: ChatHistoryMessage[] = []): Base
 
 // Exporte les types depuis LangChain pour éviter les imports multiples
 export type { BaseMessage, StructuredToolInterface, Connection, AgentExecutor, ChatOllama };
+
+// --- RAG Chat Types ---
+export interface RagSourceDocument {
+  id: string;
+  title: string;
+  contentSnippet: string; // A small snippet of the source note
+  sourceUrl?: string;
+}
+
+export interface RagChatRequestMessage extends BaseRuntimeMessage {
+  type: MessageType.RAG_CHAT_REQUEST;
+  payload: {
+    message: string;
+    chatHistory?: ChatHistoryMessage[];
+    streamHandler?: boolean;
+    portId?: string;
+  };
+}
+
+// This will be used by the streaming service, similar to existing chat
+// The actual content of the stream might differ (e.g. include source docs at the end)
+export interface RagChatStreamResponse {
+  type: StreamEventType;
+  chunk?: string; // For STREAM_CHUNK
+  sourceDocuments?: RagSourceDocument[]; // Optionally sent with STREAM_END or as a separate event
+  success?: boolean; // For STREAM_END
+  error?: string; // For STREAM_ERROR
+}
+
+// For non-streaming or as a final consolidated response
+export interface RagChatResponse {
+  success: boolean;
+  data?: string; // The AI's answer
+  sourceDocuments?: RagSourceDocument[];
+  streaming?: boolean; // True if streaming was initiated
+  error?: string;
+}

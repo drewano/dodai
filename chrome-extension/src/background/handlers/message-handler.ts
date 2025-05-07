@@ -15,12 +15,15 @@ import type {
   ListKeyPointsResponse,
   CustomPagePromptMessage,
   CustomPagePromptResponse,
+  RagChatRequestMessage,
+  RagChatResponse,
 } from '../types';
 import { convertChatHistory, MessageType } from '../types';
 import { stateService } from '../services/state-service';
 import { agentService } from '../services/agent-service';
 import { mcpService } from '../services/mcp-service';
 import { streamingService } from '../services/streaming-service';
+import { ragService } from '../services/rag-service';
 import { mcpLoadedToolsStorage, notesStorage } from '@extension/storage';
 
 // Désactiver la vérification des variables non utilisées qui commencent par '_'
@@ -56,6 +59,8 @@ export class MessageHandler {
       this.handleListKeyPoints(message as ListKeyPointsMessage),
     [MessageType.CUSTOM_PAGE_PROMPT_REQUEST]: (message: BaseRuntimeMessage) =>
       this.handleCustomPagePrompt(message as CustomPagePromptMessage),
+    [MessageType.RAG_CHAT_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleRagChatRequest(message as RagChatRequestMessage),
   };
 
   /**
@@ -180,6 +185,7 @@ export class MessageHandler {
         content: summary,
         sourceUrl: pageUrl,
         tags: tags,
+        parentId: null,
       });
 
       return {
@@ -246,6 +252,7 @@ export class MessageHandler {
         content: keyPoints,
         sourceUrl: pageUrl,
         tags: tags,
+        parentId: null,
       });
 
       return {
@@ -602,6 +609,7 @@ export class MessageHandler {
         content: noteContent,
         sourceUrl: pageUrl,
         tags: tags,
+        parentId: null,
       });
 
       return {
@@ -614,6 +622,64 @@ export class MessageHandler {
         success: false,
         error: error instanceof Error ? error.message : "Une erreur s'est produite lors du traitement du prompt.",
       };
+    }
+  }
+
+  /**
+   * Gestionnaire pour les requêtes de chat RAG avec les notes de l'utilisateur
+   */
+  private async handleRagChatRequest(message: RagChatRequestMessage): Promise<RagChatResponse> {
+    logger.debug('Reçu RAG_CHAT_REQUEST', message.payload);
+    const { message: userInput, chatHistory = [], streamHandler = false, portId } = message.payload;
+
+    if (streamHandler && portId) {
+      logger.debug(`[Message Handler] Mode streaming RAG demandé avec portId: ${portId}`);
+      const streamingPortInfo = stateService.getStreamingPort(portId);
+
+      if (!streamingPortInfo || !streamingPortInfo.port) {
+        logger.error(`[Message Handler] Port de streaming RAG non trouvé pour portId: ${portId}`);
+        return {
+          success: false,
+          error: `Port de streaming ${portId} non trouvé ou invalide.`,
+          streaming: true,
+        };
+      }
+
+      // Lancer le streaming RAG en asynchrone
+      // ragService.processRagStreamRequest gère lui-même l'envoi des messages sur le port.
+      ragService.processRagStreamRequest(userInput, chatHistory, streamingPortInfo.port).catch(error => {
+        logger.error('[Message Handler] Erreur lors du lancement du streaming RAG:', error);
+        // Essayer de notifier l'erreur via le port s'il existe encore
+        try {
+          streamingPortInfo.port.postMessage({
+            type: 'STREAM_ERROR', // Consistent with StreamEventType but might need to align with RagChatStreamResponse
+            error: error instanceof Error ? error.message : 'Erreur lors du lancement du streaming RAG',
+          });
+          streamingPortInfo.port.postMessage({ type: 'STREAM_END', success: false });
+        } catch (portError) {
+          logger.warn("[Message Handler] Impossible d'envoyer l'erreur RAG sur le port:", portError);
+        }
+      });
+
+      return { success: true, streaming: true };
+    } else {
+      // Mode non-streaming pour RAG (fallback ou test)
+      logger.debug('[Message Handler] Mode non-streaming RAG demandé.');
+      try {
+        const result = await ragService.invokeRagChain(userInput, chatHistory);
+        return {
+          success: !result.error,
+          data: result.answer,
+          sourceDocuments: result.sources,
+          error: result.error,
+        };
+      } catch (error) {
+        logger.error("[Message Handler] Erreur lors de l'appel non-stream RAG:", error);
+        return {
+          success: false,
+          error: error instanceof Error ? error.message : 'Erreur inconnue lors du RAG non-streaming.',
+        };
+      }
     }
   }
 }

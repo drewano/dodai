@@ -6,6 +6,7 @@ import { mcpService } from './services/mcp-service';
 import { streamingService } from './services/streaming-service';
 import { stateService } from './services/state-service';
 import { contextMenuHandler } from './handlers/context-menu-handler';
+import { ragService } from './services/rag-service';
 
 // --- Initialisation des écouteurs d'événements ---
 
@@ -54,7 +55,16 @@ async function initialize(): Promise<void> {
     const success = await mcpService.initializeOrReinitializeMcpClient();
     logger.info(`Initialisation initiale MCP ${success ? 'réussie' : 'échouée'}.`);
   } catch (error) {
-    logger.error("Erreur lors de l'initialisation:", error);
+    logger.error("Erreur lors de l'initialisation MCP:", error);
+  }
+
+  // Initialiser le VectorStore pour RAG Service
+  try {
+    logger.info('Initialisation du RAG Service Vector Store...');
+    await ragService.initializeVectorStore();
+    logger.info('RAG Service Vector Store initialisé.');
+  } catch (error) {
+    logger.error("Erreur lors de l'initialisation du RAG Service Vector Store:", error);
   }
 }
 

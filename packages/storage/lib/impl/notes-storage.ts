@@ -45,6 +45,7 @@ export type NotesStorageType = BaseStorage<NoteEntry[]> & {
   moveFolder: (folderId: string, targetFolderId: string | null) => Promise<void>;
   getNotesInFolder: (folderId: string | null) => Promise<NoteEntry[]>;
   reorderNote: (noteId: string, newOrderIndex: number) => Promise<void>;
+  onChange?: (callback: (newValue: NoteEntry[], oldValue?: NoteEntry[]) => void) => void;
 };
 
 // Création du stockage de base

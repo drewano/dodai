@@ -3,19 +3,21 @@ import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
+import remarkMath from 'remark-math';
 
 interface MarkdownRendererProps {
   content: string;
+  className?: string;
 }
 
 /**
  * Composant pour le rendu Markdown avec styles personnalisés
  */
-export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content }) => {
+export const MarkdownRenderer: React.FC<MarkdownRendererProps> = ({ content, className }) => {
   return (
-    <div className="markdown-content text-sm leading-tight">
+    <div className={`markdown-content text-sm leading-tight ${className || ''}`}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkMath]}
         rehypePlugins={[rehypeRaw, rehypeSanitize]}
         components={{
           // Style pour les paragraphes
