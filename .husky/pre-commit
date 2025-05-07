@@ -1,3 +1,4 @@
-export NODE_OPTIONS="--max-old-space-size=8192" 
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh" # Ligne standard de Husky
 
-pnpm dlx lint-staged --allow-empty
+pnpm dlx lint-staged --allow-empty # La commande importante !
