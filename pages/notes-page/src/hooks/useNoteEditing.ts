@@ -1,0 +1,113 @@
+import { useState, useEffect, useRef } from 'react';
+import type { NoteEntry } from '@extension/storage';
+
+export function useNoteEditing(
+  selectedNote: NoteEntry | null,
+  updateNote: (id: string, updates: Partial<Omit<NoteEntry, 'id'>>) => Promise<void>,
+) {
+  const [editedTitle, setEditedTitle] = useState<string>('');
+  const [editedContent, setEditedContent] = useState<string>('');
+  const [editedTags, setEditedTags] = useState<string[]>([]);
+  const [tagInput, setTagInput] = useState<string>('');
+  const [isEditing, setIsEditing] = useState<boolean>(false);
+  const [showPreview, setShowPreview] = useState<boolean>(false);
+
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+
+  // Update form when selected note changes
+  useEffect(() => {
+    if (selectedNote) {
+      setEditedTitle(selectedNote.title);
+      setEditedContent(selectedNote.content);
+      setEditedTags(selectedNote.tags || []);
+    } else {
+      setEditedTitle('');
+      setEditedContent('');
+      setEditedTags([]);
+      setIsEditing(false);
+    }
+  }, [selectedNote]);
+
+  // Enter edit mode
+  const handleEditMode = () => {
+    setIsEditing(true);
+    setShowPreview(false);
+  };
+
+  // Save changes to note
+  const handleSaveChanges = async () => {
+    if (
+      selectedNote &&
+      (editedTitle !== selectedNote.title ||
+        editedContent !== selectedNote.content ||
+        !arraysEqual(editedTags, selectedNote.tags || []))
+    ) {
+      await updateNote(selectedNote.id, {
+        title: editedTitle,
+        content: editedContent,
+        tags: editedTags,
+      });
+    }
+    setIsEditing(false);
+  };
+
+  // Cancel editing
+  const handleCancelEdit = () => {
+    if (selectedNote) {
+      setEditedTitle(selectedNote.title);
+      setEditedContent(selectedNote.content);
+      setEditedTags(selectedNote.tags || []);
+    }
+    setIsEditing(false);
+  };
+
+  // Tag management
+  const handleAddTag = () => {
+    const trimmedTag = tagInput.trim();
+    if (trimmedTag && !editedTags.includes(trimmedTag)) {
+      setEditedTags([...editedTags, trimmedTag]);
+      setTagInput('');
+    }
+  };
+
+  const handleRemoveTag = (tagToRemove: string) => {
+    setEditedTags(editedTags.filter(tag => tag !== tagToRemove));
+  };
+
+  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && tagInput.trim()) {
+      e.preventDefault();
+      handleAddTag();
+    }
+  };
+
+  // Utility to compare arrays
+  const arraysEqual = (a: string[], b: string[]) => {
+    if (a.length !== b.length) return false;
+    const sortedA = [...a].sort();
+    const sortedB = [...b].sort();
+    return sortedA.every((val, idx) => val === sortedB[idx]);
+  };
+
+  return {
+    editedTitle,
+    editedContent,
+    editedTags,
+    tagInput,
+    isEditing,
+    showPreview,
+    textareaRef,
+    setEditedTitle,
+    setEditedContent,
+    setEditedTags,
+    setTagInput,
+    setIsEditing,
+    setShowPreview,
+    handleEditMode,
+    handleSaveChanges,
+    handleCancelEdit,
+    handleAddTag,
+    handleRemoveTag,
+    handleTagInputKeyDown,
+  };
+}
