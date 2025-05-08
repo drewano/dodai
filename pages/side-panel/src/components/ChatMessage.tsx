@@ -23,6 +23,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showReasoning
   const [isSaving, setIsSaving] = useState(false);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
+  // Libellé pour l'affichage du modèle
+  const assistantLabel = isAssistant && message.model ? `Assistant (${message.model})` : 'Assistant';
+
   const containerClasses = `flex ${isUser ? 'justify-end' : 'justify-start'}`;
   const bubbleClasses = `max-w-[85%] p-3 rounded-lg shadow-md text-sm ${isUser ? 'bg-blue-600 text-white' : isSystem ? 'bg-yellow-700 text-yellow-100' : 'bg-gray-700 text-gray-200'}`;
 
@@ -118,7 +121,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showReasoning
                     strokeLinejoin="round"
                   />
                 </svg>
-                Assistant
+                {assistantLabel}
               </>
             )}
           </div>

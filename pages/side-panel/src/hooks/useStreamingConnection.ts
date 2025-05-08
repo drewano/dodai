@@ -122,7 +122,7 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
 
   // Gère la fin du streaming
   const handleStreamEnd = useCallback(
-    (success: boolean, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
+    (success: boolean, model: string | undefined, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
       if (success) {
         // Finaliser le message en streaming
         setMessages(prev => {
@@ -157,6 +157,7 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
               content: finalContent,
               isStreaming: false,
               reasoning: finalReasoning,
+              model: model,
             };
           }
 
@@ -183,10 +184,21 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
   // Configure les écouteurs de port
   const setupPortListeners = useCallback(
     (port: chrome.runtime.Port, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
+      // Variable pour stocker le modèle utilisé pour cette session de streaming
+      let currentModel: string | undefined;
+
       port.onMessage.addListener(message => {
+        // Déclarer la variable modelName en dehors du bloc case
+        let modelName: string | undefined;
+
         switch (message.type) {
           case StreamEventType.STREAM_START:
             console.log('[SidePanel] Début du streaming');
+            // Stocker le nom du modèle s'il est fourni
+            if (message.model) {
+              currentModel = message.model;
+              console.log(`[SidePanel] Modèle utilisé: ${currentModel}`);
+            }
             break;
 
           case StreamEventType.STREAM_CHUNK:
@@ -195,7 +207,9 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
 
           case StreamEventType.STREAM_END:
             console.log('[SidePanel] Fin du streaming, success:', message.success);
-            handleStreamEnd(message.success, setMessages);
+            // Utiliser le modèle du message de fin ou celui stocké depuis le début
+            modelName = message.model || currentModel;
+            handleStreamEnd(message.success, modelName, setMessages);
             break;
 
           case StreamEventType.STREAM_ERROR:

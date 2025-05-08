@@ -8,6 +8,7 @@ export interface ChatMessage {
   reasoning?: string | null;
   isStreaming?: boolean;
   timestamp?: number;
+  model?: string;
 }
 
 // Définition de la structure d'une conversation

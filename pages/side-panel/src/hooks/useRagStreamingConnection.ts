@@ -131,6 +131,7 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
     (
       success: boolean,
       sourceDocuments: RagSourceDocument[] | undefined,
+      model: string | undefined,
       setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
     ) => {
       // Finaliser le message en streaming et s'assurer qu'aucun raisonnement n'est laissé dans le contenu
@@ -166,6 +167,7 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
             reasoning: finalReasoning,
             isStreaming: false,
             sourceDocuments,
+            model,
           };
         }
 
@@ -185,6 +187,9 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
 
   const setupPortListeners = useCallback(
     (port: chrome.runtime.Port, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
+      // Variable pour stocker le modèle utilisé pour cette session de streaming
+      let currentModel: string | undefined;
+
       port.onMessage.addListener(message => {
         // Ensure message structure aligns with RagChatStreamResponse
         const event = message as {
@@ -193,24 +198,41 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
           sourceDocuments?: RagSourceDocument[];
           success?: boolean;
           error?: string;
+          model?: string;
         };
 
+        // Variable pour le modèle, déclarée en dehors du switch
+        let modelName: string | undefined;
+
         switch (event.type) {
+          case StreamEventType.STREAM_START:
+            // Stocker le modèle s'il est fourni
+            if (event.model) {
+              currentModel = event.model;
+              console.log(`[RAG SidePanel] Modèle utilisé: ${currentModel}`);
+            }
+            break;
+
           case StreamEventType.STREAM_CHUNK:
             if (event.chunk) {
               handleStreamChunk(event.chunk, setMessages);
             }
             break;
+
           case StreamEventType.STREAM_END:
-            handleStreamEndEvent(event.success ?? false, event.sourceDocuments, setMessages);
+            // Utiliser le modèle du message de fin ou celui stocké depuis le début
+            modelName = event.model || currentModel;
+            handleStreamEndEvent(event.success ?? false, event.sourceDocuments, modelName, setMessages);
             break;
+
           case StreamEventType.STREAM_ERROR:
             if (event.error) {
               onStreamError(event.error);
             }
             // End stream on error as well
-            handleStreamEndEvent(false, undefined, setMessages);
+            handleStreamEndEvent(false, undefined, currentModel, setMessages);
             break;
+
           default:
             console.log('[RAG SidePanel] Message de streaming RAG inconnu:', event);
         }

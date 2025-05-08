@@ -184,9 +184,13 @@ export class RagService {
       }
 
       // Si un modèle est spécifié dans la requête, l'utiliser
+      const modelToUse = selectedModel || (await aiAgentStorage.get()).selectedModel;
       const llm = selectedModel
         ? await agentService.createLLMInstance(selectedModel)
         : await agentService.createLLMInstance();
+
+      // Notifier le début du streaming avec le nom du modèle
+      port.postMessage({ type: StreamEventType.STREAM_START, model: modelToUse });
 
       const ragChain = await this.getRagChain(llm);
       const langchainHistory = convertChatHistory(chatHistory);
@@ -229,7 +233,12 @@ export class RagService {
           }));
         }
       }
-      port.postMessage({ type: StreamEventType.STREAM_END, success: true, sourceDocuments: retrievedSourceDocuments });
+      port.postMessage({
+        type: StreamEventType.STREAM_END,
+        success: true,
+        sourceDocuments: retrievedSourceDocuments,
+        model: modelToUse,
+      });
       logger.debug('[RAG Service] RAG stream ended.');
     } catch (error) {
       logger.error('[RAG Service] Error processing RAG stream request:', error);

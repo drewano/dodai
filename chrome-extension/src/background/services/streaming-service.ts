@@ -3,6 +3,7 @@ import { StreamEventType } from '../types';
 import { logger } from '../logger';
 import { stateService } from './state-service';
 import { agentService } from './agent-service';
+import { aiAgentStorage } from '@extension/storage';
 
 /**
  * Interface pour représenter un chunk de streaming de l'agent
@@ -150,8 +151,12 @@ export class StreamingService {
         return;
       }
 
-      // Notifier le début du streaming
-      port.postMessage({ type: StreamEventType.STREAM_START });
+      // Récupérer les paramètres de l'agent
+      const settings = await aiAgentStorage.get();
+      const modelName = settings.selectedModel;
+
+      // Notifier le début du streaming avec le nom du modèle
+      port.postMessage({ type: StreamEventType.STREAM_START, model: modelName });
 
       // Récupérer l'instance LLM
       const llm = await agentService.createLLMInstance();
@@ -218,8 +223,8 @@ export class StreamingService {
         }
       }
 
-      // Notifier la fin du streaming
-      port.postMessage({ type: StreamEventType.STREAM_END, success: true });
+      // Notifier la fin du streaming avec le nom du modèle
+      port.postMessage({ type: StreamEventType.STREAM_END, success: true, model: modelName });
     } catch (error: unknown) {
       const errorMessage = error instanceof Error ? error.message : 'Erreur inconnue pendant le streaming';
       logger.error('Erreur pendant le streaming:', error);

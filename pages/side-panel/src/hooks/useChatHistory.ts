@@ -72,6 +72,7 @@ export function useChatHistory() {
           role: msg.role,
           content: msg.content,
           reasoning: msg.reasoning || undefined,
+          model: msg.model,
           isStreaming: false,
         }));
 
@@ -135,6 +136,7 @@ export function useChatHistory() {
             role: msg.role,
             content: msg.content,
             reasoning: msg.reasoning || null,
+            model: msg.model,
             timestamp: Date.now(),
           }));
 
@@ -159,6 +161,7 @@ export function useChatHistory() {
             role: message.role,
             content: message.content,
             reasoning: message.reasoning || null,
+            model: message.model,
             timestamp: Date.now(),
           };
 

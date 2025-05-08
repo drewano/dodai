@@ -5,6 +5,7 @@ export interface Message {
   isTemporary?: boolean;
   reasoning?: string | null;
   sourceDocuments?: RagSourceDocument[];
+  model?: string;
 }
 
 export interface RagSourceDocument {

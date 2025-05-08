@@ -292,6 +292,7 @@ export interface RagChatStreamResponse {
   sourceDocuments?: RagSourceDocument[]; // Optionally sent with STREAM_END or as a separate event
   success?: boolean; // For STREAM_END
   error?: string; // For STREAM_ERROR
+  model?: string; // Nom du modèle qui a généré la réponse
 }
 
 // For non-streaming or as a final consolidated response
@@ -301,4 +302,5 @@ export interface RagChatResponse {
   sourceDocuments?: RagSourceDocument[];
   streaming?: boolean; // True if streaming was initiated
   error?: string;
+  model?: string; // Nom du modèle qui a généré la réponse
 }
