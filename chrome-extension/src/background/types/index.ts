@@ -93,6 +93,9 @@ export enum MessageType {
 
   // Message type for RAG chat
   RAG_CHAT_REQUEST = 'RAG_CHAT_REQUEST',
+
+  // Nouveau type de message pour sauvegarder un message comme note
+  SAVE_MESSAGE_AS_NOTE = 'SAVE_MESSAGE_AS_NOTE',
 }
 
 /**
@@ -236,6 +239,20 @@ export interface McpConnectionStatusResponse {
 // Message pour notifier un changement de configuration MCP
 export interface McpConfigChangedMessage extends BaseRuntimeMessage {
   type: MessageType.MCP_CONFIG_CHANGED;
+}
+
+// Message pour sauvegarder un message comme note
+export interface SaveMessageAsNoteMessage extends BaseRuntimeMessage {
+  type: MessageType.SAVE_MESSAGE_AS_NOTE;
+  content: string;
+  sourceUrl?: string;
+}
+
+// Réponse pour la sauvegarde d'un message comme note
+export interface SaveMessageAsNoteResponse {
+  success: boolean;
+  noteId?: string;
+  error?: string;
 }
 
 /**

@@ -17,6 +17,8 @@ import type {
   CustomPagePromptResponse,
   RagChatRequestMessage,
   RagChatResponse,
+  SaveMessageAsNoteMessage,
+  SaveMessageAsNoteResponse,
 } from '../types';
 import { convertChatHistory, MessageType } from '../types';
 import { stateService } from '../services/state-service';
@@ -61,6 +63,8 @@ export class MessageHandler {
       this.handleCustomPagePrompt(message as CustomPagePromptMessage),
     [MessageType.RAG_CHAT_REQUEST]: (message: BaseRuntimeMessage) =>
       this.handleRagChatRequest(message as RagChatRequestMessage),
+    [MessageType.SAVE_MESSAGE_AS_NOTE]: (message: BaseRuntimeMessage) =>
+      this.handleSaveMessageAsNote(message as SaveMessageAsNoteMessage),
   };
 
   /**
@@ -680,6 +684,61 @@ export class MessageHandler {
           error: error instanceof Error ? error.message : 'Erreur inconnue lors du RAG non-streaming.',
         };
       }
+    }
+  }
+
+  /**
+   * Gestionnaire pour sauvegarder un message comme note
+   */
+  private async handleSaveMessageAsNote(message: SaveMessageAsNoteMessage): Promise<SaveMessageAsNoteResponse> {
+    try {
+      logger.debug('Traitement de la requête de sauvegarde de message comme note');
+
+      if (!message.content || message.content.trim() === '') {
+        return {
+          success: false,
+          error: 'Le contenu du message ne peut pas être vide.',
+        };
+      }
+
+      // Générer un titre basé sur le contenu du message
+      const maxTitleLength = 50;
+      let title = message.content.trim().split('\n')[0]; // Première ligne du message
+
+      // Tronquer le titre si nécessaire
+      if (title.length > maxTitleLength) {
+        title = title.substring(0, maxTitleLength) + '...';
+      }
+
+      // Générer des tags à partir du contenu si possible
+      let tags: string[] = [];
+      try {
+        tags = await this.generateTagsWithAI(message.content, title, message.sourceUrl);
+      } catch (error) {
+        logger.warn('Échec de la génération des tags pour la note:', error);
+        // Continuer sans tags si la génération échoue
+      }
+
+      // Sauvegarder le message comme note
+      const noteId = await notesStorage.addNote({
+        id: Date.now().toString(36) + Math.random().toString(36).substring(2, 9),
+        title: `Réponse: ${title}`,
+        content: message.content,
+        sourceUrl: message.sourceUrl,
+        tags,
+        parentId: null,
+      });
+
+      return {
+        success: true,
+        noteId,
+      };
+    } catch (error) {
+      logger.error('Erreur lors de la sauvegarde du message comme note:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Une erreur s'est produite lors de la sauvegarde de la note.",
+      };
     }
   }
 }
