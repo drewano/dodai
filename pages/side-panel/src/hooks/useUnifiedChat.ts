@@ -78,27 +78,22 @@ export function useUnifiedChat({ isReady, selectedModel, activeConversationId }:
   );
 
   // Callbacks pour le streaming RAG
-  const handleRagStreamEnd = useCallback((success: boolean, sourceDocs?: RagSourceDocument[]) => {
-    console.log('[UnifiedChat] Stream ended (RAG).', { success, sourceDocs });
-    if (sourceDocs && sourceDocs.length > 0) {
-      // Mise à jour des sources uniquement pour le dernier message assistant
-      setMessages(prev => {
-        // Trouver l'index du dernier message de l'assistant
-        const lastAssistantIndex = [...prev].reverse().findIndex(m => m.role === 'assistant');
-        if (lastAssistantIndex !== -1) {
-          // Convertir l'index inversé en index réel
-          const actualIndex = prev.length - 1 - lastAssistantIndex;
-          const newMessages = [...prev];
-          newMessages[actualIndex] = {
-            ...newMessages[actualIndex],
-            sourceDocuments: sourceDocs,
-          };
-          return newMessages;
-        }
-        return prev;
-      });
-    }
-  }, []);
+  const handleRagStreamEnd = useCallback(
+    (success: boolean, sourceDocs?: RagSourceDocument[]) => {
+      console.log('[UnifiedChat] Stream ended (RAG).', { success, sourceDocs });
+      // Les sources sont désormais gérées directement dans useRagStreamingConnection
+      // Nous n'avons plus besoin de les ajouter ici pour éviter les doublons
+
+      // Sauvegarde de la conversation si nécessaire
+      if (activeConversationId && success) {
+        console.log('[UnifiedChat] Sauvegarde des messages à la fin du streaming RAG:', messagesRef.current);
+        saveCurrentMessages(messagesRef.current).catch(error => {
+          console.error('[UnifiedChat] Erreur lors de la sauvegarde des messages RAG:', error);
+        });
+      }
+    },
+    [saveCurrentMessages, activeConversationId],
+  );
 
   const handleRagStreamError = useCallback(
     (error: string) => {

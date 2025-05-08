@@ -25,6 +25,16 @@ Use the following pieces of retrieved context from their notes to answer the que
 If you don't know the answer from the provided context, or if the context is empty, just say that you don't have information on this topic in your notes.
 Keep the answer concise and directly relevant to the notes.
 
+When formulating your response, first analyze the question and the context inside <think></think> tags.
+These thinking tags will not be shown to the user directly but can be made visible if the user chooses to see your reasoning.
+
+Here's an example:
+<think>
+Let me analyze the user's question and the available context...
+Looking at the context, I can see information about...
+The relevant points for this question are...
+</think>
+
 Context:
 {context}
 

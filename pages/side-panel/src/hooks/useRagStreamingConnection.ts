@@ -1,6 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import type { Message, RagSourceDocument } from '../types'; // Assuming Message and RagSourceDocument are in side-panel/src/types
 import { StreamEventType, MessageType } from '../../../../chrome-extension/src/background/types';
+import { useMarkdownProcessing } from './useMarkdownProcessing';
 
 interface UseRagStreamingConnectionOptions {
   onStreamEnd: (success: boolean, sourceDocuments?: RagSourceDocument[]) => void;
@@ -11,6 +12,12 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
   const [isLoading, setIsLoading] = useState(false);
   const streamingPort = useRef<chrome.runtime.Port | null>(null);
   const streamingPortId = useRef<string | null>(null);
+  const { extractReasoning } = useMarkdownProcessing();
+
+  // État pour suivre le mode de streaming actuel
+  const isInThinkMode = useRef<boolean>(false);
+  const thinkContentBuffer = useRef<string>('');
+  const thinkDepth = useRef<number>(0);
 
   const cleanupStreamingConnection = useCallback(() => {
     if (streamingPort.current) {
@@ -61,23 +68,63 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
         }
       }
 
+      // Traiter le chunk pour séparer contenu et raisonnement
+      let visibleContent = '';
+      let reasoningContent = '';
+
+      // Extraire les blocs de raisonnement et le contenu propre
+      const extracted = extractReasoning(cleanedChunk);
+      visibleContent = extracted.cleanContent || '';
+      reasoningContent = extracted.reasoning || '';
+
+      // Loguer les résultats de l'extraction pour débogage
+      console.log(
+        '[RAG SidePanel] Séparation - Content:',
+        visibleContent.substring(0, 50) + (visibleContent.length > 50 ? '...' : ''),
+      );
+      console.log(
+        '[RAG SidePanel] Séparation - Reasoning:',
+        reasoningContent?.substring(0, 50) + (reasoningContent?.length > 50 ? '...' : '') || 'aucun',
+      );
+
       setMessages(prev => {
         const newMessages = [...prev];
         const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
         if (streamingMessageIndex !== -1) {
+          const currentMessage = newMessages[streamingMessageIndex];
+
+          // Ajouter le nouveau contenu visible au contenu existant
+          const updatedContent = currentMessage.content + visibleContent;
+
+          // Mettre à jour le raisonnement si nécessaire
+          let updatedReasoning = currentMessage.reasoning || '';
+          if (reasoningContent) {
+            if (updatedReasoning) {
+              updatedReasoning += '\n' + reasoningContent;
+            } else {
+              updatedReasoning = reasoningContent;
+            }
+          }
+
           newMessages[streamingMessageIndex] = {
-            ...newMessages[streamingMessageIndex],
-            content: newMessages[streamingMessageIndex].content + cleanedChunk,
+            ...currentMessage,
+            content: updatedContent,
+            reasoning: updatedReasoning,
             isStreaming: true,
           };
         } else {
           // Should ideally not happen if a streaming message placeholder was added
-          newMessages.push({ role: 'assistant', content: cleanedChunk, isStreaming: true });
+          newMessages.push({
+            role: 'assistant',
+            content: visibleContent,
+            reasoning: reasoningContent || null,
+            isStreaming: true,
+          });
         }
         return newMessages;
       });
     },
-    [],
+    [extractReasoning],
   );
 
   const handleStreamEndEvent = useCallback(
@@ -86,13 +133,54 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
       sourceDocuments: RagSourceDocument[] | undefined,
       setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
     ) => {
-      // Seulement marquer les messages comme n'étant plus en streaming
-      setMessages(prev => prev.map(m => (m.isStreaming ? { ...m, isStreaming: false } : m)));
+      // Finaliser le message en streaming et s'assurer qu'aucun raisonnement n'est laissé dans le contenu
+      setMessages(prev => {
+        const newMessages = [...prev];
+        const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
+
+        if (streamingMessageIndex !== -1) {
+          const currentMessage = newMessages[streamingMessageIndex];
+
+          // Une dernière vérification pour s'assurer que tout contenu <think> a été extrait
+          let finalContent = currentMessage.content;
+          let finalReasoning = currentMessage.reasoning || '';
+
+          if (finalContent.includes('<think>')) {
+            console.log('[RAG SidePanel] Extraction finale nécessaire à la fin du streaming');
+            const extractedContent = extractReasoning(finalContent);
+
+            finalContent = extractedContent.cleanContent || '';
+
+            if (extractedContent.reasoning) {
+              if (finalReasoning) {
+                finalReasoning += '\n\n' + extractedContent.reasoning;
+              } else {
+                finalReasoning = extractedContent.reasoning;
+              }
+            }
+          }
+
+          newMessages[streamingMessageIndex] = {
+            ...currentMessage,
+            content: finalContent,
+            reasoning: finalReasoning,
+            isStreaming: false,
+            sourceDocuments,
+          };
+        }
+
+        return newMessages;
+      });
+
+      // Nettoyer les variables de streaming
+      isInThinkMode.current = false;
+      thinkContentBuffer.current = '';
+      thinkDepth.current = 0;
+
       cleanupStreamingConnection();
-      // Transmettre les sources au callback parent qui s'occupera de les ajouter
       onStreamEnd(success, sourceDocuments);
     },
-    [cleanupStreamingConnection, onStreamEnd],
+    [cleanupStreamingConnection, onStreamEnd, extractReasoning],
   );
 
   const setupPortListeners = useCallback(
@@ -149,6 +237,11 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
       setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
       selectedModel?: string,
     ) => {
+      // Réinitialiser les variables de suivi du raisonnement
+      isInThinkMode.current = false;
+      thinkContentBuffer.current = '';
+      thinkDepth.current = 0;
+
       const portId = initStreamingConnection();
       const port = streamingPort.current;
 
@@ -160,7 +253,10 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
       setupPortListeners(port, setMessages);
 
       // Add assistant placeholder message for streaming response
-      setMessages(prev => [...prev, { role: 'assistant', content: '', isStreaming: true, sourceDocuments: [] }]);
+      setMessages(prev => [
+        ...prev,
+        { role: 'assistant', content: '', reasoning: null, isStreaming: true, sourceDocuments: [] },
+      ]);
 
       const requestPayload = {
         type: MessageType.RAG_CHAT_REQUEST,
