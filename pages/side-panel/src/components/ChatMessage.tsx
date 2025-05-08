@@ -52,14 +52,102 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showReasoning
     <div className={containerClasses}>
       <div className={bubbleClasses}>
         <div className="flex items-center justify-between mb-1">
-          <div className="text-xs font-medium text-gray-400">
-            {isUser ? 'Vous' : isSystem ? 'Système' : 'Assistant'}
+          <div className="text-xs font-medium text-gray-400 flex items-center">
+            {isUser ? (
+              <>
+                <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12 11C14.2091 11 16 9.20914 16 7C16 4.79086 14.2091 3 12 3C9.79086 3 8 4.79086 8 7C8 9.20914 9.79086 11 12 11Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M3 21V19C3 17.9391 3.42143 16.9217 4.17157 16.1716C4.92172 15.4214 5.93913 15 7 15H17C18.0609 15 19.0783 15.4214 19.8284 16.1716C20.5786 16.9217 21 17.9391 21 19V21"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Vous
+              </>
+            ) : isSystem ? (
+              <>
+                <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12 22C17.5228 22 22 17.5228 22 12C22 6.47715 17.5228 2 12 2C6.47715 2 2 6.47715 2 12C2 17.5228 6.47715 22 12 22Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M12 16V12M12 8H12.01"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Système
+              </>
+            ) : (
+              <>
+                <svg className="w-3.5 h-3.5 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M12 16C14.2091 16 16 14.2091 16 12C16 9.79086 14.2091 8 12 8C9.79086 8 8 9.79086 8 12C8 14.2091 9.79086 16 12 16Z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M20 12C20 7.58172 16.4183 4 12 4C7.58172 4 4 7.58172 4 12C4 16.4183 7.58172 20 12 20"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M19 17V22M21.5 19.5H16.5"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+                Assistant
+              </>
+            )}
           </div>
 
           <div className="flex items-center space-x-2">
             {hasReasoning && (
-              <button onClick={toggleShowReasoning} className="text-xs text-blue-400 hover:text-blue-300">
-                {showReasoning ? 'Masquer le raisonnement' : 'Afficher le raisonnement'}
+              <button
+                onClick={toggleShowReasoning}
+                className="p-1 text-blue-400 hover:text-blue-300 rounded-full hover:bg-gray-600/50"
+                title={showReasoning ? 'Masquer le raisonnement' : 'Afficher le raisonnement'}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  {showReasoning ? (
+                    <path
+                      d="M18 15l-6-6-6 6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  ) : (
+                    <path
+                      d="M6 9l6 6 6-6"
+                      stroke="currentColor"
+                      strokeWidth="2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  )}
+                </svg>
               </button>
             )}
 
@@ -67,12 +155,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showReasoning
               <button
                 onClick={handleSaveAsNote}
                 disabled={isSaving}
-                className="text-xs text-blue-400 hover:text-blue-300 flex items-center"
+                className="p-1 text-blue-400 hover:text-blue-300 rounded-full hover:bg-gray-600/50"
                 title="Enregistrer dans les notes">
                 {isSaving ? (
-                  <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin mr-1"></span>
+                  <span className="inline-block w-3 h-3 border-2 border-blue-400 border-t-transparent rounded-full animate-spin"></span>
                 ) : savedSuccess ? (
-                  <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
                       d="M20 6L9 17L4 12"
                       stroke="currentColor"
@@ -82,23 +170,16 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showReasoning
                     />
                   </svg>
                 ) : (
-                  <svg className="w-3 h-3 mr-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                     <path
-                      d="M19 21H5C3.89543 21 3 20.1046 3 19V5C3 3.89543 3.89543 3 5 3H16L21 8V19C21 20.1046 20.1046 21 19 21Z"
+                      d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 012-2h2a2 2 0 012 2M9 5a2 2 0 002 2h2a2 2 0 002-2"
                       stroke="currentColor"
                       strokeWidth="2"
                       strokeLinecap="round"
                       strokeLinejoin="round"
                     />
                     <path
-                      d="M17 21V13H7V21"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
-                    <path
-                      d="M7 3V8H15"
+                      d="M9 12h6M9 16h6"
                       stroke="currentColor"
                       strokeWidth="2"
                       strokeLinecap="round"
@@ -106,7 +187,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showReasoning
                     />
                   </svg>
                 )}
-                {isSaving ? 'Enregistrement...' : savedSuccess ? 'Enregistré' : 'Enregistrer dans les notes'}
               </button>
             )}
           </div>
