@@ -16,7 +16,7 @@ export function useNoteSelection(
 
   // Create a new note
   const handleCreateNewNote = useCallback(
-    async (parentId: string | null = null) => {
+    async (parentId: string | null = null): Promise<NoteEntry | null> => {
       const timestamp = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
       const newNoteTitle = `Nouvelle Note (${timestamp})`;
       const newNoteContent = '';
@@ -24,20 +24,25 @@ export function useNoteSelection(
       // Generate a unique ID for the note
       const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
 
-      const newNoteId = await addNote({
-        id: tempId,
-        title: newNoteTitle,
-        content: newNoteContent,
-        parentId,
-        tags: [],
-      });
+      try {
+        const newNoteId = await addNote({
+          id: tempId,
+          title: newNoteTitle,
+          content: newNoteContent,
+          parentId,
+          tags: [],
+        });
 
-      // Get the new note to select it
-      const newNote = await getNote(newNoteId);
-      if (newNote) {
-        setSelectedNote(newNote);
-        return newNote;
+        // Get the new note to select it
+        const newNote = await getNote(newNoteId);
+        if (newNote) {
+          setSelectedNote(newNote);
+          return newNote;
+        }
+      } catch (error) {
+        console.error('Erreur lors de la création de la note:', error);
       }
+
       return null;
     },
     [addNote, getNote],

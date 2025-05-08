@@ -99,13 +99,15 @@ export function useNotes() {
     await notesStorage.reorderNote(noteId, newOrderIndex);
   };
 
-  const clearScratchpad = async () => {
+  const clearScratchpad = async (): Promise<NoteEntry | null> => {
     if (scratchpad) {
       await notesStorage.updateNote(SCRATCHPAD_ID, {
         content:
           '# 📥 Scratchpad\n\nUtilisez cette note comme collecteur rapide pour vos idées et captures web.\n\n---\n\n',
       });
-      return await notesStorage.getNote(SCRATCHPAD_ID);
+      const updatedScratchpad = await notesStorage.getNote(SCRATCHPAD_ID);
+      // S'assurer de ne jamais retourner undefined
+      return updatedScratchpad || null;
     }
     return null;
   };
