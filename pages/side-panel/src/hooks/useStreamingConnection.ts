@@ -72,23 +72,17 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
       let visibleContent = '';
       let reasoningContent = '';
 
-      // Si le chunk contient <think>, faire la séparation immédiatement
-      if (chunk.includes('<think>')) {
-        // Extraire les blocs de raisonnement et le contenu propre
-        const extracted = extractReasoning(chunk);
-        visibleContent = extracted.cleanContent || '';
-        reasoningContent = extracted.reasoning || '';
+      // Extraire les blocs de raisonnement et le contenu propre
+      const extracted = extractReasoning(chunk);
+      visibleContent = extracted.cleanContent || '';
+      reasoningContent = extracted.reasoning || '';
 
-        // Loguer les résultats de l'extraction pour débogage
-        console.log('[SidePanel] Séparation immédiate - Content:', visibleContent.substring(0, 50) + '...');
-        console.log(
-          '[SidePanel] Séparation immédiate - Reasoning:',
-          reasoningContent?.substring(0, 50) + (reasoningContent?.length > 50 ? '...' : '') || 'aucun',
-        );
-      } else {
-        // Pas de balise <think>, tout est du contenu visible
-        visibleContent = chunk;
-      }
+      // Loguer les résultats de l'extraction pour débogage
+      console.log('[SidePanel] Séparation - Content:', visibleContent.substring(0, 50) + '...');
+      console.log(
+        '[SidePanel] Séparation - Reasoning:',
+        reasoningContent?.substring(0, 50) + (reasoningContent?.length > 50 ? '...' : '') || 'aucun',
+      );
 
       // Mettre à jour le message en streaming
       setMessages(prev => {

@@ -18,16 +18,22 @@ export class AgentService {
   private availableModels: { name: string; id: string; modified_at?: string }[] = [];
 
   /**
-   * Crée une instance de ChatOllama à partir des paramètres stockés
+   * Crée une nouvelle instance du LLM Ollama
    */
-  async createLLMInstance(): Promise<ChatOllama> {
-    const settings = await aiAgentStorage.get();
-    return new ChatOllama({
-      baseUrl: settings.baseUrl || 'http://localhost:11434',
-      model: settings.selectedModel || 'llama3',
-      temperature: settings.temperature || 0.7,
-      numCtx: settings.contextSize || 4096,
-    });
+  async createLLMInstance(modelOverride?: string): Promise<ChatOllama> {
+    try {
+      const settings = await aiAgentStorage.get();
+      const modelToUse = modelOverride || settings.selectedModel;
+      return new ChatOllama({
+        baseUrl: settings.baseUrl,
+        model: modelToUse,
+        temperature: settings.temperature || 0.7,
+        numCtx: settings.contextSize || 4096,
+      });
+    } catch (error) {
+      logger.error("Erreur lors de la création de l'instance LLM:", error);
+      throw error;
+    }
   }
 
   /**

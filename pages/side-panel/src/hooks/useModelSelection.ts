@@ -12,31 +12,24 @@ interface OllamaModel {
  */
 export function useModelSelection() {
   // Liste de modèles disponibles par défaut
-  const [availableModels, setAvailableModels] = useState<string[]>([
-    'llama3',
-    'llama3:8b',
-    'llama3:70b',
-    'mistral',
-    'mixtral',
-    'phi3',
-    'gemma',
-    'codellama',
-  ]);
-
-  const [loadingModels, setLoadingModels] = useState<boolean>(false);
+  const [availableModels, setAvailableModels] = useState<string[]>([]);
+  const [loadingModels, setLoadingModels] = useState<boolean>(true);
   const [showModelDropdown, setShowModelDropdown] = useState<boolean>(false);
   const modelDropdownRef = useRef<HTMLDivElement>(null);
 
   // Fonction pour récupérer les modèles disponibles depuis Ollama
-  const fetchAvailableModels = useCallback(async (baseUrl?: string) => {
-    if (!baseUrl) return;
-
-    setLoadingModels(true);
+  const fetchAvailableModels = useCallback(async () => {
     try {
-      // Utiliser le message runtime pour obtenir les modèles
+      // Récupérer les paramètres depuis le stockage
+      const settings = await aiAgentStorage.get();
+      const url = settings.baseUrl || 'http://localhost:11434';
+
+      setLoadingModels(true);
+
+      // Utiliser le message runtime pour obtenir les modèles avec une structure simple
       const response = await chrome.runtime.sendMessage({
         type: MessageType.GET_AVAILABLE_MODELS,
-        baseUrl,
+        baseUrl: url.toString().trim(),
       });
 
       if (response && response.success && Array.isArray(response.models)) {
@@ -44,18 +37,32 @@ export function useModelSelection() {
         const modelNames = response.models.map((model: OllamaModel) => model.name);
         if (modelNames.length > 0) {
           setAvailableModels(modelNames);
+          console.log('Modèles récupérés avec succès:', modelNames);
+        } else {
+          // Fallback vers une liste par défaut si aucun modèle n'est trouvé
+          setAvailableModels(['llama3', 'llama3:8b', 'llama3:70b', 'mistral', 'mixtral', 'phi3', 'gemma']);
+          console.warn('Aucun modèle trouvé, utilisation de la liste par défaut');
         }
       } else {
         // Fallback si la structure n'est pas comme attendu
+        setAvailableModels(['llama3', 'llama3:8b', 'llama3:70b', 'mistral', 'mixtral', 'phi3', 'gemma']);
         console.warn('Format de réponse inattendu:', response);
       }
     } catch (error) {
       console.error('Erreur lors de la récupération des modèles:', error);
-      // On garde la liste par défaut en cas d'erreur
+      // On utilise la liste par défaut en cas d'erreur
+      setAvailableModels(['llama3', 'llama3:8b', 'llama3:70b', 'mistral', 'mixtral', 'phi3', 'gemma']);
     } finally {
       setLoadingModels(false);
     }
   }, []);
+
+  // Effet pour charger les modèles au montage du composant
+  useEffect(() => {
+    fetchAvailableModels().catch(error => {
+      console.error('Erreur lors du chargement initial des modèles:', error);
+    });
+  }, [fetchAvailableModels]);
 
   // Fonction pour changer le modèle
   const handleModelChange = useCallback(async (model: string) => {
@@ -86,15 +93,13 @@ export function useModelSelection() {
   }, []);
 
   // Ouvrir/fermer le dropdown
-  const toggleModelDropdown = useCallback(
-    (baseUrl?: string) => {
-      if (!showModelDropdown && baseUrl) {
-        fetchAvailableModels(baseUrl);
-      }
-      setShowModelDropdown(prev => !prev);
-    },
-    [fetchAvailableModels, showModelDropdown],
-  );
+  const toggleModelDropdown = useCallback(() => {
+    if (!showModelDropdown) {
+      // Rafraîchir la liste des modèles à chaque ouverture du menu déroulant
+      fetchAvailableModels();
+    }
+    setShowModelDropdown(prev => !prev);
+  }, [fetchAvailableModels, showModelDropdown]);
 
   // Fermer le dropdown quand on clique à l'extérieur
   useEffect(() => {

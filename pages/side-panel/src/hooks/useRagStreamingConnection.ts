@@ -42,18 +42,37 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
 
   const handleStreamChunk = useCallback(
     (chunk: string, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
+      // Nettoyer les réponses JSON malformées
+      let cleanedChunk = chunk;
+      // Si le chunk commence par { ou contient "answer":
+      if (chunk.trim().startsWith('{') || chunk.includes('"answer":')) {
+        try {
+          // Tenter de parser le JSON
+          const parsedChunk = JSON.parse(chunk);
+          if (parsedChunk.answer) {
+            cleanedChunk = parsedChunk.answer;
+          }
+        } catch {
+          // Si le parsing échoue, essayer d'extraire la valeur answer avec une regex
+          const answerMatch = chunk.match(/"answer"\s*:\s*"([^"]*)"/);
+          if (answerMatch && answerMatch[1]) {
+            cleanedChunk = answerMatch[1];
+          }
+        }
+      }
+
       setMessages(prev => {
         const newMessages = [...prev];
         const streamingMessageIndex = newMessages.findIndex(m => m.isStreaming);
         if (streamingMessageIndex !== -1) {
           newMessages[streamingMessageIndex] = {
             ...newMessages[streamingMessageIndex],
-            content: newMessages[streamingMessageIndex].content + chunk,
+            content: newMessages[streamingMessageIndex].content + cleanedChunk,
             isStreaming: true,
           };
         } else {
           // Should ideally not happen if a streaming message placeholder was added
-          newMessages.push({ role: 'assistant', content: chunk, isStreaming: true });
+          newMessages.push({ role: 'assistant', content: cleanedChunk, isStreaming: true });
         }
         return newMessages;
       });
@@ -67,8 +86,10 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
       sourceDocuments: RagSourceDocument[] | undefined,
       setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
     ) => {
-      setMessages(prev => prev.map(m => (m.isStreaming ? { ...m, isStreaming: false, sourceDocuments } : m)));
+      // Seulement marquer les messages comme n'étant plus en streaming
+      setMessages(prev => prev.map(m => (m.isStreaming ? { ...m, isStreaming: false } : m)));
       cleanupStreamingConnection();
+      // Transmettre les sources au callback parent qui s'occupera de les ajouter
       onStreamEnd(success, sourceDocuments);
     },
     [cleanupStreamingConnection, onStreamEnd],
@@ -122,7 +143,12 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
   );
 
   const startStreaming = useCallback(
-    (input: string, currentMessages: Message[], setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
+    (
+      input: string,
+      currentMessages: Message[],
+      setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+      selectedModel?: string,
+    ) => {
       const portId = initStreamingConnection();
       const port = streamingPort.current;
 
@@ -145,6 +171,7 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
             .map(msg => ({ role: msg.role, content: msg.content })),
           streamHandler: true,
           portId,
+          selectedModel,
         },
       };
 

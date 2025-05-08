@@ -263,6 +263,7 @@ export interface RagChatRequestMessage extends BaseRuntimeMessage {
     chatHistory?: ChatHistoryMessage[];
     streamHandler?: boolean;
     portId?: string;
+    selectedModel?: string;
   };
 }
 

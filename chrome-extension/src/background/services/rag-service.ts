@@ -157,6 +157,7 @@ export class RagService {
     userInput: string,
     chatHistory: ChatHistoryMessage[] = [],
     port: chrome.runtime.Port,
+    selectedModel?: string,
   ): Promise<void> {
     logger.debug('[RAG Service] Processing RAG stream request:', { userInput });
     try {
@@ -172,7 +173,11 @@ export class RagService {
         return;
       }
 
-      const llm = await agentService.createLLMInstance();
+      // Si un modèle est spécifié dans la requête, l'utiliser
+      const llm = selectedModel
+        ? await agentService.createLLMInstance(selectedModel)
+        : await agentService.createLLMInstance();
+
       const ragChain = await this.getRagChain(llm);
       const langchainHistory = convertChatHistory(chatHistory);
 
@@ -185,7 +190,25 @@ export class RagService {
 
       for await (const chunk of stream) {
         if (chunk.answer) {
-          port.postMessage({ type: StreamEventType.STREAM_CHUNK, chunk: chunk.answer });
+          // Vérifier et nettoyer la réponse si c'est un string JSON
+          let cleanedAnswer = chunk.answer;
+          if (
+            typeof cleanedAnswer === 'string' &&
+            (cleanedAnswer.trim().startsWith('{') || cleanedAnswer.includes('"answer":'))
+          ) {
+            try {
+              // Tenter de parser si c'est un JSON
+              const parsed = JSON.parse(cleanedAnswer);
+              if (parsed.answer && typeof parsed.answer === 'string') {
+                cleanedAnswer = parsed.answer;
+              }
+            } catch {
+              // Ignorer l'erreur, envoyer le chunk tel quel
+              logger.debug('[RAG Service] Failed to parse JSON in answer chunk');
+            }
+          }
+
+          port.postMessage({ type: StreamEventType.STREAM_CHUNK, chunk: cleanedAnswer });
         }
         if (chunk.context && Array.isArray(chunk.context)) {
           retrievedSourceDocuments = chunk.context.map((doc: Document) => ({

@@ -115,6 +115,7 @@ export class ContextMenuHandler {
           content:
             '# 📥 Scratchpad\n\nUtilisez cette note comme collecteur rapide pour vos idées et captures web.\n\n---\n\n',
           tags: ['system', 'scratchpad'],
+          parentId: null,
         });
       }
     } catch (error) {
@@ -145,6 +146,7 @@ export class ContextMenuHandler {
         content: content,
         sourceUrl: sourceUrl,
         tags: [],
+        parentId: null,
       });
 
       // Générer des tags avec l'IA
@@ -208,6 +210,7 @@ export class ContextMenuHandler {
         content: content,
         sourceUrl: url,
         tags: [],
+        parentId: null,
       });
 
       // Générer des tags avec l'IA

@@ -3,25 +3,24 @@ import { useState, useCallback } from 'react';
 import { useStorage, withErrorBoundary, withSuspense } from '@extension/shared';
 import { aiAgentStorage, mcpLoadedToolsStorage } from '@extension/storage';
 
-// Types et composants
-import type { TabType } from './types';
-import { TabNavigation } from './components/TabNavigation';
-import { ChatPanel } from './components/ChatPanel';
-import { ToolsPanel } from './components/ToolsPanel';
-import { MemoryPanel } from './components/MemoryPanel';
-
 // Hooks personnalisés
 import { useAgentStatus } from './hooks/useAgentStatus';
-import { useChat } from './hooks/useChat';
 import { useChatHistory } from './hooks/useChatHistory';
 import { useModelSelection } from './hooks/useModelSelection';
+import { useUnifiedChat } from './hooks/useUnifiedChat';
+
+// Composants
+import { ChatMessage } from './components/ChatMessage';
+import { ChatInput } from './components/ChatInput';
+import { ModelSelector } from './components/ModelSelector';
+import { ChatHistorySidebar } from './components/ChatHistorySidebar';
+import { MemorySwitch } from './components/MemorySwitch';
+import { ToolsPopover } from './components/ToolsPopover';
 
 const SidePanel = () => {
   const settings = useStorage(aiAgentStorage);
   const loadedTools = useStorage(mcpLoadedToolsStorage);
-
-  // État pour l'onglet actif
-  const [activeTab, setActiveTab] = useState<TabType>('chat');
+  const [showToolsPopover, setShowToolsPopover] = useState(false);
 
   // Hook pour le statut de l'agent IA
   const { isReady } = useAgentStatus();
@@ -49,19 +48,21 @@ const SidePanel = () => {
     toggleModelDropdown,
   } = useModelSelection();
 
-  // Hook pour la gestion du chat
+  // Hook pour la gestion du chat unifié (standard + RAG)
   const {
     messages,
     input,
     isLoading,
     isFetchingPageContent,
     showReasoning,
+    isRagMode,
     messagesEndRef,
     setInput,
     setShowReasoning,
+    setIsRagMode,
     handleSubmit,
     resetOrLoadMessages,
-  } = useChat({
+  } = useUnifiedChat({
     isReady,
     selectedModel: settings.selectedModel || 'llama3',
     activeConversationId,
@@ -121,33 +122,18 @@ const SidePanel = () => {
           <h1 className="text-base font-medium">DoDai</h1>
         </div>
         <div className="flex items-center space-x-2">
-          {/* Bouton Scratchpad */}
-          <button
-            className="p-1 text-gray-200 hover:text-white rounded-full hover:bg-blue-800/50"
-            onClick={() => {
-              const scratchpadUrl = chrome.runtime.getURL('notes-page/index.html?scratchpad=true');
-              chrome.tabs.create({ url: scratchpadUrl });
-            }}
-            title="Ouvrir le Scratchpad">
-            <svg width="16" height="16" viewBox="0 0 20 20" fill="none" xmlns="http://www.w3.org/2000/svg">
+          {/* Bouton Outils MCP */}
+          <ToolsPopover isOpen={showToolsPopover} onOpenChange={setShowToolsPopover} tools={loadedTools}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
               <path
-                d="M3 5a2 2 0 012-2h10a2 2 0 012 2v10a2 2 0 01-2 2H5a2 2 0 01-2-2V5z"
+                d="M14.7 6.3a1 1 0 000 1.4l1.6 1.6a1 1 0 001.4 0l3.77-3.77a6 6 0 01-7.94 7.94l-6.91 6.91a2.12 2.12 0 01-3-3l6.91-6.91a6 6 0 017.94-7.94l-3.76 3.76z"
                 stroke="currentColor"
                 strokeWidth="2"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
-              <path
-                d="M5 8h10M5 12h10"
-                stroke="currentColor"
-                strokeWidth="2"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-              <circle cx="7" cy="8" r="1" fill="currentColor" />
-              <circle cx="7" cy="12" r="1" fill="currentColor" />
             </svg>
-          </button>
+          </ToolsPopover>
 
           {/* Bouton Voir mes notes */}
           <button
@@ -197,46 +183,138 @@ const SidePanel = () => {
         </div>
       </div>
 
-      {/* Tabs navigation */}
-      <TabNavigation activeTab={activeTab} setActiveTab={setActiveTab} />
-
-      {/* Main content based on active tab */}
+      {/* Main content - Chat view */}
       <div className="flex-1 flex flex-col min-h-0">
-        {activeTab === 'chat' && (
-          <ChatPanel
-            messages={messages}
-            input={input}
-            currentChatName={currentChatName}
-            showReasoning={showReasoning}
-            showChatHistory={showChatHistory}
-            isLoading={isLoading}
-            isFetchingPageContent={isFetchingPageContent}
-            isReady={isReady}
-            selectedModel={settings.selectedModel || 'llama3'}
-            availableModels={availableModels}
-            loadingModels={loadingModels}
-            showModelDropdown={showModelDropdown}
-            modelDropdownRef={modelDropdownRef}
-            chatHistory={chatHistory || []}
+        {/* Title with chat name and history button */}
+        <div className="p-3 border-b border-gray-700 bg-gray-900 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h2 className="text-base font-medium flex items-center text-gray-100">
+              <button
+                className="mr-2 p-1 text-gray-400 hover:text-blue-400 rounded-full hover:bg-gray-800/50"
+                onClick={() => setShowChatHistory(!showChatHistory)}
+                title="Historique des conversations">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M19 3H5a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2V5a2 2 0 00-2-2z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <line x1="8" y1="10" x2="16" y2="10" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="8" y1="14" x2="16" y2="14" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                  <line x1="8" y1="18" x2="12" y2="18" stroke="currentColor" strokeWidth="2" strokeLinecap="round" />
+                </svg>
+              </button>
+              <span className="truncate max-w-[250px]">{isRagMode ? 'Chat avec mes notes' : currentChatName}</span>
+            </h2>
+
+            {/* Bouton pour renommer la conversation */}
+            {activeConversationId && !isRagMode && (
+              <button
+                className="p-1 text-gray-400 hover:text-blue-400 rounded-full hover:bg-gray-800/50"
+                onClick={() => {
+                  const newName = prompt('Renommer la conversation:', currentChatName);
+                  if (newName && newName.trim() !== '') {
+                    renameCurrentConversation(newName.trim());
+                  }
+                }}
+                title="Renommer la conversation">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                  <path
+                    d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                  <path
+                    d="M18.5 2.5a2.121 2.121 0 113 3L12 15l-4 1 1-4 9.5-9.5z"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* Chat history sidebar - conditionally rendered */}
+        {showChatHistory && !isRagMode && (
+          <ChatHistorySidebar
+            chatHistory={chatHistory}
             activeConversationId={activeConversationId}
-            setInput={setInput}
-            handleSubmit={handleSubmit}
-            setShowReasoning={setShowReasoning}
-            setShowChatHistory={setShowChatHistory}
             createNewConversation={handleCreateNewConversation}
             loadConversation={handleLoadConversation}
             deleteConversation={handleDeleteConversation}
-            renameCurrentConversation={renameCurrentConversation}
-            toggleModelDropdown={() => toggleModelDropdown(settings.baseUrl)}
-            handleModelChange={handleModelChange}
-            messagesEndRef={messagesEndRef}
-            isEnabled={settings.isEnabled}
+            onClose={() => setShowChatHistory(false)}
           />
         )}
 
-        {activeTab === 'tools' && <ToolsPanel loadedTools={loadedTools} />}
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto p-3 space-y-3 min-h-0">
+          {messages.map((message, index) => (
+            <ChatMessage
+              key={index}
+              message={message}
+              showReasoning={showReasoning}
+              toggleShowReasoning={() => setShowReasoning(!showReasoning)}
+            />
+          ))}
+          <div ref={messagesEndRef}></div>
+        </div>
 
-        {activeTab === 'memory' && <MemoryPanel />}
+        {/* Memory Switch */}
+        <MemorySwitch isRagModeActive={isRagMode} onToggleRagMode={setIsRagMode} isEnabled={isReady} />
+
+        {/* Input area */}
+        <div className="p-3 border-t border-gray-700 bg-gray-900">
+          <ChatInput
+            input={input}
+            setInput={setInput}
+            handleSubmit={handleSubmit}
+            isLoading={isLoading || isFetchingPageContent}
+            isEnabled={settings.isEnabled}
+            isReady={isReady}
+          />
+          <div className="flex justify-between items-center text-xs mt-1">
+            <div className="flex items-center space-x-2">
+              <ModelSelector
+                selectedModel={settings.selectedModel || 'llama3'}
+                availableModels={availableModels}
+                loadingModels={loadingModels}
+                showModelDropdown={showModelDropdown}
+                isLoading={isLoading || isFetchingPageContent}
+                isEnabled={settings.isEnabled}
+                isReady={isReady}
+                modelDropdownRef={modelDropdownRef}
+                toggleModelDropdown={toggleModelDropdown}
+                handleModelChange={handleModelChange}
+              />
+              {isFetchingPageContent && (
+                <span className="text-blue-300 flex items-center">
+                  <span className="inline-block w-2 h-2 bg-blue-500 rounded-full mr-1 animate-pulse"></span>
+                  Récupération du contenu de la page...
+                </span>
+              )}
+            </div>
+
+            {!isReady && (
+              <span className="text-red-400 flex items-center">
+                <span className="inline-block w-2 h-2 bg-red-500 rounded-full mr-1"></span>
+                Non connecté
+              </span>
+            )}
+            {isReady && (
+              <span className="text-green-400 flex items-center">
+                <span className="inline-block w-2 h-2 bg-green-500 rounded-full mr-1"></span>
+                Connecté
+              </span>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );

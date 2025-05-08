@@ -1,5 +1,3 @@
-export type TabType = 'chat' | 'tools' | 'memory';
-
 export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;

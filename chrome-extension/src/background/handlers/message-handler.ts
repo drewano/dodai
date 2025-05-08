@@ -630,7 +630,7 @@ export class MessageHandler {
    */
   private async handleRagChatRequest(message: RagChatRequestMessage): Promise<RagChatResponse> {
     logger.debug('Reçu RAG_CHAT_REQUEST', message.payload);
-    const { message: userInput, chatHistory = [], streamHandler = false, portId } = message.payload;
+    const { message: userInput, chatHistory = [], streamHandler = false, portId, selectedModel } = message.payload;
 
     if (streamHandler && portId) {
       logger.debug(`[Message Handler] Mode streaming RAG demandé avec portId: ${portId}`);
@@ -647,7 +647,7 @@ export class MessageHandler {
 
       // Lancer le streaming RAG en asynchrone
       // ragService.processRagStreamRequest gère lui-même l'envoi des messages sur le port.
-      ragService.processRagStreamRequest(userInput, chatHistory, streamingPortInfo.port).catch(error => {
+      ragService.processRagStreamRequest(userInput, chatHistory, streamingPortInfo.port, selectedModel).catch(error => {
         logger.error('[Message Handler] Erreur lors du lancement du streaming RAG:', error);
         // Essayer de notifier l'erreur via le port s'il existe encore
         try {
