@@ -24,8 +24,8 @@ const NotesPage = () => {
   const rightSidebarRef = useRef<HTMLDivElement>(null);
 
   // States for UI control
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(250);
-  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(200);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(220);
+  const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(180);
   const [isResizingLeft, setIsResizingLeft] = useState<boolean>(false);
   const [isResizingRight, setIsResizingRight] = useState<boolean>(false);
   const [selectedItemType, setSelectedItemType] = useState<'note' | 'chat'>('note');
@@ -237,7 +237,7 @@ const NotesPage = () => {
           }}></button>
 
         {/* Center Panel */}
-        <div className="flex-1 overflow-auto">
+        <div className="flex-1 flex flex-col overflow-hidden">
           <CenterPanel
             selectedItemType={selectedItemType}
             selectedNote={selectedNote}

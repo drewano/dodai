@@ -126,158 +126,162 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
     }
 
     return (
-      <div className="h-full p-4 overflow-y-auto">
-        <div className="mb-4 flex justify-between items-center">
-          <input
-            type="text"
-            value={editedTitle}
-            onChange={onTitleChange}
-            placeholder="Titre de la note"
-            className="text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-gray-700 focus:border-blue-500 focus:outline-none w-full px-0 py-1"
-          />
+      <div className="flex flex-col h-full">
+        <div className="p-4 pb-2">
+          <div className="mb-3 flex justify-between items-center">
+            <input
+              type="text"
+              value={editedTitle}
+              onChange={onTitleChange}
+              placeholder="Titre de la note"
+              className="text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-gray-700 focus:border-blue-500 focus:outline-none w-full px-0 py-1"
+            />
 
-          <div className="flex space-x-2">
-            <div className="text-sm text-gray-400 flex items-center mr-2">
-              {saveStatus === 'saving' && (
-                <span className="inline-flex items-center">
-                  <svg
-                    className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400"
-                    xmlns="http://www.w3.org/2000/svg"
-                    fill="none"
-                    viewBox="0 0 24 24">
-                    <circle
-                      className="opacity-25"
-                      cx="12"
-                      cy="12"
-                      r="10"
-                      stroke="currentColor"
-                      strokeWidth="4"></circle>
-                    <path
-                      className="opacity-75"
-                      fill="currentColor"
-                      d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                  </svg>
-                  Sauvegarde...
-                </span>
-              )}
-              {saveStatus === 'saved' && (
-                <span className="inline-flex items-center text-green-500">
-                  <svg className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Sauvegardé
-                </span>
-              )}
-              {saveStatus === 'error' && (
-                <span className="inline-flex items-center text-red-500">
-                  <svg className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                    <path
-                      fillRule="evenodd"
-                      d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                      clipRule="evenodd"
-                    />
-                  </svg>
-                  Erreur
-                </span>
-              )}
-            </div>
-
-            <button
-              onClick={onTogglePreview}
-              className={`px-3 py-1 ${showPreview ? 'bg-gray-600' : 'bg-purple-600 hover:bg-purple-700'} rounded text-white text-sm transition flex items-center gap-1`}>
-              {showPreview ? 'Éditer' : 'Aperçu'}
-            </button>
-
-            <button
-              onClick={handleExportNote}
-              className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors">
-              Exporter
-            </button>
-
-            <button
-              onClick={onDeleteNote}
-              className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">
-              Supprimer
-            </button>
-          </div>
-        </div>
-
-        {/* Date info */}
-        <div className="flex justify-between items-center text-sm text-gray-400 mb-4">
-          <span>Modifié {formatDate(selectedNote.updatedAt)}</span>
-          <span>Créé {formatDate(selectedNote.createdAt)}</span>
-        </div>
-
-        {/* Tags */}
-        <div className="mb-4">
-          <div className="flex flex-wrap gap-2 mb-2">
-            {editedTags.map(tag => (
-              <div key={tag} className="flex items-center bg-gray-700 text-blue-300 px-2 py-1 rounded-full text-sm">
-                #{tag}
-                <button onClick={() => onRemoveTag(tag)} className="ml-1 text-gray-400 hover:text-red-400">
-                  ×
-                </button>
+            <div className="flex space-x-2">
+              <div className="text-sm text-gray-400 flex items-center mr-2">
+                {saveStatus === 'saving' && (
+                  <span className="inline-flex items-center">
+                    <svg
+                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400"
+                      xmlns="http://www.w3.org/2000/svg"
+                      fill="none"
+                      viewBox="0 0 24 24">
+                      <circle
+                        className="opacity-25"
+                        cx="12"
+                        cy="12"
+                        r="10"
+                        stroke="currentColor"
+                        strokeWidth="4"></circle>
+                      <path
+                        className="opacity-75"
+                        fill="currentColor"
+                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                    </svg>
+                    Sauvegarde...
+                  </span>
+                )}
+                {saveStatus === 'saved' && (
+                  <span className="inline-flex items-center text-green-500">
+                    <svg className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Sauvegardé
+                  </span>
+                )}
+                {saveStatus === 'error' && (
+                  <span className="inline-flex items-center text-red-500">
+                    <svg className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                    Erreur
+                  </span>
+                )}
               </div>
-            ))}
-            <div className="flex items-center bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-sm">
-              <input
-                type="text"
-                value={tagInput}
-                onChange={onTagInputChange}
-                onKeyDown={onTagInputKeyDown}
-                placeholder="Ajouter un tag"
-                className="bg-transparent border-none outline-none w-24 text-sm"
-              />
-              {tagInput && (
-                <button onClick={onAddTag} className="ml-1 text-gray-400 hover:text-blue-400">
-                  +
-                </button>
-              )}
+
+              <button
+                onClick={onTogglePreview}
+                className={`px-3 py-1 ${showPreview ? 'bg-gray-600' : 'bg-purple-600 hover:bg-purple-700'} rounded text-white text-sm transition flex items-center gap-1`}>
+                {showPreview ? 'Éditer' : 'Aperçu'}
+              </button>
+
+              <button
+                onClick={handleExportNote}
+                className="px-3 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-sm transition-colors">
+                Exporter
+              </button>
+
+              <button
+                onClick={onDeleteNote}
+                className="px-3 py-1 bg-red-600 hover:bg-red-700 text-white rounded text-sm transition-colors">
+                Supprimer
+              </button>
             </div>
           </div>
+
+          {/* Date info */}
+          <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
+            <span>Modifié {formatDate(selectedNote.updatedAt)}</span>
+            <span>Créé {formatDate(selectedNote.createdAt)}</span>
+          </div>
+
+          {/* Tags */}
+          <div className="mb-3">
+            <div className="flex flex-wrap gap-2 mb-2">
+              {editedTags.map(tag => (
+                <div key={tag} className="flex items-center bg-gray-700 text-blue-300 px-2 py-1 rounded-full text-sm">
+                  #{tag}
+                  <button onClick={() => onRemoveTag(tag)} className="ml-1 text-gray-400 hover:text-red-400">
+                    ×
+                  </button>
+                </div>
+              ))}
+              <div className="flex items-center bg-gray-700 text-gray-300 px-2 py-1 rounded-full text-sm">
+                <input
+                  type="text"
+                  value={tagInput}
+                  onChange={onTagInputChange}
+                  onKeyDown={onTagInputKeyDown}
+                  placeholder="Ajouter un tag"
+                  className="bg-transparent border-none outline-none w-24 text-sm"
+                />
+                {tagInput && (
+                  <button onClick={onAddTag} className="ml-1 text-gray-400 hover:text-blue-400">
+                    +
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+
+          {/* Source URL if present */}
+          {selectedNote.sourceUrl && (
+            <div className="py-2 px-3 bg-gray-700 rounded text-sm mb-3">
+              <span className="text-gray-400">Source: </span>
+              <a
+                href={selectedNote.sourceUrl}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-400 hover:underline">
+                {selectedNote.sourceUrl}
+              </a>
+            </div>
+          )}
         </div>
 
-        {/* Source URL if present */}
-        {selectedNote.sourceUrl && (
-          <div className="py-2 px-3 bg-gray-700 rounded text-sm mb-4">
-            <span className="text-gray-400">Source: </span>
-            <a
-              href={selectedNote.sourceUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-blue-400 hover:underline">
-              {selectedNote.sourceUrl}
-            </a>
-          </div>
-        )}
-
-        {/* Content area */}
-        {showPreview ? (
-          <div className="prose prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none bg-gray-800 rounded-md p-4">
-            <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
-              {editedContent}
-            </ReactMarkdown>
-          </div>
-        ) : (
-          <div className="flex-1 flex flex-col">
-            <MarkdownToolbar
-              onInsertMarkdown={insertMarkdown}
-              onInsertLink={handleInsertLink}
-              onInsertImage={handleInsertImage}
-            />
-            <textarea
-              ref={textareaRef}
-              value={editedContent}
-              onChange={onContentChange}
-              className="flex-1 w-full p-4 bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm leading-relaxed min-h-[300px]"
-              placeholder="Commencez à écrire ici..."
-            />
-          </div>
-        )}
+        {/* Content area - occupies all remaining height */}
+        <div className="flex-1 flex flex-col px-4 pb-4">
+          {showPreview ? (
+            <div className="flex-1 prose prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none bg-gray-800 rounded-md p-6 overflow-y-auto">
+              <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
+                {editedContent}
+              </ReactMarkdown>
+            </div>
+          ) : (
+            <div className="flex-1 flex flex-col">
+              <MarkdownToolbar
+                onInsertMarkdown={insertMarkdown}
+                onInsertLink={handleInsertLink}
+                onInsertImage={handleInsertImage}
+              />
+              <textarea
+                ref={textareaRef}
+                value={editedContent}
+                onChange={onContentChange}
+                className="flex-1 w-full p-4 bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none font-mono text-sm leading-relaxed"
+                placeholder="Commencez à écrire ici..."
+              />
+            </div>
+          )}
+        </div>
       </div>
     );
   }
@@ -292,7 +296,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
     }
 
     return (
-      <div className="h-full flex flex-col">
+      <div className="flex flex-col h-full">
         <div className="p-4 border-b border-gray-700">
           <h2 className="text-xl font-bold">{selectedChat.name}</h2>
           <p className="text-sm text-gray-400">

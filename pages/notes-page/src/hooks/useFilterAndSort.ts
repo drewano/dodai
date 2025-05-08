@@ -39,7 +39,7 @@ export function useFilterAndSort(notes: NoteEntry[] | null) {
     if (!notes || !currentFolderId) return [];
 
     const path: NoteEntry[] = [];
-    let currentId = currentFolderId;
+    let currentId: string | null = currentFolderId;
 
     while (currentId) {
       const folder = notes.find(note => note.id === currentId);
