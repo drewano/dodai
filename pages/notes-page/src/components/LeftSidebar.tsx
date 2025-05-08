@@ -4,7 +4,6 @@ import type { NoteEntry, ChatConversation } from '@extension/storage';
 import NoteCard from './NoteCard';
 import FolderCard from './FolderCard';
 import ScratchpadCard from './ScratchpadCard';
-import FolderBreadcrumb from './FolderBreadcrumb';
 import SortOptions from './SortOptions';
 import type { SortOption } from '../hooks/useFilterAndSort';
 import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
@@ -29,7 +28,6 @@ interface LeftSidebarProps {
   scratchpad: NoteEntry | null;
   chatHistory: ChatConversation[];
   currentFolderId: string | null;
-  folderPath: NoteEntry[];
   selectedNoteId: string | null;
   selectedChatId: string | null;
   sortOption: SortOption;
@@ -54,7 +52,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   scratchpad,
   chatHistory,
   currentFolderId,
-  folderPath,
   selectedNoteId,
   selectedChatId,
   sortOption,
@@ -229,9 +226,6 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                 </button>
               </div>
             )}
-
-            {/* Breadcrumb navigation */}
-            <FolderBreadcrumb path={folderPath} onNavigate={onNavigateToFolder} />
 
             {/* Sort options */}
             <SortOptions value={sortOption} onChange={onSortChange} />

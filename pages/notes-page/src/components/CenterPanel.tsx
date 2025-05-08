@@ -27,7 +27,6 @@ interface CenterPanelProps {
   onSaveChanges: () => Promise<void>;
   onCancelEdit: () => void;
   onDeleteNote: () => Promise<void>;
-  onTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onContentChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onTagInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTagInputKeyDown: (e: React.KeyboardEvent) => void;
@@ -52,7 +51,6 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   textareaRef,
   onSaveChanges,
   onDeleteNote,
-  onTitleChange,
   onContentChange,
   onTagInputChange,
   onTagInputKeyDown,
@@ -129,13 +127,8 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
       <div className="flex flex-col h-full">
         <div className="p-4 pb-2">
           <div className="mb-3 flex justify-between items-center">
-            <input
-              type="text"
-              value={editedTitle}
-              onChange={onTitleChange}
-              placeholder="Titre de la note"
-              className="text-2xl font-bold bg-transparent border-0 border-b border-transparent hover:border-gray-700 focus:border-blue-500 focus:outline-none w-full px-0 py-1"
-            />
+            {/* Le titre est maintenant complètement géré dans le Header */}
+            <div />
 
             <div className="flex space-x-2">
               <div className="text-sm text-gray-400 flex items-center mr-2">

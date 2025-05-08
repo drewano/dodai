@@ -31,6 +31,9 @@ const NotesPage = () => {
   const [selectedItemType, setSelectedItemType] = useState<'note' | 'chat'>('note');
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
   const [expandedSection, setExpandedSection] = useState<'notes' | 'chats' | null>('notes');
+  // Nouveaux états pour contrôler la visibilité des barres latérales
+  const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(true);
+  const [showRightSidebar, setShowRightSidebar] = useState<boolean>(true);
 
   // Get chat history data
   const chatHistory = useStorage(chatHistoryStorage);
@@ -90,6 +93,15 @@ const NotesPage = () => {
     textareaRef as React.RefObject<HTMLTextAreaElement>,
     setEditedContent,
   );
+
+  // Toggle sidebars
+  const toggleLeftSidebar = useCallback(() => {
+    setShowLeftSidebar(prev => !prev);
+  }, []);
+
+  const toggleRightSidebar = useCallback(() => {
+    setShowRightSidebar(prev => !prev);
+  }, []);
 
   // Select note handler (switches to note view)
   const handleSelectNoteItem = useCallback(
@@ -186,55 +198,70 @@ const NotesPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-900 text-gray-100 flex flex-col">
-      {/* Header */}
-      <Header />
+      <Header
+        showLeftSidebar={showLeftSidebar}
+        showRightSidebar={showRightSidebar}
+        toggleLeftSidebar={toggleLeftSidebar}
+        toggleRightSidebar={toggleRightSidebar}
+        selectedNote={selectedNote}
+        selectedItemType={selectedItemType}
+        folderPath={folderPath}
+        navigateToFolder={navigateToFolder}
+        currentFolderId={currentFolderId}
+        isEditing={isEditing}
+        editedTitle={editedTitle}
+        onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
+      />
 
       {/* Main Content */}
       <main className="flex-1 flex overflow-hidden">
-        {/* Left Sidebar */}
-        <div
-          ref={leftSidebarRef}
-          className="flex-shrink-0 bg-gray-800 border-r border-gray-700"
-          style={{ width: `${leftSidebarWidth}px` }}>
-          <LeftSidebar
-            notes={filteredAndSortedNotes}
-            scratchpad={scratchpad || null}
-            chatHistory={chatHistory}
-            currentFolderId={currentFolderId}
-            folderPath={folderPath}
-            selectedNoteId={selectedNote?.id || null}
-            selectedChatId={selectedChatId}
-            sortOption={sortOption}
-            expandedSection={expandedSection}
-            onToggleSection={handleToggleSection}
-            onSelectNote={handleSelectNoteItem}
-            onSelectChat={handleSelectChat}
-            onCreateNote={handleCreateNewNote}
-            onCreateFolder={handleCreateFolder}
-            onNavigateToFolder={navigateToFolder}
-            onClearScratchpad={clearScratchpad}
-            onMoveNoteToFolder={moveNoteToFolder}
-            onMoveFolder={moveFolder}
-            onCreateFolderFromNotes={createFolderFromNotes}
-            onSortChange={handleSortChange}
-            getChildrenOf={getChildrenOf}
-            activeTag={activeTag}
-          />
-        </div>
+        {/* Left Sidebar - conditionnellement affiché */}
+        {showLeftSidebar && (
+          <>
+            <div
+              ref={leftSidebarRef}
+              className="flex-shrink-0 bg-gray-800 border-r border-gray-700"
+              style={{ width: `${leftSidebarWidth}px` }}>
+              <LeftSidebar
+                notes={filteredAndSortedNotes}
+                scratchpad={scratchpad || null}
+                chatHistory={chatHistory}
+                currentFolderId={currentFolderId}
+                selectedNoteId={selectedNote?.id || null}
+                selectedChatId={selectedChatId}
+                sortOption={sortOption}
+                expandedSection={expandedSection}
+                onToggleSection={handleToggleSection}
+                onSelectNote={handleSelectNoteItem}
+                onSelectChat={handleSelectChat}
+                onCreateNote={handleCreateNewNote}
+                onCreateFolder={handleCreateFolder}
+                onNavigateToFolder={navigateToFolder}
+                onClearScratchpad={clearScratchpad}
+                onMoveNoteToFolder={moveNoteToFolder}
+                onMoveFolder={moveFolder}
+                onCreateFolderFromNotes={createFolderFromNotes}
+                onSortChange={handleSortChange}
+                getChildrenOf={getChildrenOf}
+                activeTag={activeTag}
+              />
+            </div>
 
-        {/* Resize Handle for Left Sidebar */}
-        <button
-          type="button"
-          aria-label="Redimensionner la barre latérale gauche"
-          className="cursor-col-resize w-1 bg-gray-700 hover:bg-blue-500 active:bg-blue-600 p-0 border-0 focus:outline-none"
-          onMouseDown={handleMouseDownLeft}
-          onKeyDown={(e: React.KeyboardEvent) => {
-            if (e.key === 'ArrowLeft') {
-              setLeftSidebarWidth(prev => Math.max(150, prev - 10));
-            } else if (e.key === 'ArrowRight') {
-              setLeftSidebarWidth(prev => Math.min(400, prev + 10));
-            }
-          }}></button>
+            {/* Resize Handle for Left Sidebar */}
+            <button
+              type="button"
+              aria-label="Redimensionner la barre latérale gauche"
+              className="cursor-col-resize w-1 bg-gray-700 hover:bg-blue-500 active:bg-blue-600 p-0 border-0 focus:outline-none"
+              onMouseDown={handleMouseDownLeft}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === 'ArrowLeft') {
+                  setLeftSidebarWidth(prev => Math.max(150, prev - 10));
+                } else if (e.key === 'ArrowRight') {
+                  setLeftSidebarWidth(prev => Math.min(400, prev + 10));
+                }
+              }}></button>
+          </>
+        )}
 
         {/* Center Panel */}
         <div className="flex-1 flex flex-col overflow-hidden">
@@ -253,7 +280,6 @@ const NotesPage = () => {
             onSaveChanges={handleSaveChanges}
             onCancelEdit={handleCancelEdit}
             onDeleteNote={handleDeleteNote}
-            onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
             onContentChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditedContent(e.target.value)}
             onTagInputChange={(e: React.ChangeEvent<HTMLInputElement>) => setTagInput(e.target.value)}
             onTagInputKeyDown={handleTagInputKeyDown}
@@ -266,32 +292,37 @@ const NotesPage = () => {
           />
         </div>
 
-        {/* Resize Handle for Right Sidebar */}
-        <button
-          type="button"
-          aria-label="Redimensionner la barre latérale droite"
-          className="cursor-col-resize w-1 bg-gray-700 hover:bg-blue-500 active:bg-blue-600 p-0 border-0 focus:outline-none"
-          onMouseDown={handleMouseDownRight}
-          onKeyDown={(e: React.KeyboardEvent) => {
-            if (e.key === 'ArrowLeft') {
-              setRightSidebarWidth(prev => Math.min(300, prev + 10));
-            } else if (e.key === 'ArrowRight') {
-              setRightSidebarWidth(prev => Math.max(150, prev - 10));
-            }
-          }}></button>
+        {/* Right Sidebar - conditionnellement affiché */}
+        {showRightSidebar && (
+          <>
+            {/* Resize Handle for Right Sidebar */}
+            <button
+              type="button"
+              aria-label="Redimensionner la barre latérale droite"
+              className="cursor-col-resize w-1 bg-gray-700 hover:bg-blue-500 active:bg-blue-600 p-0 border-0 focus:outline-none"
+              onMouseDown={handleMouseDownRight}
+              onKeyDown={(e: React.KeyboardEvent) => {
+                if (e.key === 'ArrowLeft') {
+                  setRightSidebarWidth(prev => Math.min(300, prev + 10));
+                } else if (e.key === 'ArrowRight') {
+                  setRightSidebarWidth(prev => Math.max(150, prev - 10));
+                }
+              }}></button>
 
-        {/* Right Sidebar */}
-        <div
-          ref={rightSidebarRef}
-          className="flex-shrink-0 bg-gray-800 border-l border-gray-700"
-          style={{ width: `${rightSidebarWidth}px` }}>
-          <RightSidebar
-            allTags={allTags}
-            activeTag={activeTag}
-            onTagSelect={handleTagFilter}
-            onClearFilter={clearTagFilter}
-          />
-        </div>
+            {/* Right Sidebar */}
+            <div
+              ref={rightSidebarRef}
+              className="flex-shrink-0 bg-gray-800 border-l border-gray-700"
+              style={{ width: `${rightSidebarWidth}px` }}>
+              <RightSidebar
+                allTags={allTags}
+                activeTag={activeTag}
+                onTagSelect={handleTagFilter}
+                onClearFilter={clearTagFilter}
+              />
+            </div>
+          </>
+        )}
       </main>
     </div>
   );
