@@ -252,12 +252,6 @@ export function useRagStreamingConnection({ onStreamEnd, onStreamError }: UseRag
 
       setupPortListeners(port, setMessages);
 
-      // Add assistant placeholder message for streaming response
-      setMessages(prev => [
-        ...prev,
-        { role: 'assistant', content: '', reasoning: null, isStreaming: true, sourceDocuments: [] },
-      ]);
-
       const requestPayload = {
         type: MessageType.RAG_CHAT_REQUEST,
         payload: {
