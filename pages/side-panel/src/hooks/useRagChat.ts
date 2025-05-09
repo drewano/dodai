@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Message, RagSourceDocument } from '../types';
-import { useRagStreamingConnection } from './useRagStreamingConnection';
+import { useBaseStreamingConnection } from './useBaseStreamingConnection';
 
 /**
  * Hook qui gère la fonctionnalité du chat RAG avec les notes
@@ -21,10 +21,16 @@ export function useRagChat() {
     messagesRef.current = messages;
   }, [messages]);
 
-  const handleStreamEnd = useCallback((success: boolean, sourceDocs?: RagSourceDocument[]) => {
+  const handleStreamStart = useCallback((modelName?: string) => {
+    console.log(`[RAG Chat] Streaming démarré avec le modèle: ${modelName || 'non spécifié'}`);
+  }, []);
+
+  const handleStreamEnd = useCallback((success: boolean, extraData?: Record<string, unknown>) => {
     // If needed, handle source documents being attached to the last message
-    // This is already handled by useRagStreamingConnection setting sourceDocuments on the streaming message
+    // This is already handled by useBaseStreamingConnection setting sourceDocuments on the streaming message
+    const sourceDocs = extraData?.sourceDocuments as RagSourceDocument[] | undefined;
     console.log('[RAG Chat] Stream ended.', { success, sourceDocs });
+
     if (sourceDocs && sourceDocs.length > 0) {
       setMessages(prev =>
         prev.map(m => {
@@ -44,10 +50,16 @@ export function useRagChat() {
     setMessages(prev => [...prev, { role: 'system', content: `Erreur: ${error}`, sourceDocuments: [] }]);
   }, []);
 
-  const { isLoading, startStreaming } = useRagStreamingConnection({
-    onStreamEnd: handleStreamEnd,
-    onStreamError: handleStreamError,
+  // Utiliser notre hook de base pour le streaming
+  const streamingConnection = useBaseStreamingConnection({
+    streamingEventHandlers: {
+      onStreamStart: handleStreamStart,
+      onStreamEnd: handleStreamEnd,
+      onStreamError: handleStreamError,
+    },
   });
+
+  const isLoading = streamingConnection.isLoading;
 
   useEffect(() => {
     if (messagesEndRef.current) {
@@ -64,10 +76,21 @@ export function useRagChat() {
       setMessages(prev => [...prev, userMessage]);
       setInput('');
 
-      // Start streaming with the current messages (for history) and the setMessages updater
-      startStreaming(input, messagesRef.current, setMessages);
+      // Ajouter un message assistant vide pour le streaming
+      setMessages(prev => [
+        ...prev,
+        {
+          role: 'assistant',
+          content: '',
+          isStreaming: true,
+          sourceDocuments: [],
+        },
+      ]);
+
+      // Utiliser la méthode startRagStreaming du hook de base
+      streamingConnection.startRagStreaming(input, messagesRef.current, setMessages);
     },
-    [input, isLoading, startStreaming, setMessages],
+    [input, isLoading, streamingConnection, setMessages],
   );
 
   return {

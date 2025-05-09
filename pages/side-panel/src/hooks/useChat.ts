@@ -1,6 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
 import type { Message } from '../types';
-import { useStreamingConnection } from './useStreamingConnection';
+import { useBaseStreamingConnection } from './useBaseStreamingConnection';
 import { useChatHistory } from './useChatHistory';
 
 interface UseChatOptions {
@@ -30,15 +30,19 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
     messagesRef.current = messages;
   }, [messages]);
 
-  // Gestion des callbacks pour le streaming
+  // Gestionnaires d'événements pour le streaming
+  const handleStreamStart = useCallback((modelName?: string) => {
+    console.log(`[Chat] Streaming démarré avec le modèle: ${modelName || 'non spécifié'}`);
+  }, []);
+
   const handleStreamEnd = useCallback(
     (success: boolean = true) => {
       // Sauvegarder la conversation après la fin du streaming
       // Utiliser messagesRef.current pour accéder aux messages les plus récents
       if (activeConversationId && success) {
-        console.log('[SidePanel] Sauvegarde des messages à la fin du streaming:', messagesRef.current);
+        console.log('[Chat] Sauvegarde des messages à la fin du streaming:', messagesRef.current);
         saveCurrentMessages(messagesRef.current).catch(error => {
-          console.error('[SidePanel] Erreur lors de la sauvegarde des messages:', error);
+          console.error('[Chat] Erreur lors de la sauvegarde des messages:', error);
         });
       }
     },
@@ -46,7 +50,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
   );
 
   const handleStreamError = useCallback((error: string) => {
-    console.error('Stream error:', error);
+    console.error('[Chat] Stream error:', error);
 
     // Mettre à jour le message en streaming avec l'erreur
     setMessages(prev => {
@@ -72,11 +76,17 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
     });
   }, []);
 
-  // Intégration du hook de streaming
-  const { isLoading, startStreaming, cleanupStreamingConnection } = useStreamingConnection({
-    onStreamEnd: handleStreamEnd,
-    onStreamError: handleStreamError,
+  // Utiliser notre hook de base pour le streaming
+  const streamingConnection = useBaseStreamingConnection({
+    streamingEventHandlers: {
+      onStreamStart: handleStreamStart,
+      onStreamEnd: handleStreamEnd,
+      onStreamError: handleStreamError,
+    },
   });
+
+  // État de chargement
+  const isLoading = streamingConnection.isLoading;
 
   // Scroll to bottom whenever messages change
   useEffect(() => {
@@ -152,10 +162,27 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
       ]);
 
       try {
-        // Démarrer le streaming
-        await startStreaming(input, messagesRef.current, setMessages);
+        // Préparer le message d'assistant qui recevra le stream
+        setMessages(prev => {
+          const newMessages = [...prev];
+          const tempMessageIndex = newMessages.findIndex(m => m.isStreaming && m.isTemporary);
+
+          if (tempMessageIndex !== -1) {
+            newMessages[tempMessageIndex] = {
+              role: 'assistant',
+              content: '',
+              reasoning: '',
+              isStreaming: true,
+            };
+          }
+
+          return newMessages;
+        });
+
+        // Démarrer le streaming standard
+        streamingConnection.startStandardStreaming(input, messagesRef.current, setMessages);
       } catch (error) {
-        console.error('Error starting stream:', error);
+        console.error('[Chat] Error starting stream:', error);
 
         let errorMessage = 'Désolé, une erreur est survenue. Veuillez réessayer plus tard.';
         if (error instanceof Error) {
@@ -177,7 +204,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
           return newMessages;
         });
 
-        cleanupStreamingConnection();
+        streamingConnection.cleanupStreamingConnection();
       } finally {
         setIsFetchingPageContent(false);
       }
@@ -189,8 +216,7 @@ export function useChat({ isReady, selectedModel, activeConversationId }: UseCha
       isReady,
       activeConversationId,
       selectedModel,
-      cleanupStreamingConnection,
-      startStreaming,
+      streamingConnection,
       createNewConversation,
       addMessageToConversation,
     ],

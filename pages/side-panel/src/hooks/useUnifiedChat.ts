@@ -1,7 +1,6 @@
 import { useState, useRef, useCallback, useEffect } from 'react';
-import type { Message, RagSourceDocument } from '../types';
-import { useStreamingConnection } from './useStreamingConnection';
-import { useRagStreamingConnection } from './useRagStreamingConnection';
+import type { Message } from '../types';
+import { useBaseStreamingConnection } from './useBaseStreamingConnection';
 import { useChatHistory } from './useChatHistory';
 
 interface UseUnifiedChatOptions {
@@ -56,11 +55,15 @@ export function useUnifiedChat({ isReady, selectedModel, activeConversationId }:
     });
   }, []);
 
-  // Callbacks pour le streaming standard
-  const handleStandardStreamEnd = useCallback(
+  // Gestionnaires d'événements pour le streaming
+  const handleStreamStart = useCallback((modelName?: string) => {
+    console.log(`[UnifiedChat] Streaming démarré avec le modèle: ${modelName || 'non spécifié'}`);
+  }, []);
+
+  const handleStreamEnd = useCallback(
     (success: boolean = true) => {
       if (activeConversationId && success) {
-        console.log('[UnifiedChat] Sauvegarde des messages à la fin du streaming standard:', messagesRef.current);
+        console.log('[UnifiedChat] Sauvegarde des messages à la fin du streaming:', messagesRef.current);
         saveCurrentMessages(messagesRef.current).catch(error => {
           console.error('[UnifiedChat] Erreur lors de la sauvegarde des messages:', error);
         });
@@ -69,53 +72,25 @@ export function useUnifiedChat({ isReady, selectedModel, activeConversationId }:
     [saveCurrentMessages, activeConversationId],
   );
 
-  const handleStandardStreamError = useCallback(
+  const handleStreamError = useCallback(
     (error: string) => {
-      console.error('[UnifiedChat] Stream error (standard):', error);
+      console.error('[UnifiedChat] Stream error:', error);
       updateMessagesWithError(error);
     },
     [updateMessagesWithError],
   );
 
-  // Callbacks pour le streaming RAG
-  const handleRagStreamEnd = useCallback(
-    (success: boolean, sourceDocs?: RagSourceDocument[]) => {
-      console.log('[UnifiedChat] Stream ended (RAG).', { success, sourceDocs });
-      // Les sources sont désormais gérées directement dans useRagStreamingConnection
-      // Nous n'avons plus besoin de les ajouter ici pour éviter les doublons
-
-      // Sauvegarde de la conversation si nécessaire
-      if (activeConversationId && success) {
-        console.log('[UnifiedChat] Sauvegarde des messages à la fin du streaming RAG:', messagesRef.current);
-        saveCurrentMessages(messagesRef.current).catch(error => {
-          console.error('[UnifiedChat] Erreur lors de la sauvegarde des messages RAG:', error);
-        });
-      }
+  // Utiliser notre hook de base pour le streaming
+  const streamingConnection = useBaseStreamingConnection({
+    streamingEventHandlers: {
+      onStreamStart: handleStreamStart,
+      onStreamEnd: handleStreamEnd,
+      onStreamError: handleStreamError,
     },
-    [saveCurrentMessages, activeConversationId],
-  );
-
-  const handleRagStreamError = useCallback(
-    (error: string) => {
-      console.error('[UnifiedChat] Stream error (RAG):', error);
-      updateMessagesWithError(error);
-    },
-    [updateMessagesWithError],
-  );
-
-  // Intégration des hooks de streaming
-  const standardStreaming = useStreamingConnection({
-    onStreamEnd: handleStandardStreamEnd,
-    onStreamError: handleStandardStreamError,
-  });
-
-  const ragStreaming = useRagStreamingConnection({
-    onStreamEnd: handleRagStreamEnd,
-    onStreamError: handleRagStreamError,
   });
 
   // État de chargement combiné
-  const isLoading = standardStreaming.isLoading || ragStreaming.isLoading;
+  const isLoading = streamingConnection.isLoading;
 
   // Scroll vers le bas quand les messages changent
   useEffect(() => {
@@ -193,7 +168,7 @@ export function useUnifiedChat({ isReady, selectedModel, activeConversationId }:
             },
           ]);
 
-          ragStreaming.startStreaming(input, messagesRef.current, setMessages, selectedModel);
+          streamingConnection.startRagStreaming(input, messagesRef.current, setMessages, selectedModel);
         } else {
           // Mode standard - récupérer le contenu de la page et utiliser le streaming standard
           setIsFetchingPageContent(true);
@@ -207,8 +182,25 @@ export function useUnifiedChat({ isReady, selectedModel, activeConversationId }:
             },
           ]);
 
+          // Avant de commencer le streaming standard, on prépare le message d'assistant qui recevra le stream
+          setMessages(prev => {
+            const newMessages = [...prev];
+            const tempMessageIndex = newMessages.findIndex(m => m.isStreaming && m.isTemporary);
+
+            if (tempMessageIndex !== -1) {
+              newMessages[tempMessageIndex] = {
+                role: 'assistant',
+                content: '',
+                reasoning: '',
+                isStreaming: true,
+              };
+            }
+
+            return newMessages;
+          });
+
           // Démarrer le streaming standard
-          await standardStreaming.startStreaming(input, messagesRef.current, setMessages);
+          streamingConnection.startStandardStreaming(input, messagesRef.current, setMessages);
         }
       } catch (error) {
         console.error('[UnifiedChat] Error starting stream:', error);
@@ -232,8 +224,7 @@ export function useUnifiedChat({ isReady, selectedModel, activeConversationId }:
       isRagMode,
       activeConversationId,
       selectedModel,
-      standardStreaming,
-      ragStreaming,
+      streamingConnection,
       createNewConversation,
       addMessageToConversation,
       updateMessagesWithError,

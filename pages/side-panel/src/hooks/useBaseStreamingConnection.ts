@@ -1,26 +1,28 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
-import type { Message } from '../types';
+import type { Message, RagSourceDocument } from '../types';
 import { useMarkdownProcessing } from './useMarkdownProcessing';
 import { StreamEventType, MessageType } from '../../../../chrome-extension/src/background/types';
 
-interface UseStreamingConnectionOptions {
-  onStreamEnd: (success: boolean) => void;
+export type StreamingEventHandlers = {
+  onStreamStart?: (modelName?: string) => void;
+  onStreamEnd: (success: boolean, extraData?: Record<string, unknown>) => void;
   onStreamError: (error: string) => void;
+};
+
+export type MessageUpdater = (messages: Message[]) => void;
+
+export interface UseBaseStreamingConnectionOptions {
+  streamingEventHandlers: StreamingEventHandlers;
 }
 
 /**
- * Hook qui gère la connexion de streaming avec le background script
+ * Hook de base qui gère la connexion de streaming avec le background script
  */
-export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStreamingConnectionOptions) {
+export function useBaseStreamingConnection({ streamingEventHandlers }: UseBaseStreamingConnectionOptions) {
   const [isLoading, setIsLoading] = useState(false);
   const streamingPort = useRef<chrome.runtime.Port | null>(null);
   const streamingPortId = useRef<string | null>(null);
   const { extractReasoning } = useMarkdownProcessing();
-
-  // État pour suivre le mode de streaming actuel
-  const isInThinkMode = useRef<boolean>(false);
-  const thinkContentBuffer = useRef<string>('');
-  const thinkDepth = useRef<number>(0);
 
   // Nettoie la connexion de streaming
   const cleanupStreamingConnection = useCallback(() => {
@@ -28,7 +30,7 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
       try {
         streamingPort.current.disconnect();
       } catch (e) {
-        console.warn('[SidePanel] Erreur lors de la déconnexion du port:', e);
+        console.warn('[BaseStreamingConnection] Erreur lors de la déconnexion du port:', e);
       }
       streamingPort.current = null;
       streamingPortId.current = null;
@@ -45,9 +47,10 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
   }, [cleanupStreamingConnection]);
 
   // Initialise une connexion de streaming
-  const initStreamingConnection = useCallback(() => {
+  const initStreamingConnection = useCallback((type: 'ai' | 'rag') => {
     // Générer un ID unique pour ce port
-    const uniquePortId = `ai_streaming_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    const prefix = type === 'ai' ? 'ai_streaming_' : 'rag_streaming_';
+    const uniquePortId = `${prefix}${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
     streamingPortId.current = uniquePortId;
 
     // Créer le port
@@ -64,7 +67,7 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
     (chunk: string, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
       // Logguer pour déboguer (en développement)
       console.log(
-        `[SidePanel] Chunk reçu (${chunk.length} chars):`,
+        `[BaseStreamingConnection] Chunk reçu (${chunk.length} chars):`,
         chunk.length > 50 ? chunk.substring(0, 50) + '...' : chunk,
       );
 
@@ -76,13 +79,6 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
       const extracted = extractReasoning(chunk);
       visibleContent = extracted.cleanContent || '';
       reasoningContent = extracted.reasoning || '';
-
-      // Loguer les résultats de l'extraction pour débogage
-      console.log('[SidePanel] Séparation - Content:', visibleContent.substring(0, 50) + '...');
-      console.log(
-        '[SidePanel] Séparation - Reasoning:',
-        reasoningContent?.substring(0, 50) + (reasoningContent?.length > 50 ? '...' : '') || 'aucun',
-      );
 
       // Mettre à jour le message en streaming
       setMessages(prev => {
@@ -122,7 +118,11 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
 
   // Gère la fin du streaming
   const handleStreamEnd = useCallback(
-    (success: boolean, model: string | undefined, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
+    (
+      success: boolean,
+      extraData: Record<string, unknown>,
+      setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+    ) => {
       if (success) {
         // Finaliser le message en streaming
         setMessages(prev => {
@@ -137,7 +137,7 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
             let finalReasoning = currentMessage.reasoning || '';
 
             if (finalContent.includes('<think>')) {
-              console.log('[SidePanel] Extraction finale nécessaire à la fin du streaming');
+              console.log('[BaseStreamingConnection] Extraction finale nécessaire à la fin du streaming');
               const extractedContent = extractReasoning(finalContent);
 
               finalContent = extractedContent.cleanContent || '';
@@ -151,13 +151,20 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
               }
             }
 
+            // Extraire le nom du modèle s'il est présent
+            const modelName = extraData?.model as string | undefined;
+
+            // Gérer les documents sources pour RAG si présents
+            const sourceDocuments = extraData?.sourceDocuments as RagSourceDocument[] | undefined;
+
             // Enlever le marqueur de streaming et finaliser le contenu
             newMessages[streamingMessageIndex] = {
               ...currentMessage,
               content: finalContent,
               isStreaming: false,
               reasoning: finalReasoning,
-              model: model,
+              model: modelName,
+              ...(sourceDocuments ? { sourceDocuments } : {}),
             };
           }
 
@@ -165,39 +172,26 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
         });
       }
 
-      // Nettoyer les variables de streaming
-      isInThinkMode.current = false;
-      thinkContentBuffer.current = '';
-      thinkDepth.current = 0;
-
       // Fermer et nettoyer le port
       cleanupStreamingConnection();
 
       // Appeler le callback onStreamEnd après un court délai pour s'assurer que les états sont à jour
       setTimeout(() => {
-        onStreamEnd(success);
+        streamingEventHandlers.onStreamEnd(success, extraData);
       }, 100);
     },
-    [cleanupStreamingConnection, extractReasoning, onStreamEnd],
+    [cleanupStreamingConnection, extractReasoning, streamingEventHandlers],
   );
 
   // Configure les écouteurs de port
   const setupPortListeners = useCallback(
     (port: chrome.runtime.Port, setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
-      // Variable pour stocker le modèle utilisé pour cette session de streaming
-      let currentModel: string | undefined;
-
       port.onMessage.addListener(message => {
-        // Déclarer la variable modelName en dehors du bloc case
-        let modelName: string | undefined;
-
         switch (message.type) {
           case StreamEventType.STREAM_START:
-            console.log('[SidePanel] Début du streaming');
-            // Stocker le nom du modèle s'il est fourni
-            if (message.model) {
-              currentModel = message.model;
-              console.log(`[SidePanel] Modèle utilisé: ${currentModel}`);
+            console.log('[BaseStreamingConnection] Début du streaming');
+            if (streamingEventHandlers.onStreamStart) {
+              streamingEventHandlers.onStreamStart(message.model);
             }
             break;
 
@@ -206,70 +200,48 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
             break;
 
           case StreamEventType.STREAM_END:
-            console.log('[SidePanel] Fin du streaming, success:', message.success);
-            // Utiliser le modèle du message de fin ou celui stocké depuis le début
-            modelName = message.model || currentModel;
-            handleStreamEnd(message.success, modelName, setMessages);
+            console.log('[BaseStreamingConnection] Fin du streaming, success:', message.success);
+            // Transmettre toutes les données supplémentaires (model, sourceDocuments, etc.)
+            handleStreamEnd(message.success, message as Record<string, unknown>, setMessages);
             break;
 
           case StreamEventType.STREAM_ERROR:
-            onStreamError(message.error);
+            streamingEventHandlers.onStreamError(message.error);
             break;
 
           default:
-            console.log('[SidePanel] Message de streaming inconnu:', message);
+            console.log('[BaseStreamingConnection] Message de streaming inconnu:', message);
         }
       });
 
       port.onDisconnect.addListener(() => {
-        console.log('[SidePanel] Port de streaming déconnecté');
+        console.log('[BaseStreamingConnection] Port de streaming déconnecté');
         if (isLoading) {
           // Si toujours en chargement, c'est une déconnexion inattendue
-          onStreamError('Connexion perdue avec le background');
+          streamingEventHandlers.onStreamError('Connexion perdue avec le background');
         }
         streamingPort.current = null;
         streamingPortId.current = null;
+        setIsLoading(false);
       });
     },
-    [handleStreamChunk, handleStreamEnd, isLoading, onStreamError],
+    [handleStreamChunk, handleStreamEnd, isLoading, streamingEventHandlers],
   );
 
-  // Commence le streaming avec le background
-  const startStreaming = useCallback(
-    (input: string, messages: Message[], setMessages: React.Dispatch<React.SetStateAction<Message[]>>) => {
-      // Réinitialiser les variables de suivi du raisonnement
-      isInThinkMode.current = false;
-      thinkContentBuffer.current = '';
-      thinkDepth.current = 0;
-
+  // Commence le streaming standard avec le background
+  const startStandardStreaming = useCallback(
+    (input: string, messages: Message[], setMessages: React.Dispatch<React.SetStateAction<Message[]>>): boolean => {
       // Initialiser le streaming
-      const portId = initStreamingConnection();
+      const portId = initStreamingConnection('ai');
       const port = streamingPort.current;
 
       if (!port) {
-        onStreamError("Échec de l'initialisation de la connexion streaming");
+        streamingEventHandlers.onStreamError("Échec de l'initialisation de la connexion streaming");
         return false;
       }
 
       // Configurer les écouteurs de port
       setupPortListeners(port, setMessages);
-
-      // Remplacer le message temporaire "Récupération du contenu de la page..." par un message d'assistant en streaming
-      setMessages(prev => {
-        const newMessages = [...prev];
-        const tempMessageIndex = newMessages.findIndex(m => m.isStreaming && m.isTemporary);
-
-        if (tempMessageIndex !== -1) {
-          newMessages[tempMessageIndex] = {
-            role: 'assistant',
-            content: '',
-            reasoning: '',
-            isStreaming: true,
-          };
-        }
-
-        return newMessages;
-      });
 
       // Préparer le payload avec le message, l'historique et les infos de streaming
       const requestPayload = {
@@ -286,38 +258,102 @@ export function useStreamingConnection({ onStreamEnd, onStreamError }: UseStream
             })),
           streamHandler: true,
           portId,
-          // Note: Le contenu de la page sera récupéré côté background
-          // On n'a pas besoin de l'envoyer ici
         },
       };
 
       // Envoyer la requête au background
       chrome.runtime.sendMessage(requestPayload, response => {
         if (chrome.runtime.lastError) {
-          console.error("[SidePanel] Erreur lors de l'envoi du message:", chrome.runtime.lastError);
-          onStreamError(chrome.runtime.lastError.message || 'Erreur de communication avec le background');
+          console.error("[BaseStreamingConnection] Erreur lors de l'envoi du message:", chrome.runtime.lastError);
+          streamingEventHandlers.onStreamError(
+            chrome.runtime.lastError.message || 'Erreur de communication avec le background',
+          );
           cleanupStreamingConnection();
           return;
         }
 
         if (!response || !response.success) {
           const errorMsg = response?.error || 'Erreur inconnue lors du lancement du streaming';
-          onStreamError(errorMsg);
+          streamingEventHandlers.onStreamError(errorMsg);
           cleanupStreamingConnection();
           return;
         }
 
-        console.log('[SidePanel] Requête de streaming envoyée avec succès');
+        console.log('[BaseStreamingConnection] Requête de streaming standard envoyée avec succès');
       });
 
       return true;
     },
-    [cleanupStreamingConnection, initStreamingConnection, onStreamError, setupPortListeners],
+    [cleanupStreamingConnection, initStreamingConnection, setupPortListeners, streamingEventHandlers],
+  );
+
+  // Commence le streaming RAG avec le background
+  const startRagStreaming = useCallback(
+    (
+      input: string,
+      messages: Message[],
+      setMessages: React.Dispatch<React.SetStateAction<Message[]>>,
+      selectedModel?: string,
+    ): boolean => {
+      // Initialiser le streaming
+      const portId = initStreamingConnection('rag');
+      const port = streamingPort.current;
+
+      if (!port) {
+        streamingEventHandlers.onStreamError("Échec de l'initialisation de la connexion streaming RAG");
+        return false;
+      }
+
+      // Configurer les écouteurs de port
+      setupPortListeners(port, setMessages);
+
+      // Préparer le payload RAG
+      const requestPayload = {
+        type: MessageType.RAG_CHAT_REQUEST,
+        payload: {
+          message: input,
+          chatHistory: messages
+            .filter(msg => msg.role === 'user' || msg.role === 'assistant')
+            .map(msg => ({
+              role: msg.role,
+              content: msg.content,
+            })),
+          streamHandler: true,
+          portId,
+          selectedModel,
+        },
+      };
+
+      // Envoyer la requête au background
+      chrome.runtime.sendMessage(requestPayload, response => {
+        if (chrome.runtime.lastError) {
+          console.error("[BaseStreamingConnection] Erreur lors de l'envoi du message RAG:", chrome.runtime.lastError);
+          streamingEventHandlers.onStreamError(
+            chrome.runtime.lastError.message || 'Erreur de communication avec le background pour RAG',
+          );
+          cleanupStreamingConnection();
+          return;
+        }
+
+        if (!response || !response.success) {
+          const errorMsg = response?.error || 'Erreur inconnue lors du lancement du streaming RAG';
+          streamingEventHandlers.onStreamError(errorMsg);
+          cleanupStreamingConnection();
+          return;
+        }
+
+        console.log('[BaseStreamingConnection] Requête de streaming RAG envoyée avec succès');
+      });
+
+      return true;
+    },
+    [cleanupStreamingConnection, initStreamingConnection, setupPortListeners, streamingEventHandlers],
   );
 
   return {
     isLoading,
-    startStreaming,
+    startStandardStreaming,
+    startRagStreaming,
     cleanupStreamingConnection,
     streamingPortId: streamingPortId.current,
   };
