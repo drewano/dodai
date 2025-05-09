@@ -19,7 +19,7 @@ export interface InlineAssistState {
   suggestionElement: HTMLElement | null;
   debounceTimer: NodeJS.Timeout | null;
   currentSuggestion: string;
-  isProcessingTab: boolean;
+  isProcessingSuggestion: boolean;
   pageContent: string;
   isWaitingForSuggestion: boolean;
   isEnabled: boolean;

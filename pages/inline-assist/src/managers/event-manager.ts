@@ -64,18 +64,18 @@ export function handleKeyDown(e: KeyboardEvent): void {
 
   if (!isEditableElement(target) || target !== stateManager.activeElement) return;
 
-  // Accepter la suggestion si Tab est pressé et qu'une suggestion est affichée
-  if (e.key === 'Tab' && stateManager.currentSuggestion && !stateManager.isProcessingTab) {
+  // Accepter la suggestion si Ctrl+Espace est pressé et qu'une suggestion est affichée
+  if (e.ctrlKey && e.code === 'Space' && stateManager.currentSuggestion && !stateManager.isProcessingSuggestion) {
     if (stateManager.suggestionElement) {
-      stateManager.isProcessingTab = true;
+      stateManager.isProcessingSuggestion = true;
       const accepted = acceptSuggestion();
 
       if (accepted) {
-        // Empêcher le comportement par défaut de Tab (changement de focus)
+        // Empêcher le comportement par défaut de Ctrl+Espace
         e.preventDefault();
       }
 
-      stateManager.isProcessingTab = false;
+      stateManager.isProcessingSuggestion = false;
     }
   }
 

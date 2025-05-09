@@ -10,7 +10,7 @@ const initialState: InlineAssistState = {
   suggestionElement: null,
   debounceTimer: null,
   currentSuggestion: '',
-  isProcessingTab: false,
+  isProcessingSuggestion: false,
   pageContent: '',
   isWaitingForSuggestion: false,
   isEnabled: true, // Par défaut, sera mis à jour depuis le storage
@@ -45,8 +45,8 @@ class StateManager {
     return this.state.currentSuggestion;
   }
 
-  get isProcessingTab(): boolean {
-    return this.state.isProcessingTab;
+  get isProcessingSuggestion(): boolean {
+    return this.state.isProcessingSuggestion;
   }
 
   get pageContent(): string {
@@ -86,8 +86,8 @@ class StateManager {
     this.updateState('currentSuggestion', value);
   }
 
-  set isProcessingTab(value: boolean) {
-    this.updateState('isProcessingTab', value);
+  set isProcessingSuggestion(value: boolean) {
+    this.updateState('isProcessingSuggestion', value);
   }
 
   set pageContent(value: string) {
