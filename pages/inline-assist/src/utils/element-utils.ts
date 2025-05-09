@@ -82,18 +82,58 @@ export function setCursorPosition(element: EditableElement, position: number): v
     return;
   }
 
-  // contenteditable - plus complexe
+  // Approche améliorée pour contenteditable
+  // qui gère les éléments avec structure complexe
   const selection = window.getSelection();
-  if (selection && element.firstChild) {
-    const range = document.createRange();
-    const textNode = element.firstChild;
-    const maxPosition = Math.min(position, textNode.textContent?.length || 0);
+  if (!selection) return;
 
-    range.setStart(textNode, maxPosition);
-    range.setEnd(textNode, maxPosition);
+  function findNodeAndOffsetAt(container: Node, targetPosition: number): { node: Node; offset: number } | null {
+    let currentPosition = 0;
 
-    selection.removeAllRanges();
-    selection.addRange(range);
+    function traverse(node: Node): { node: Node; offset: number } | null {
+      if (node.nodeType === Node.TEXT_NODE) {
+        const nodeLength = node.textContent?.length || 0;
+
+        if (currentPosition <= targetPosition && currentPosition + nodeLength >= targetPosition) {
+          return {
+            node: node,
+            offset: targetPosition - currentPosition,
+          };
+        }
+
+        currentPosition += nodeLength;
+      } else {
+        if (node.hasChildNodes()) {
+          for (let i = 0; i < node.childNodes.length; i++) {
+            const result = traverse(node.childNodes[i]);
+            if (result) return result;
+          }
+        }
+      }
+
+      return null;
+    }
+
+    return traverse(container);
+  }
+
+  const result = findNodeAndOffsetAt(element, position);
+
+  if (result) {
+    try {
+      const range = document.createRange();
+      range.setStart(result.node, result.offset);
+      range.collapse(true);
+
+      selection.removeAllRanges();
+      selection.addRange(range);
+
+      if (element instanceof HTMLElement) {
+        element.focus();
+      }
+    } catch (error) {
+      console.error('Erreur lors du positionnement du curseur:', error);
+    }
   }
 }
 

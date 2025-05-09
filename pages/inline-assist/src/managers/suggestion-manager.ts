@@ -51,33 +51,56 @@ export function positionSuggestionElement(element: HTMLElement, activeElement: E
     element.style.left = `${activeRect.left + textWidth + window.scrollX}px`;
     element.style.top = `${activeRect.top + window.scrollY}px`;
   } else if (activeElement instanceof HTMLTextAreaElement) {
-    // Pour un textarea, on doit considérer les sauts de ligne
-    // Copier les styles pour une mesure plus précise
+    // Approche améliorée pour les textarea
     const styles = window.getComputedStyle(activeElement);
     const textBeforeCursor = activeElement.value.substring(0, cursorPosition);
 
-    // Trouver le nombre de lignes avant le curseur
-    const lines = textBeforeCursor.split('\n');
-    const lastLine = lines[lines.length - 1];
+    // Créer un élément miroir pour calculer précisément la position
+    const mirror = document.createElement('div');
+    mirror.style.position = 'absolute';
+    mirror.style.top = '0';
+    mirror.style.left = '0';
+    mirror.style.visibility = 'hidden';
+    mirror.style.overflow = 'hidden';
+    mirror.style.width = `${activeElement.clientWidth}px`;
+    mirror.style.height = 'auto';
 
-    // Calculer la position verticale basée sur le nombre de lignes
-    const lineHeight = parseFloat(styles.lineHeight) || parseFloat(styles.fontSize) * 1.2;
-    const paddingTop = parseFloat(styles.paddingTop);
-    const borderTop = parseFloat(styles.borderTopWidth);
+    // Copier tous les styles qui affectent le texte
+    mirror.style.fontFamily = styles.fontFamily;
+    mirror.style.fontSize = styles.fontSize;
+    mirror.style.fontWeight = styles.fontWeight;
+    mirror.style.letterSpacing = styles.letterSpacing;
+    mirror.style.lineHeight = styles.lineHeight;
+    mirror.style.textTransform = styles.textTransform;
+    mirror.style.whiteSpace = styles.whiteSpace;
+    mirror.style.wordSpacing = styles.wordSpacing;
+    mirror.style.padding = styles.padding;
+    mirror.style.border = styles.border;
+    mirror.style.boxSizing = styles.boxSizing;
 
-    // Position verticale : hauteur de ligne * (nombre de lignes - 1) + padding + border
-    const verticalOffset = (lines.length - 1) * lineHeight + paddingTop + borderTop;
+    // Préparer le contenu du miroir
+    const textUpToCursor = document.createTextNode(textBeforeCursor);
+    const cursorSpan = document.createElement('span');
+    cursorSpan.id = 'mirror-cursor-marker';
+    mirror.appendChild(textUpToCursor);
+    mirror.appendChild(cursorSpan);
 
-    // Mesurer la largeur du texte de la dernière ligne
-    const lastLineWidth = measureTextWidth(lastLine, activeElement);
-    const paddingLeft = parseFloat(styles.paddingLeft);
-    const borderLeft = parseFloat(styles.borderLeftWidth);
+    document.body.appendChild(mirror);
 
-    element.style.left = `${activeRect.left + lastLineWidth + paddingLeft + borderLeft + window.scrollX}px`;
-    element.style.top = `${activeRect.top + verticalOffset + window.scrollY}px`;
+    // Obtenir la position précise du marqueur de curseur
+    const markerRect = cursorSpan.getBoundingClientRect();
+
+    // Calcul de la position absolue en tenant compte du défilement de l'élément
+    const cursorX = markerRect.left - mirror.getBoundingClientRect().left;
+    const cursorY = markerRect.top - mirror.getBoundingClientRect().top;
+
+    // Nettoyer
+    document.body.removeChild(mirror);
+
+    element.style.left = `${activeRect.left + cursorX - activeElement.scrollLeft + window.scrollX}px`;
+    element.style.top = `${activeRect.top + cursorY - activeElement.scrollTop + window.scrollY}px`;
   } else {
-    // contenteditable - encore plus complexe, approche simplifiée
-    // Une approche plus précise nécessiterait de déterminer la position exacte du caret
+    // contenteditable - utiliser l'API de sélection pour plus de précision
     const selection = window.getSelection();
     if (selection && selection.rangeCount > 0) {
       const range = selection.getRangeAt(0);
@@ -116,11 +139,67 @@ export function acceptSuggestion(): boolean {
   // Insérer la suggestion à la position du curseur
   const newValue =
     currentValue.substring(0, cursorPos) + stateManager.currentSuggestion + currentValue.substring(cursorPos);
-  setElementValue(stateManager.activeElement, newValue);
 
-  // Repositionner le curseur après la suggestion
+  // Calculer la nouvelle position du curseur avant de modifier la valeur
   const newCursorPosition = cursorPos + stateManager.currentSuggestion.length;
-  setCursorPosition(stateManager.activeElement, newCursorPosition);
+
+  // Pour les éléments contenteditable, approche spéciale
+  if (
+    !(stateManager.activeElement instanceof HTMLInputElement) &&
+    !(stateManager.activeElement instanceof HTMLTextAreaElement)
+  ) {
+    // Si c'est un contenteditable, on utilise un Range pour une meilleure précision
+    const selection = window.getSelection();
+    if (selection && selection.rangeCount > 0) {
+      // On sauvegarde l'ancienne plage pour pouvoir la restaurer si nécessaire
+      const oldRange = selection.getRangeAt(0).cloneRange();
+
+      // Mettre à jour le contenu
+      setElementValue(stateManager.activeElement, newValue);
+
+      // Maintenant, on force le focus et la position du curseur
+      if (stateManager.activeElement instanceof HTMLElement) {
+        stateManager.activeElement.focus();
+      }
+
+      // On crée une nouvelle plage à la position souhaitée
+      try {
+        // Positionner le curseur après la suggestion insérée
+        setCursorPosition(stateManager.activeElement, newCursorPosition);
+      } catch {
+        // Si ça échoue, on essaie de restaurer la plage originale avec un décalage
+        try {
+          console.warn('Positionnement du curseur échoué, tentative de fallback');
+          const range = document.createRange();
+          range.setStart(oldRange.startContainer, oldRange.startOffset + stateManager.currentSuggestion.length);
+          range.collapse(true);
+          selection.removeAllRanges();
+          selection.addRange(range);
+        } catch (innerError) {
+          console.error('Échec du positionnement du curseur:', innerError);
+        }
+      }
+    } else {
+      // Fallback si pas de sélection
+      setElementValue(stateManager.activeElement, newValue);
+      setCursorPosition(stateManager.activeElement, newCursorPosition);
+    }
+  } else {
+    // Pour input et textarea standards
+    setElementValue(stateManager.activeElement, newValue);
+
+    // Forcer un timeout pour permettre au navigateur de mettre à jour la valeur d'abord
+    setTimeout(() => {
+      // Vérifier que l'élément existe toujours
+      if (stateManager.activeElement) {
+        setCursorPosition(stateManager.activeElement, newCursorPosition);
+        // Double-vérification pour les textarea qui peuvent être problématiques
+        if (stateManager.activeElement instanceof HTMLTextAreaElement) {
+          stateManager.activeElement.setSelectionRange(newCursorPosition, newCursorPosition);
+        }
+      }
+    }, 0);
+  }
 
   removeSuggestion();
   return true;
