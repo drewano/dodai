@@ -13,7 +13,7 @@ import { useMarkdownTools } from './hooks/useMarkdownTools';
 import Header from './components/Header';
 import LeftSidebar from './components/LeftSidebar.js';
 import CenterPanel from './components/CenterPanel.js';
-import RightSidebar from './components/RightSidebar.js';
+import TagsPanel from './components/TagsPanel';
 
 // Types
 import type { NoteEntry } from '@extension/storage';
@@ -314,7 +314,8 @@ const NotesPage = () => {
               ref={rightSidebarRef}
               className="flex-shrink-0 bg-gray-800 border-l border-gray-700"
               style={{ width: `${rightSidebarWidth}px` }}>
-              <RightSidebar
+              <TagsPanel
+                notes={notes}
                 allTags={allTags}
                 activeTag={activeTag}
                 onTagSelect={handleTagFilter}
