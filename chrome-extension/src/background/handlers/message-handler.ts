@@ -19,6 +19,8 @@ import type {
   RagChatResponse,
   SaveMessageAsNoteMessage,
   SaveMessageAsNoteResponse,
+  GetInlineCompletionRequestMessage,
+  GetInlineCompletionResponseMessage,
 } from '../types';
 import { convertChatHistory, MessageType } from '../types';
 import { stateService } from '../services/state-service';
@@ -65,6 +67,8 @@ export class MessageHandler {
       this.handleRagChatRequest(message as RagChatRequestMessage),
     [MessageType.SAVE_MESSAGE_AS_NOTE]: (message: BaseRuntimeMessage) =>
       this.handleSaveMessageAsNote(message as SaveMessageAsNoteMessage),
+    [MessageType.GET_INLINE_COMPLETION_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleGetInlineCompletion(message as GetInlineCompletionRequestMessage),
   };
 
   /**
@@ -135,6 +139,78 @@ export class MessageHandler {
     } catch (error) {
       logger.error('Erreur lors de la génération des tags avec IA:', error);
       return [];
+    }
+  }
+
+  /**
+   * Gestionnaire pour les requêtes d'autocomplétion inline
+   */
+  private async handleGetInlineCompletion(
+    message: GetInlineCompletionRequestMessage,
+  ): Promise<GetInlineCompletionResponseMessage> {
+    logger.debug("Traitement de la requête d'autocomplétion inline", {
+      currentTextLength: message.currentText.length,
+      pageContentLength: message.pageContent.length,
+    });
+
+    try {
+      // Vérifier si le contenu est vide
+      if (!message.currentText.trim()) {
+        return {
+          type: MessageType.GET_INLINE_COMPLETION_RESPONSE,
+          success: false,
+          error: "Le texte de l'utilisateur est vide",
+        };
+      }
+
+      // Demander l'autocomplétion via l'agent service
+      const result = await agentService.getInlineCompletion(
+        message.currentText,
+        message.surroundingText,
+        message.pageContent,
+        message.selectedModel,
+      );
+
+      // Si une erreur est retournée
+      if (result.error) {
+        logger.warn("Erreur lors de la génération d'autocomplétion:", result.error);
+        return {
+          type: MessageType.GET_INLINE_COMPLETION_RESPONSE,
+          success: false,
+          error: result.error,
+          model: result.model,
+        };
+      }
+
+      // Si aucune complétion n'est générée
+      if (!result.completion) {
+        logger.debug("Aucune suggestion d'autocomplétion générée");
+        return {
+          type: MessageType.GET_INLINE_COMPLETION_RESPONSE,
+          success: false,
+          error: 'Aucune suggestion générée',
+          model: result.model,
+        };
+      }
+
+      logger.debug('Autocomplétion générée avec succès:', {
+        completionLength: result.completion.length,
+        model: result.model,
+      });
+
+      return {
+        type: MessageType.GET_INLINE_COMPLETION_RESPONSE,
+        success: true,
+        completion: result.completion,
+        model: result.model,
+      };
+    } catch (error) {
+      logger.error("Erreur inattendue lors du traitement de la requête d'autocomplétion:", error);
+      return {
+        type: MessageType.GET_INLINE_COMPLETION_RESPONSE,
+        success: false,
+        error: error instanceof Error ? error.message : "Erreur inconnue lors de la génération d'autocomplétion",
+      };
     }
   }
 

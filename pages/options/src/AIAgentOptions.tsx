@@ -100,6 +100,16 @@ export const AIAgentOptions = () => {
     aiAgentStorage.updateContextSize(parseInt(e.target.value, 10));
   };
 
+  const handleInlineAssistToggle = () => {
+    aiAgentStorage.toggleInlineAssistEnabled();
+  };
+
+  const handleInlineAssistModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const value = e.target.value;
+    // Si "Même que le modèle global" est sélectionné, enregistre null
+    aiAgentStorage.updateInlineAssistModel(value === '' ? null : value);
+  };
+
   const handleRefresh = () => {
     setIsLoading(true);
     checkOllamaServer();
@@ -349,6 +359,55 @@ export const AIAgentOptions = () => {
               Nombre maximum de tokens que le modèle peut traiter (paramètre num_ctx d'Ollama). Une valeur plus élevée
               permet de traiter des conversations plus longues, mais utilise plus de mémoire.
             </p>
+          </div>
+
+          {/* Options pour l'autocomplétion inline */}
+          <div className="mt-8 border-t border-gray-800 pt-6">
+            <h3 className="text-md font-medium text-blue-400 mb-4">Autocomplétion Inline</h3>
+
+            <div className="flex items-center mb-4">
+              <div className="relative inline-flex h-5 w-10 items-center">
+                <input
+                  type="checkbox"
+                  id="enable-inline-assist"
+                  checked={settings.inlineAssistEnabled}
+                  onChange={handleInlineAssistToggle}
+                  disabled={!isServerRunning || !settings.isEnabled}
+                  className="peer sr-only"
+                />
+                <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
+                <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
+              </div>
+              <label htmlFor="enable-inline-assist" className="ml-3 text-sm font-medium text-gray-300 select-none">
+                Activer l'autocomplétion inline
+              </label>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="inline-model-select" className="block text-sm font-medium text-gray-300">
+                Modèle pour l'autocomplétion
+              </label>
+              <select
+                id="inline-model-select"
+                value={settings.inlineAssistModel || ''}
+                onChange={handleInlineAssistModelChange}
+                className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                          focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                          disabled:opacity-60 disabled:cursor-not-allowed"
+                disabled={!isServerRunning || !settings.isEnabled || !settings.inlineAssistEnabled}>
+                <option value="">Même que le modèle global</option>
+                {availableModels.length === 0 && <option value="">Aucun modèle disponible</option>}
+                {availableModels.map(model => (
+                  <option key={model.id} value={model.name}>
+                    {model.name}
+                  </option>
+                ))}
+              </select>
+              <p className="text-xs text-gray-500">
+                Sélectionnez le modèle à utiliser spécifiquement pour l'autocomplétion inline, ou utilisez le même que
+                pour l'assistant global.
+              </p>
+            </div>
           </div>
         </div>
       </div>

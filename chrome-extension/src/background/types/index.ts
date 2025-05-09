@@ -96,6 +96,10 @@ export enum MessageType {
 
   // Nouveau type de message pour sauvegarder un message comme note
   SAVE_MESSAGE_AS_NOTE = 'SAVE_MESSAGE_AS_NOTE',
+
+  // Nouveaux types de messages pour l'autocomplétion inline
+  GET_INLINE_COMPLETION_REQUEST = 'GET_INLINE_COMPLETION_REQUEST',
+  GET_INLINE_COMPLETION_RESPONSE = 'GET_INLINE_COMPLETION_RESPONSE',
 }
 
 /**
@@ -253,6 +257,27 @@ export interface SaveMessageAsNoteResponse {
   success: boolean;
   noteId?: string;
   error?: string;
+}
+
+// Interface pour la requête d'autocomplétion inline
+export interface GetInlineCompletionRequestMessage extends BaseRuntimeMessage {
+  type: MessageType.GET_INLINE_COMPLETION_REQUEST;
+  currentText: string;
+  surroundingText: {
+    preceding: string;
+    succeeding: string;
+  };
+  pageContent: string;
+  selectedModel?: string;
+}
+
+// Interface pour la réponse d'autocomplétion inline
+export interface GetInlineCompletionResponseMessage extends BaseRuntimeMessage {
+  type: MessageType.GET_INLINE_COMPLETION_RESPONSE;
+  success: boolean;
+  completion?: string;
+  error?: string;
+  model?: string;
 }
 
 /**

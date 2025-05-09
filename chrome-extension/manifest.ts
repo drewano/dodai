@@ -50,6 +50,14 @@ const manifest = {
     128: 'icon-128.png',
   },
   devtools_page: 'devtools/index.html',
+  content_scripts: [
+    {
+      matches: ['<all_urls>'],
+      js: ['inline-assist/index.js'],
+      all_frames: true,
+      run_at: 'document_end',
+    },
+  ],
   web_accessible_resources: [
     {
       resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-34.png', 'notes-page/index.html'],

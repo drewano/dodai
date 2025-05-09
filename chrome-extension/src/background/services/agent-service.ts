@@ -246,6 +246,117 @@ export class AgentService {
   }
 
   /**
+   * Obtient une suggestion d'autocomplétion inline basée sur le contexte
+   * @param currentText Texte tapé par l'utilisateur jusqu'au curseur
+   * @param surroundingText Texte autour du curseur (précédent et suivant)
+   * @param pageContent Contenu de la page active
+   * @param selectedModel Modèle spécifique à utiliser (optionnel)
+   */
+  async getInlineCompletion(
+    currentText: string,
+    surroundingText: { preceding: string; succeeding: string },
+    pageContent: string,
+    selectedModel?: string,
+  ): Promise<{ completion: string; model: string; error?: string }> {
+    try {
+      // Vérifier si le serveur Ollama est prêt
+      const isReady = await this.isAgentReady();
+      if (!isReady) {
+        return {
+          completion: '',
+          model: '',
+          error: "Le service d'IA n'est pas disponible. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        };
+      }
+
+      // Créer une instance LLM avec le modèle spécifié ou par défaut
+      const llm = await this.createLLMInstance(selectedModel);
+      const settings = await aiAgentStorage.get();
+      const modelUsed = selectedModel || settings.selectedModel;
+
+      // Préparer un extrait du contenu de la page (limiter la taille)
+      const maxPageContentLength = 1500;
+      const pageContentSnippet =
+        pageContent.length > maxPageContentLength
+          ? pageContent.substring(0, maxPageContentLength) + '...'
+          : pageContent;
+
+      // Construire le prompt pour l'autocomplétion
+      const prompt = `Tu es un assistant d'écriture intelligent. Complète le texte de l'utilisateur.
+L'utilisateur écrit dans un champ de texte sur une page web.
+
+Contexte de la page web (contenu extrait):
+---
+${pageContentSnippet}
+---
+
+Contenu actuel du champ de texte:
+${surroundingText.preceding}<CURSOR_POSITION>${surroundingText.succeeding}
+---
+
+Entrée de l'utilisateur jusqu'au curseur: "${currentText}"
+---
+
+Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. Ne renvoie que la suggestion, pas d'explications ni de guillemets. La suggestion doit être courte et contextuellement pertinente, idéale pour une autocomplétion.`;
+
+      logger.debug("Envoi du prompt d'autocomplétion au LLM");
+
+      // Appeler le LLM pour obtenir la suggestion
+      const response = await llm.invoke([{ type: 'human', content: prompt }]);
+
+      if (typeof response.content !== 'string') {
+        return {
+          completion: '',
+          model: modelUsed,
+          error: 'Format de réponse invalide du LLM',
+        };
+      }
+
+      // Nettoyer la réponse: supprimer les guillemets, espaces en début/fin, et texte d'intro potentiel
+      let completion = response.content.trim();
+
+      // Supprimer les guillemets s'ils entourent complètement la réponse
+      if (
+        (completion.startsWith('"') && completion.endsWith('"')) ||
+        (completion.startsWith("'") && completion.endsWith("'"))
+      ) {
+        completion = completion.substring(1, completion.length - 1);
+      }
+
+      // Supprimer les phrases d'introduction communes
+      const introPatterns = [
+        'Voici ma suggestion:',
+        'Suggestion:',
+        'Voici une suggestion:',
+        'Je suggère:',
+        'Complétion:',
+      ];
+
+      for (const pattern of introPatterns) {
+        if (completion.startsWith(pattern)) {
+          completion = completion.substring(pattern.length).trim();
+          break;
+        }
+      }
+
+      logger.debug(`Autocomplétion générée: "${completion}"`);
+
+      return {
+        completion,
+        model: modelUsed,
+      };
+    } catch (error) {
+      logger.error("Erreur lors de la génération d'autocomplétion:", error);
+      return {
+        completion: '',
+        model: '',
+        error:
+          error instanceof Error ? error.message : "Une erreur s'est produite lors de la génération de la suggestion",
+      };
+    }
+  }
+
+  /**
    * Appelle l'AgentExecutor avec les outils MCP
    * @param input Message de l'utilisateur
    * @param history Historique du chat

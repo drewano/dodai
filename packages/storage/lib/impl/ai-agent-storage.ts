@@ -7,6 +7,8 @@ export interface AIAgentSettings {
   baseUrl: string;
   isEnabled: boolean;
   contextSize: number;
+  inlineAssistEnabled: boolean;
+  inlineAssistModel: string | null;
 }
 
 const defaultAgentSettings: AIAgentSettings = {
@@ -15,6 +17,8 @@ const defaultAgentSettings: AIAgentSettings = {
   baseUrl: 'http://localhost:11434',
   isEnabled: true,
   contextSize: 4096,
+  inlineAssistEnabled: true,
+  inlineAssistModel: null, // Null signifie que le modèle par défaut sera utilisé
 };
 
 type AIAgentStorageType = BaseStorage<AIAgentSettings> & {
@@ -23,6 +27,8 @@ type AIAgentStorageType = BaseStorage<AIAgentSettings> & {
   updateBaseUrl: (baseUrl: string) => Promise<void>;
   toggleEnabled: () => Promise<void>;
   updateContextSize: (contextSize: number) => Promise<void>;
+  toggleInlineAssistEnabled: () => Promise<void>;
+  updateInlineAssistModel: (model: string | null) => Promise<void>;
 };
 
 const storage = createStorage<AIAgentSettings>('ai-agent-settings', defaultAgentSettings, {
@@ -61,6 +67,18 @@ export const aiAgentStorage: AIAgentStorageType = {
     await storage.set(settings => ({
       ...settings,
       contextSize,
+    }));
+  },
+  toggleInlineAssistEnabled: async () => {
+    await storage.set(settings => ({
+      ...settings,
+      inlineAssistEnabled: !settings.inlineAssistEnabled,
+    }));
+  },
+  updateInlineAssistModel: async (model: string | null) => {
+    await storage.set(settings => ({
+      ...settings,
+      inlineAssistModel: model,
     }));
   },
 };
