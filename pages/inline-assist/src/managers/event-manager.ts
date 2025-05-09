@@ -4,7 +4,7 @@
 
 import { stateManager } from '../state';
 import { CONFIG } from '../config';
-import { isEditableElement } from '../utils/element-utils';
+import { isEditableElement, getElementValue, getCursorPosition } from '../utils/element-utils';
 import { showSuggestion, removeSuggestion, acceptSuggestion } from './suggestion-manager';
 import { requestCompletion } from '../services/api-service';
 import { extractPageContent } from '../utils/dom-utils';
@@ -92,8 +92,9 @@ export function handleKeyDown(e: KeyboardEvent): void {
 async function requestSuggestion(): Promise<void> {
   if (!stateManager.activeElement || stateManager.isWaitingForSuggestion || !stateManager.isEnabled) return;
 
-  const text = stateManager.activeElement.value;
-  const cursorPos = stateManager.activeElement.selectionStart || 0;
+  // Utiliser les fonctions utilitaires au lieu d'accéder directement aux propriétés
+  const text = getElementValue(stateManager.activeElement);
+  const cursorPos = getCursorPosition(stateManager.activeElement);
 
   // Vérifier que le texte n'est pas vide et que le curseur n'est pas au début
   if (!text || cursorPos === 0) return;
