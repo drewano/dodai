@@ -22,5 +22,10 @@ export default withPageConfig({
       entry: resolve(srcDir, 'index.ts'),
     },
     outDir: resolve(rootDir, '..', '..', 'dist', 'inline-assist'),
+    rollupOptions: {
+      output: {
+        entryFileNames: 'index.js',
+      },
+    },
   },
 });

@@ -761,6 +761,28 @@ importers:
         specifier: workspace:*
         version: link:../../packages/vite-config
 
+  pages/inline-assist:
+    dependencies:
+      '@extension/env':
+        specifier: workspace:*
+        version: link:../../packages/env
+      '@extension/shared':
+        specifier: workspace:*
+        version: link:../../packages/shared
+      '@extension/storage':
+        specifier: workspace:*
+        version: link:../../packages/storage
+    devDependencies:
+      '@extension/hmr':
+        specifier: workspace:*
+        version: link:../../packages/hmr
+      '@extension/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@extension/vite-config':
+        specifier: workspace:*
+        version: link:../../packages/vite-config
+
   pages/new-tab:
     dependencies:
       '@extension/i18n':
