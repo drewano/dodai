@@ -2,18 +2,29 @@ import { useRef } from 'react';
 import type { FC } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 
+// Types pour les éléments du graphe
+interface NodeObject {
+  id: string;
+  name: string;
+  val: number;
+  [key: string]: unknown;
+}
+
+interface LinkObject {
+  source: string;
+  target: string;
+  value: number;
+  [key: string]: unknown;
+}
+
+// Type générique pour la référence au graphe
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type ForceGraphInstance = any;
+
 interface TagGraphViewProps {
   tagData: {
-    nodes: Array<{
-      id: string;
-      name: string;
-      val: number; // Taille du noeud (nombre de notes avec ce tag)
-    }>;
-    links: Array<{
-      source: string;
-      target: string;
-      value: number; // Épaisseur du lien (nombre de cooccurrences)
-    }>;
+    nodes: Array<NodeObject>;
+    links: Array<LinkObject>;
   };
   activeTag: string | null;
   onTagSelect: (tag: string) => void;
@@ -21,10 +32,11 @@ interface TagGraphViewProps {
 }
 
 const TagGraphView: FC<TagGraphViewProps> = ({ tagData, activeTag, onTagSelect, onClearFilter }) => {
-  const fgRef = useRef<any>();
+  // On utilise un type plus simple pour la référence
+  const fgRef = useRef<ForceGraphInstance>(null);
 
   // Couleurs pour les noeuds
-  const nodeColor = (node: any) => {
+  const nodeColor = (node: NodeObject) => {
     if (activeTag && node.id === activeTag) {
       return '#3b82f6'; // blue-500 (sélectionné)
     }
@@ -68,12 +80,12 @@ const TagGraphView: FC<TagGraphViewProps> = ({ tagData, activeTag, onTagSelect, 
             graphData={tagData}
             nodeLabel="name"
             nodeColor={nodeColor}
-            nodeVal={node => node.val}
+            nodeVal={(node: NodeObject) => node.val}
             linkWidth={link => (link.value ? Math.sqrt(link.value) * 0.5 : 1)}
             nodeRelSize={6} // Taille de base des noeuds
             linkColor={() => '#4b5563'} // gray-600
             backgroundColor="#1f2937" // gray-800
-            onNodeClick={(node: any) => onTagSelect(node.id)}
+            onNodeClick={(node: NodeObject) => onTagSelect(node.id)}
             cooldownTicks={100}
             linkDirectionalParticles={2}
             linkDirectionalParticleWidth={link => (link.value ? Math.sqrt(link.value) * 0.5 : 1)}

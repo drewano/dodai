@@ -174,7 +174,7 @@ const NotesPage = () => {
       }
       if (isResizingRight) {
         const newWidth = window.innerWidth - e.clientX;
-        if (newWidth >= 150 && newWidth <= 300) {
+        if (newWidth >= 150 && newWidth <= 800) {
           setRightSidebarWidth(newWidth);
         }
       }
@@ -303,7 +303,7 @@ const NotesPage = () => {
               onMouseDown={handleMouseDownRight}
               onKeyDown={(e: React.KeyboardEvent) => {
                 if (e.key === 'ArrowLeft') {
-                  setRightSidebarWidth(prev => Math.min(300, prev + 10));
+                  setRightSidebarWidth(prev => Math.min(800, prev + 10));
                 } else if (e.key === 'ArrowRight') {
                   setRightSidebarWidth(prev => Math.max(150, prev - 10));
                 }
