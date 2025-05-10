@@ -43,48 +43,110 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`p-3 rounded-md cursor-pointer hover:bg-gray-700 transition ${
-        isSelected ? 'bg-gray-700 border-l-4 border-blue-400' : ''
-      } ${isDragging ? 'opacity-50 border-dashed border-2 border-blue-400' : ''}`}
+      className={`relative p-3.5 rounded-md cursor-pointer transition-all duration-200
+        ${
+          isSelected
+            ? 'bg-slate-700 shadow-md shadow-slate-900/30 ring-1 ring-blue-500/20'
+            : 'bg-slate-800/90 hover:bg-slate-700/80 hover:shadow-sm hover:shadow-slate-900/10'
+        } 
+        ${
+          isDragging ? 'opacity-70 border-dashed border-2 border-blue-400 bg-slate-700/60 shadow-lg scale-[1.01]' : ''
+        }`}
       onClick={() => onSelect(note)}
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
       aria-pressed={isSelected}
       style={style}>
-      <div className="flex items-center gap-2">
-        <div className="text-gray-400">
-          <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 6a1 1 0 011-1h6a1 1 0 110 2H7a1 1 0 01-1-1zm1 3a1 1 0 100 2h6a1 1 0 100-2H7z"
-              clipRule="evenodd"
-            />
+      {/* Sélection marker */}
+      {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-md" />}
+
+      <div className="flex items-center gap-2.5">
+        <div className={`text-blue-400 w-5 h-5 flex-shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>
+          <svg
+            xmlns="http://www.w3.org/2000/svg"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round">
+            <path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z" />
+            <polyline points="14 2 14 8 20 8" />
+            <line x1="16" y1="13" x2="8" y2="13" />
+            <line x1="16" y1="17" x2="8" y2="17" />
+            <line x1="10" y1="9" x2="8" y2="9" />
           </svg>
         </div>
-        <h3 className="font-medium truncate">{note.title}</h3>
+        <h3 className={`font-medium truncate text-base leading-tight ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+          {note.title || 'Sans titre'}
+        </h3>
       </div>
 
-      <p className="text-gray-400 text-sm mt-1 truncate ml-6">
-        {note.content.substring(0, 60)}
-        {note.content.length > 60 ? '...' : ''}
+      <p className="text-slate-400 text-sm mt-2 line-clamp-2 ml-7">
+        {note.content.substring(0, 100)}
+        {note.content.length > 100 ? '...' : ''}
       </p>
 
-      {/* Display tags if present */}
-      {note.tags && note.tags.length > 0 && (
-        <div className="flex flex-wrap gap-1 mt-1 ml-6">
-          {note.tags.slice(0, 3).map(tag => (
-            <span key={tag} className="text-xs bg-gray-600 text-blue-300 px-1.5 py-0.5 rounded">
-              #{tag}
-            </span>
-          ))}
-          {note.tags.length > 3 && <span className="text-xs text-gray-400">+{note.tags.length - 3}</span>}
-        </div>
-      )}
+      {/* Footer avec métadonnées */}
+      <div className="mt-3 ml-7 flex flex-wrap items-center gap-y-2">
+        {/* Tags */}
+        {note.tags && note.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mr-auto">
+            {note.tags.slice(0, 3).map(tag => (
+              <span
+                key={tag}
+                className="text-xs px-1.5 py-0.5 rounded-full bg-slate-700/80 text-blue-300 border border-slate-600/30">
+                #{tag}
+              </span>
+            ))}
+            {note.tags.length > 3 && (
+              <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-700/80 text-slate-400 border border-slate-600/30">
+                +{note.tags.length - 3}
+              </span>
+            )}
+          </div>
+        )}
 
-      <div className="flex justify-between items-center mt-2">
-        <span className="text-xs text-gray-500">{formatDate(note.updatedAt)}</span>
-        {note.sourceUrl && <span className="text-xs text-blue-400">Source web</span>}
+        {/* Info */}
+        <div className="flex items-center gap-2 text-xs text-slate-500 ml-auto">
+          {/* Date */}
+          <span className="flex items-center">
+            <svg
+              className="w-3 h-3 mr-1 text-slate-500"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            {formatDate(note.updatedAt)}
+          </span>
+
+          {/* Source Web */}
+          {note.sourceUrl && (
+            <span className="flex items-center text-blue-400">
+              <svg
+                className="w-3 h-3 mr-1"
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round">
+                <circle cx="12" cy="12" r="10" />
+                <line x1="2" y1="12" x2="22" y2="12" />
+                <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
+              </svg>
+              Web
+            </span>
+          )}
+        </div>
       </div>
     </div>
   );

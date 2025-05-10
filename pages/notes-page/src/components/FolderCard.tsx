@@ -71,10 +71,16 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
         ref={setNodeRef}
         {...listeners}
         {...attributes}
-        className={`p-3 rounded-md cursor-pointer hover:bg-gray-700 transition ${
-          isSelected ? 'bg-gray-700 border-l-4 border-blue-400' : ''
-        } ${isDragging ? 'opacity-50 border-dashed border-2 border-blue-400' : ''}
-      ${isOver ? 'bg-gray-600 border-2 border-blue-300' : ''}`}
+        className={`relative p-3.5 rounded-md cursor-pointer transition-all duration-200
+          ${
+            isSelected
+              ? 'bg-slate-700 shadow-md shadow-slate-900/30 ring-1 ring-blue-500/20'
+              : 'bg-slate-800/70 hover:bg-slate-700/70 hover:shadow-sm hover:shadow-slate-900/10'
+          } 
+          ${
+            isDragging ? 'opacity-70 border-dashed border-2 border-blue-400 bg-slate-700/60 shadow-lg scale-[1.01]' : ''
+          }
+          ${isOver ? 'bg-slate-700/90 ring-2 ring-blue-400/30 shadow-md' : ''}`}
         onClick={() => onSelect(folder)}
         onDoubleClick={() => onOpen(folder)}
         onKeyDown={handleKeyDown}
@@ -82,32 +88,90 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
         role="button"
         aria-pressed={isSelected}
         style={style}>
-        <div className="flex items-center gap-2">
-          <div className="text-blue-300">
+        {/* Sélection marker */}
+        {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-md" />}
+
+        <div className="flex items-center gap-2.5">
+          <div
+            className={`text-blue-400 w-5 h-5 flex-shrink-0 ${isOpen ? 'text-amber-400' : isSelected ? 'text-blue-400' : 'text-amber-300/80'}`}>
             {isOpen ? (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path
-                  fillRule="evenodd"
-                  d="M2 6a2 2 0 012-2h4l2 2h4a2 2 0 012 2v1H8a3 3 0 00-3 3v1.5a1.5 1.5 0 01-3 0V6z"
-                  clipRule="evenodd"
-                />
-                <path d="M6 12a2 2 0 012-2h8a2 2 0 012 2v2a2 2 0 01-2 2H2h2a2 2 0 002-2v-2z" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round">
+                <path d="M5 19a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2h4l2 2h4a2 2 0 0 1 2 2v1" />
+                <path d="M15 13h5v6a2 2 0 0 1-2 2h-15" />
+                <path d="M9 16h1" />
               </svg>
             ) : (
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                <path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" />
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round">
+                <path d="M5 4h4l2 2h9a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z" />
               </svg>
             )}
           </div>
-          <h3 className="font-medium truncate flex-grow">{folder.title}</h3>
+          <h3
+            className={`font-medium truncate text-base leading-tight flex-grow ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+            {folder.title || 'Dossier sans nom'}
+          </h3>
         </div>
 
-        <div className="flex justify-between items-center mt-2">
-          <span className="text-xs text-gray-500">{formatDate(folder.updatedAt)}</span>
-          <span className="text-xs text-gray-400">
-            {notesCount} élément{notesCount !== 1 ? 's' : ''}
-          </span>
+        {/* Information du dossier */}
+        <div className="mt-3 ml-7 flex items-center justify-between">
+          <div className="flex items-center text-xs text-slate-500">
+            <svg
+              className="w-3 h-3 mr-1 text-slate-500"
+              xmlns="http://www.w3.org/2000/svg"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+            {formatDate(folder.updatedAt)}
+          </div>
+
+          <div className="flex items-center">
+            <span
+              className={`text-xs px-2 py-0.5 rounded-full ${
+                notesCount > 0
+                  ? 'bg-amber-500/10 text-amber-400 border border-amber-500/20'
+                  : 'bg-slate-700/80 text-slate-400 border border-slate-600/40'
+              }`}>
+              <span className="flex items-center">
+                <svg
+                  className="w-3 h-3 mr-1"
+                  xmlns="http://www.w3.org/2000/svg"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                  strokeLinecap="round"
+                  strokeLinejoin="round">
+                  <path d="M14 2H6a2 2 0 0 0-2 2v16c0 1.1.9 2 2 2h12a2 2 0 0 0 2-2V8l-6-6z" />
+                  <path d="M14 3v5h5" />
+                </svg>
+                {notesCount} élément{notesCount !== 1 ? 's' : ''}
+              </span>
+            </span>
+          </div>
         </div>
+
+        {/* Indicateur visuel pour le drag & drop */}
+        {isOver && <div className="absolute inset-0 border-2 border-blue-400/40 rounded-md pointer-events-none"></div>}
       </div>
     );
   },
