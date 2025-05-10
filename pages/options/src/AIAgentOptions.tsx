@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
 import { MessageType } from '../../../chrome-extension/src/background/types';
+import { cn } from '@extension/ui';
 
 interface OllamaModelInfo {
   id: string;
@@ -124,26 +125,30 @@ export const AIAgentOptions = () => {
 
   if (isLoading) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 min-h-[240px] bg-gray-800/30">
-        <div className="flex space-x-2">
-          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '0s' }} />
-          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '0.2s' }} />
-          <div className="w-3 h-3 rounded-full bg-blue-500 animate-pulse" style={{ animationDelay: '0.4s' }} />
+      <div className="flex flex-col items-center justify-center p-8 min-h-[240px]">
+        <div className="relative h-12 w-12">
+          <div className="absolute inset-0 animate-pulse h-full w-full rounded-full border-4 border-blue-500 opacity-20"></div>
+          <div className="absolute inset-0 h-full w-full rounded-full border-t-4 border-blue-500 animate-spin"></div>
         </div>
-        <p className="mt-4 text-gray-400 text-sm">Vérification d'Ollama...</p>
+        <p className="mt-6 text-gray-400 font-medium">Vérification d'Ollama...</p>
       </div>
     );
   }
 
   return (
     <div>
-      <div className="flex justify-between items-center p-5 border-b border-gray-800">
-        <h2 className="text-lg font-medium text-blue-400">Paramètres de l'Agent IA</h2>
+      <div className="flex justify-between items-center py-5 px-6 border-b border-gray-800/50 backdrop-blur-md">
+        <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300">
+          Paramètres de l'Agent IA
+        </h2>
         <button
           onClick={handleRefresh}
           disabled={isRefreshing}
-          className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center
-                    bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50 disabled:opacity-50">
+          className={cn(
+            'px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center',
+            'bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50 disabled:opacity-50',
+            'hover:shadow-[0_0_8px_rgba(59,130,246,0.3)]',
+          )}>
           {isRefreshing ? (
             <svg
               className="animate-spin h-3.5 w-3.5 mr-1.5"
@@ -175,10 +180,11 @@ export const AIAgentOptions = () => {
         </button>
       </div>
 
-      <div className="p-5 space-y-6">
+      <div className="p-6 space-y-6">
+        {/* Notifications d'état */}
         {error && (
-          <div className="mb-4 rounded-lg border border-red-900/50 bg-red-900/20 text-red-400 overflow-hidden">
-            <div className="p-3 flex items-start">
+          <div className="mb-6 rounded-lg border border-red-900/50 bg-red-900/20 text-red-400 overflow-hidden shadow-[0_0_15px_rgba(220,38,38,0.1)] transform transition-all">
+            <div className="p-4 flex items-start">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-5 w-5 mr-3 mt-0.5 flex-shrink-0 text-red-500"
@@ -226,8 +232,8 @@ export const AIAgentOptions = () => {
         )}
 
         {!isServerRunning && !error && (
-          <div className="mb-4 rounded-lg border border-yellow-700/50 bg-yellow-800/20 text-yellow-400 overflow-hidden">
-            <div className="p-3 flex items-center">
+          <div className="mb-6 rounded-lg border border-yellow-700/50 bg-yellow-800/20 text-yellow-400 overflow-hidden shadow-[0_0_15px_rgba(253,224,71,0.1)] transform transition-all">
+            <div className="p-4 flex items-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-5 w-5 mr-3 flex-shrink-0 text-yellow-500"
@@ -245,8 +251,8 @@ export const AIAgentOptions = () => {
         )}
 
         {isServerRunning && !settings.isEnabled && !error && (
-          <div className="mb-4 rounded-lg border border-yellow-700/50 bg-yellow-800/20 text-yellow-400 overflow-hidden">
-            <div className="p-3 flex items-center">
+          <div className="mb-6 rounded-lg border border-yellow-700/50 bg-yellow-800/20 text-yellow-400 overflow-hidden shadow-[0_0_15px_rgba(253,224,71,0.1)] transform transition-all">
+            <div className="p-4 flex items-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-5 w-5 mr-3 flex-shrink-0 text-yellow-500"
@@ -264,8 +270,8 @@ export const AIAgentOptions = () => {
         )}
 
         {isServerRunning && settings.isEnabled && !error && (
-          <div className="mb-4 rounded-lg border border-green-800/50 bg-green-900/20 text-green-400 overflow-hidden">
-            <div className="p-3 flex items-center">
+          <div className="mb-6 rounded-lg border border-green-800/50 bg-green-900/20 text-green-400 overflow-hidden shadow-[0_0_15px_rgba(34,197,94,0.1)] transform transition-all">
+            <div className="p-4 flex items-center">
               <svg
                 xmlns="http://www.w3.org/2000/svg"
                 className="h-5 w-5 mr-3 flex-shrink-0 text-green-500"
@@ -279,151 +285,50 @@ export const AIAgentOptions = () => {
           </div>
         )}
 
-        <div className="grid gap-6">
-          <div className="flex items-center">
-            <label htmlFor="enable-agent" className="flex items-center cursor-pointer">
-              <div className="relative inline-flex h-5 w-10 items-center">
-                <input
-                  type="checkbox"
-                  id="enable-agent"
-                  checked={settings.isEnabled}
-                  onChange={handleEnableToggle}
-                  disabled={!isServerRunning}
-                  className="peer sr-only"
-                />
-                <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
-                <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
-              </div>
-              <span className="ml-3 text-sm font-medium text-gray-300 select-none">Activer l'Agent IA</span>
-            </label>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="model-select" className="block text-sm font-medium text-gray-300">
-              Modèle
-            </label>
-            <select
-              id="model-select"
-              value={settings.selectedModel}
-              onChange={handleModelChange}
-              className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
-                        disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={!isServerRunning || !settings.isEnabled}>
-              {availableModels.length === 0 && <option value="">Aucun modèle disponible</option>}
-              {availableModels.map(model => (
-                <option key={model.id} value={model.name}>
-                  {model.name}
-                </option>
-              ))}
-            </select>
-            <p className="text-xs text-gray-500">
-              {availableModels.length === 0 && isServerRunning
-                ? 'Installez des modèles avec la commande "ollama pull [nom_du_modèle]"'
-                : "Sélectionnez le modèle à utiliser pour l'agent IA"}
-            </p>
-          </div>
-
-          <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-300">
-              Température (<span className="text-blue-400">{settings.temperature.toFixed(1)}</span>)
-            </label>
-            <div className="px-1">
-              <input
-                type="range"
-                min="0"
-                max="1"
-                step="0.1"
-                value={settings.temperature}
-                onChange={handleTemperatureChange}
-                className="w-full h-1.5 rounded-lg appearance-none cursor-pointer bg-gray-700 disabled:opacity-50
-                          [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-blue-500 
-                          [&::-webkit-slider-thumb]:h-3.5 [&::-webkit-slider-thumb]:w-3.5 [&::-webkit-slider-thumb]:rounded-full"
-                disabled={!isServerRunning || !settings.isEnabled}
-              />
-              <div className="flex justify-between text-xs text-gray-500 mt-1.5 px-0.5">
-                <span>Précis</span>
-                <span>Créatif</span>
-              </div>
+        {/* Options de configuration */}
+        <div className="space-y-8">
+          {/* Option d'activation */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-6 border-b border-gray-800/50">
+            <div>
+              <h3 className="text-lg font-medium text-gray-200">Activer l'Agent IA</h3>
+              <p className="text-sm text-gray-400 mt-1">Activez ou désactivez l'agent d'intelligence artificielle.</p>
             </div>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="server-url" className="block text-sm font-medium text-gray-300">
-              URL du serveur Ollama
-            </label>
-            <input
-              id="server-url"
-              type="text"
-              value={settings.baseUrl}
-              onChange={handleBaseUrlChange}
-              className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
-                        disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={!settings.isEnabled}
-            />
-            <p className="text-xs text-gray-500">URL du serveur Ollama (par défaut: http://localhost:11434)</p>
-          </div>
-
-          <div className="space-y-2">
-            <label htmlFor="context-size" className="block text-sm font-medium text-gray-300">
-              Taille du Contexte (num_ctx)
-            </label>
-            <input
-              id="context-size"
-              type="number"
-              min="1024"
-              step="1024"
-              value={settings.contextSize}
-              onChange={handleContextSizeChange}
-              className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                        focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
-                        disabled:opacity-60 disabled:cursor-not-allowed"
-              disabled={!isServerRunning || !settings.isEnabled}
-            />
-            <p className="text-xs text-gray-500">
-              Nombre maximum de tokens que le modèle peut traiter (paramètre num_ctx d'Ollama). Une valeur plus élevée
-              permet de traiter des conversations plus longues, mais utilise plus de mémoire.
-            </p>
-          </div>
-
-          {/* Options pour l'autocomplétion inline */}
-          <div className="mt-8 border-t border-gray-800 pt-6">
-            <h3 className="text-md font-medium text-blue-400 mb-4">Autocomplétion Inline</h3>
-
-            <div className="flex items-center mb-4">
-              <label htmlFor="enable-inline-assist" className="flex items-center cursor-pointer">
-                <div className="relative inline-flex h-5 w-10 items-center">
+            <div className="flex items-center justify-end">
+              <label htmlFor="enable-agent" className="flex items-center cursor-pointer group">
+                <div className="relative inline-flex h-7 w-14 items-center">
                   <input
                     type="checkbox"
-                    id="enable-inline-assist"
-                    checked={settings.inlineAssistEnabled}
-                    onChange={handleInlineAssistToggle}
-                    disabled={!isServerRunning || !settings.isEnabled}
+                    id="enable-agent"
+                    checked={settings.isEnabled}
+                    onChange={handleEnableToggle}
+                    disabled={!isServerRunning}
                     className="peer sr-only"
                   />
-                  <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
-                  <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
+                  <div className="h-6 w-12 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-2 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-800 group-hover:bg-opacity-80 transition-all"></div>
+                  <div className="absolute left-1 h-4 w-4 rounded-full bg-gray-400 transition-all duration-300 peer-checked:left-7 peer-checked:bg-blue-400 peer-checked:h-4 peer-checked:w-4 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
                 </div>
-                <span className="ml-3 text-sm font-medium text-gray-300 select-none">
-                  Activer l'autocomplétion inline
+                <span className="ml-3 text-sm font-medium text-gray-300 select-none group-hover:text-blue-300 transition-colors">
+                  {settings.isEnabled ? 'Activé' : 'Désactivé'}
                 </span>
               </label>
             </div>
+          </div>
 
-            <div className="space-y-2">
-              <label htmlFor="inline-model-select" className="block text-sm font-medium text-gray-300">
-                Modèle pour l'autocomplétion
-              </label>
+          {/* Sélection du modèle */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+            <div>
+              <h3 className="text-lg font-medium text-gray-200">Modèle</h3>
+              <p className="text-sm text-gray-400 mt-1">Sélectionnez le modèle IA à utiliser pour l'agent.</p>
+            </div>
+            <div>
               <select
-                id="inline-model-select"
-                value={settings.inlineAssistModel || ''}
-                onChange={handleInlineAssistModelChange}
-                className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                id="model-select"
+                value={settings.selectedModel}
+                onChange={handleModelChange}
+                className="w-full py-2.5 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
                           focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
-                          disabled:opacity-60 disabled:cursor-not-allowed"
-                disabled={!isServerRunning || !settings.isEnabled || !settings.inlineAssistEnabled}>
-                <option value="">Même que le modèle global</option>
+                          disabled:opacity-60 disabled:cursor-not-allowed hover:border-blue-700 transition-colors"
+                disabled={!isServerRunning || !settings.isEnabled}>
                 {availableModels.length === 0 && <option value="">Aucun modèle disponible</option>}
                 {availableModels.map(model => (
                   <option key={model.id} value={model.name}>
@@ -431,10 +336,211 @@ export const AIAgentOptions = () => {
                   </option>
                 ))}
               </select>
-              <p className="text-xs text-gray-500">
-                Sélectionnez le modèle à utiliser spécifiquement pour l'autocomplétion inline, ou utilisez le même que
-                pour l'assistant global.
+              <p className="text-xs text-gray-500 mt-2">
+                {availableModels.length === 0 && isServerRunning
+                  ? 'Installez des modèles avec la commande "ollama pull [nom_du_modèle]"'
+                  : "Sélectionnez le modèle à utiliser pour l'agent IA"}
               </p>
+            </div>
+          </div>
+
+          {/* Température */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+            <div>
+              <h3 className="text-lg font-medium text-gray-200">Température</h3>
+              <p className="text-sm text-gray-400 mt-1">Ajustez la créativité des réponses générées par l'IA.</p>
+            </div>
+            <div>
+              <div className="mb-2 flex items-center justify-between">
+                <span className="text-xs text-gray-500">Précis</span>
+                <span className="text-sm font-medium text-blue-400 bg-blue-900/30 px-2 py-1 rounded-full">
+                  {settings.temperature.toFixed(1)}
+                </span>
+                <span className="text-xs text-gray-500">Créatif</span>
+              </div>
+              <div className="relative px-1 pt-1 pb-4">
+                <div className="absolute h-1 w-full rounded-full bg-gray-700"></div>
+                <div
+                  className="absolute h-1 rounded-full bg-gradient-to-r from-blue-800 to-blue-500"
+                  style={{ width: `${settings.temperature * 100}%` }}></div>
+                <input
+                  type="range"
+                  min="0"
+                  max="1"
+                  step="0.1"
+                  value={settings.temperature}
+                  onChange={handleTemperatureChange}
+                  className="absolute w-full h-1 rounded-lg appearance-none cursor-pointer bg-transparent
+                            [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:bg-blue-500 
+                            [&::-webkit-slider-thumb]:h-5 [&::-webkit-slider-thumb]:w-5 [&::-webkit-slider-thumb]:rounded-full
+                            [&::-webkit-slider-thumb]:shadow-[0_0_6px_rgba(59,130,246,0.5)]
+                            [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-blue-800"
+                  disabled={!isServerRunning || !settings.isEnabled}
+                />
+              </div>
+            </div>
+          </div>
+
+          {/* URL du serveur */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+            <div>
+              <h3 className="text-lg font-medium text-gray-200">URL du serveur Ollama</h3>
+              <p className="text-sm text-gray-400 mt-1">Adresse du serveur Ollama à utiliser pour l'IA.</p>
+            </div>
+            <div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9h18"
+                    />
+                  </svg>
+                </div>
+                <input
+                  id="server-url"
+                  type="text"
+                  value={settings.baseUrl}
+                  onChange={handleBaseUrlChange}
+                  className="w-full py-2.5 pl-10 pr-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                            disabled:opacity-60 disabled:cursor-not-allowed hover:border-blue-700 transition-colors"
+                  disabled={!settings.isEnabled}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">URL du serveur Ollama (par défaut: http://localhost:11434)</p>
+            </div>
+          </div>
+
+          {/* Taille du contexte */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+            <div>
+              <h3 className="text-lg font-medium text-gray-200">Taille du Contexte (num_ctx)</h3>
+              <p className="text-sm text-gray-400 mt-1">Nombre maximum de tokens que le modèle peut traiter.</p>
+            </div>
+            <div>
+              <div className="relative">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-4 w-4"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor">
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d="M9 7h6m0 10v-3m-3 3h.01M9 17h.01M9 14h.01M12 14h.01M15 11h.01M12 11h.01M9 11h.01M7 21h10a2 2 0 002-2V5a2 2 0 00-2-2H7a2 2 0 00-2 2v14a2 2 0 002 2z"
+                    />
+                  </svg>
+                </div>
+                <input
+                  id="context-size"
+                  type="number"
+                  min="1024"
+                  step="1024"
+                  value={settings.contextSize}
+                  onChange={handleContextSizeChange}
+                  className="w-full py-2.5 pl-10 pr-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                            focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                            disabled:opacity-60 disabled:cursor-not-allowed hover:border-blue-700 transition-colors"
+                  disabled={!isServerRunning || !settings.isEnabled}
+                />
+              </div>
+              <p className="text-xs text-gray-500 mt-2">
+                Une valeur plus élevée permet de traiter des conversations plus longues, mais utilise plus de mémoire.
+              </p>
+            </div>
+          </div>
+
+          {/* Section Autocomplétion Inline */}
+          <div className="pt-4">
+            <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300 mb-4">
+              Autocomplétion Inline
+            </h3>
+
+            {/* Option d'activation autocomplétion */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+              <div>
+                <h3 className="text-lg font-medium text-gray-200">Activer l'autocomplétion inline</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Permet la suggestion automatique de code pendant que vous tapez.
+                </p>
+              </div>
+              <div className="flex items-center justify-end">
+                <label htmlFor="enable-inline-assist" className="flex items-center cursor-pointer group">
+                  <div className="relative inline-flex h-7 w-14 items-center">
+                    <input
+                      type="checkbox"
+                      id="enable-inline-assist"
+                      checked={settings.inlineAssistEnabled}
+                      onChange={handleInlineAssistToggle}
+                      disabled={!isServerRunning || !settings.isEnabled}
+                      className="peer sr-only"
+                    />
+                    <div className="h-6 w-12 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-2 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-800 group-hover:bg-opacity-80 transition-all"></div>
+                    <div className="absolute left-1 h-4 w-4 rounded-full bg-gray-400 transition-all duration-300 peer-checked:left-7 peer-checked:bg-blue-400 peer-checked:h-4 peer-checked:w-4 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                  </div>
+                  <span className="ml-3 text-sm font-medium text-gray-300 select-none group-hover:text-blue-300 transition-colors">
+                    {settings.inlineAssistEnabled ? 'Activé' : 'Désactivé'}
+                  </span>
+                </label>
+              </div>
+            </div>
+
+            {/* Modèle pour l'autocomplétion */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+              <div>
+                <h3 className="text-lg font-medium text-gray-200">Modèle pour l'autocomplétion</h3>
+                <p className="text-sm text-gray-400 mt-1">Choisissez un modèle spécifique pour l'autocomplétion.</p>
+              </div>
+              <div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"
+                      />
+                    </svg>
+                  </div>
+                  <select
+                    id="inline-model-select"
+                    value={settings.inlineAssistModel || ''}
+                    onChange={handleInlineAssistModelChange}
+                    className="w-full py-2.5 pl-10 pr-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                              disabled:opacity-60 disabled:cursor-not-allowed hover:border-blue-700 transition-colors"
+                    disabled={!isServerRunning || !settings.isEnabled || !settings.inlineAssistEnabled}>
+                    <option value="">Même que le modèle global</option>
+                    {availableModels.length === 0 && <option value="">Aucun modèle disponible</option>}
+                    {availableModels.map(model => (
+                      <option key={model.id} value={model.name}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Sélectionnez le modèle à utiliser spécifiquement pour l'autocomplétion inline, ou utilisez le même que
+                  pour l'assistant global.
+                </p>
+              </div>
             </div>
           </div>
         </div>

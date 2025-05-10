@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useStorage } from '@extension/shared';
 import { mcpConfigStorage, type McpServerConfigEntry } from '@extension/storage';
 import type { McpConnectionsState } from '../../../chrome-extension/src/background/types';
+import { cn } from '@extension/ui';
 
 interface ServerFormData {
   name: string;
@@ -206,12 +207,17 @@ export const McpServerOptions = () => {
 
   return (
     <div>
-      <div className="flex justify-between items-center p-5 border-b border-gray-800">
-        <h2 className="text-lg font-medium text-blue-400">Serveurs MCP (Model Context Protocol)</h2>
+      <div className="flex justify-between items-center py-5 px-6 border-b border-gray-800/50 backdrop-blur-md">
+        <h2 className="text-xl font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300">
+          Serveurs MCP (Model Context Protocol)
+        </h2>
         <button
           onClick={handleAddServer}
-          className="px-3 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center
-                    bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50">
+          className={cn(
+            'px-3 py-1.5 rounded-md text-xs font-medium transition-all duration-200 flex items-center',
+            'bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50',
+            'hover:shadow-[0_0_8px_rgba(59,130,246,0.3)]',
+          )}>
           <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5 mr-1" viewBox="0 0 20 20" fill="currentColor">
             <path
               fillRule="evenodd"
@@ -223,13 +229,13 @@ export const McpServerOptions = () => {
         </button>
       </div>
 
-      <div className="p-5">
+      <div className="p-6">
         {/* Liste des serveurs configurés */}
         {Object.keys(mcpServers).length === 0 ? (
-          <div className="flex flex-col items-center justify-center py-8 px-4 rounded-lg border border-gray-800 bg-gray-800/30">
+          <div className="flex flex-col items-center justify-center py-12 px-4 rounded-lg border border-gray-800/50 bg-gray-800/20 backdrop-blur-sm transition-all">
             <svg
               xmlns="http://www.w3.org/2000/svg"
-              className="h-12 w-12 text-gray-600 mb-4"
+              className="h-16 w-16 text-gray-600 mb-4 opacity-80"
               fill="none"
               viewBox="0 0 24 24"
               stroke="currentColor">
@@ -240,13 +246,29 @@ export const McpServerOptions = () => {
                 d="M5 12h14M12 5v14M9 3h6m-3-3v6m5 5h3a2 2 0 012 2v6a2 2 0 01-2 2h-3m-6 0H6a2 2 0 01-2-2v-6a2 2 0 012-2h3"
               />
             </svg>
-            <p className="text-gray-400 font-medium mb-2">Aucun serveur MCP configuré</p>
-            <p className="text-sm text-gray-500 text-center max-w-md">
+            <p className="text-gray-300 font-medium mb-3 text-lg">Aucun serveur MCP configuré</p>
+            <p className="text-sm text-gray-400 text-center max-w-md mb-6">
               Les serveurs MCP permettent d'étendre les capacités de l'agent avec des outils externes.
             </p>
+            <button
+              onClick={handleAddServer}
+              className={cn(
+                'px-4 py-2 rounded-md font-medium transition-all duration-200 flex items-center',
+                'bg-blue-600 hover:bg-blue-700 text-white shadow-md',
+                'hover:shadow-[0_0_12px_rgba(59,130,246,0.5)]',
+              )}>
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              Configurer votre premier serveur
+            </button>
           </div>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-gray-800 bg-gray-800/30">
+          <div className="overflow-hidden rounded-lg border border-gray-800/50 bg-gray-800/20 backdrop-blur-sm shadow-lg">
             <div className="overflow-x-auto">
               <table className="w-full border-collapse">
                 <thead>
@@ -272,15 +294,17 @@ export const McpServerOptions = () => {
                   {Object.entries(mcpServers).map(([name, config], index) => (
                     <tr
                       key={name}
-                      className={`hover:bg-gray-800/40 transition-colors
-                        ${index !== Object.entries(mcpServers).length - 1 ? 'border-b border-gray-800' : ''}`}>
+                      className={cn(
+                        'hover:bg-gray-800/40 transition-colors',
+                        index !== Object.entries(mcpServers).length - 1 ? 'border-b border-gray-800/50' : '',
+                      )}>
                       <td className="px-4 py-3 whitespace-nowrap text-sm font-medium text-gray-300">{name}</td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400 truncate max-w-[200px]">
                         {config.url}
                       </td>
                       <td className="px-4 py-3 whitespace-nowrap text-sm text-gray-400">
                         {config.headers && Object.keys(config.headers).length > 0 ? (
-                          <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-blue-900/40 text-blue-400 border border-blue-900/50">
+                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-900/40 text-blue-400 border border-blue-900/50">
                             {Object.keys(config.headers).length} en-tête(s)
                           </span>
                         ) : (
@@ -291,7 +315,7 @@ export const McpServerOptions = () => {
                         {connectionStatus[name] ? (
                           connectionStatus[name].status === 'connected' ? (
                             <div className="flex items-center">
-                              <div className="relative">
+                              <div className="relative flex">
                                 <div className="h-2.5 w-2.5 bg-green-500 rounded-full"></div>
                                 <div
                                   className="absolute inset-0 h-2.5 w-2.5 bg-green-500 rounded-full animate-ping opacity-75"
@@ -323,7 +347,7 @@ export const McpServerOptions = () => {
                         <div className="flex gap-3">
                           <button
                             onClick={() => handleEditServer(name)}
-                            className="text-blue-400 hover:text-blue-300 transition-colors">
+                            className="text-blue-400 hover:text-blue-300 transition-colors p-1 rounded-full hover:bg-blue-900/20">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               className="h-4 w-4"
@@ -334,7 +358,7 @@ export const McpServerOptions = () => {
                           </button>
                           <button
                             onClick={() => handleDeleteServer(name)}
-                            className="text-red-400 hover:text-red-300 transition-colors">
+                            className="text-red-400 hover:text-red-300 transition-colors p-1 rounded-full hover:bg-red-900/20">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               className="h-4 w-4"
@@ -358,7 +382,7 @@ export const McpServerOptions = () => {
         )}
 
         {/* Explication sur les serveurs MCP */}
-        <div className="mt-5 p-4 rounded-lg border border-blue-900/50 bg-blue-900/20 text-sm text-blue-300">
+        <div className="mt-6 p-4 rounded-lg border border-blue-900/50 bg-blue-900/20 text-sm text-blue-300 backdrop-blur-sm">
           <h3 className="font-medium mb-2 flex items-center">
             <svg
               xmlns="http://www.w3.org/2000/svg"
@@ -388,13 +412,15 @@ export const McpServerOptions = () => {
 
       {/* Formulaire modal d'ajout/modification */}
       {showAddForm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm">
-          <div className="bg-gray-900 border border-gray-800 rounded-lg shadow-xl max-h-[90vh] w-full max-w-2xl overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-gray-800">
-              <h3 className="text-lg font-medium text-blue-400">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm">
+          <div className="bg-gray-900 border border-gray-800/50 rounded-xl shadow-2xl max-h-[90vh] w-full max-w-2xl overflow-hidden">
+            <div className="flex justify-between items-center p-4 border-b border-gray-800/70 bg-gray-800/30">
+              <h3 className="text-lg font-medium text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300">
                 {editingServer ? `Modifier le serveur "${editingServer}"` : 'Ajouter un serveur MCP'}
               </h3>
-              <button onClick={handleCancel} className="text-gray-400 hover:text-gray-300 transition-colors">
+              <button
+                onClick={handleCancel}
+                className="text-gray-400 hover:text-gray-300 transition-colors p-1 rounded-full hover:bg-gray-800/50">
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                   <path
                     fillRule="evenodd"
@@ -407,7 +433,7 @@ export const McpServerOptions = () => {
 
             <div className="p-5 overflow-y-auto max-h-[calc(90vh-64px)]">
               {formError && (
-                <div className="mb-4 rounded-lg border border-red-900/50 bg-red-900/20 text-red-400 overflow-hidden">
+                <div className="mb-4 rounded-lg border border-red-900/50 bg-red-900/20 text-red-400 overflow-hidden shadow-[0_0_15px_rgba(220,38,38,0.1)]">
                   <div className="p-3 flex items-center">
                     <svg
                       xmlns="http://www.w3.org/2000/svg"
@@ -430,18 +456,30 @@ export const McpServerOptions = () => {
                   <label htmlFor="serverName" className="block text-sm font-medium text-gray-300">
                     Nom du serveur
                   </label>
-                  <input
-                    type="text"
-                    id="serverName"
-                    className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                              focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
-                              disabled:opacity-60 disabled:cursor-not-allowed"
-                    placeholder="my_filesystem, remote_api, etc."
-                    value={formData.name}
-                    onChange={e => handleFormChange('name', e.target.value)}
-                    disabled={!!editingServer}
-                    required
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M12 5v14" />
+                      </svg>
+                    </div>
+                    <input
+                      type="text"
+                      id="serverName"
+                      className="w-full py-2.5 pl-10 pr-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                                focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                                disabled:opacity-60 disabled:cursor-not-allowed hover:border-blue-700 transition-colors"
+                      placeholder="my_filesystem, remote_api, etc."
+                      value={formData.name}
+                      onChange={e => handleFormChange('name', e.target.value)}
+                      disabled={!!editingServer}
+                      required
+                    />
+                  </div>
                   <p className="text-xs text-gray-500">
                     Un identifiant unique pour ce serveur, utilisé dans l'extension.
                   </p>
@@ -451,16 +489,34 @@ export const McpServerOptions = () => {
                   <label htmlFor="serverUrl" className="block text-sm font-medium text-gray-300">
                     URL du serveur
                   </label>
-                  <input
-                    type="url"
-                    id="serverUrl"
-                    className="w-full py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                              focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
-                    placeholder="http://localhost:8000/sse"
-                    value={formData.url}
-                    onChange={e => handleFormChange('url', e.target.value)}
-                    required
-                  />
+                  <div className="relative">
+                    <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9h18"
+                        />
+                      </svg>
+                    </div>
+                    <input
+                      type="url"
+                      id="serverUrl"
+                      className="w-full py-2.5 pl-10 pr-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                                focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent
+                                hover:border-blue-700 transition-colors"
+                      placeholder="http://localhost:8000/sse"
+                      value={formData.url}
+                      onChange={e => handleFormChange('url', e.target.value)}
+                      required
+                    />
+                  </div>
                   <p className="text-xs text-gray-500">L'URL complète du point de terminaison SSE du serveur MCP.</p>
                 </div>
 
@@ -473,7 +529,11 @@ export const McpServerOptions = () => {
                       type="button"
                       id="headersSection"
                       onClick={handleAddHeader}
-                      className="px-2 py-1 text-xs rounded-md bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50 transition-colors flex items-center">
+                      className={cn(
+                        'px-2 py-1 text-xs rounded-md flex items-center transition-all duration-200',
+                        'bg-blue-600/20 hover:bg-blue-600/30 text-blue-400 border border-blue-800/50',
+                        'hover:shadow-[0_0_8px_rgba(59,130,246,0.3)]',
+                      )}>
                       <svg
                         xmlns="http://www.w3.org/2000/svg"
                         className="h-3 w-3 mr-1"
@@ -490,34 +550,47 @@ export const McpServerOptions = () => {
                   </div>
 
                   {formData.headers.length === 0 ? (
-                    <p className="text-xs text-gray-500 py-2 px-3 rounded-md border border-gray-800 bg-gray-800/50">
+                    <p className="text-xs text-gray-500 py-3 px-4 rounded-md border border-gray-800/50 bg-gray-800/50 flex items-center">
+                      <svg
+                        xmlns="http://www.w3.org/2000/svg"
+                        className="h-4 w-4 mr-2 text-gray-400"
+                        fill="none"
+                        viewBox="0 0 24 24"
+                        stroke="currentColor">
+                        <path
+                          strokeLinecap="round"
+                          strokeLinejoin="round"
+                          strokeWidth={2}
+                          d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"
+                        />
+                      </svg>
                       Aucun en-tête défini. Les en-têtes sont utiles pour l'authentification (ex: Authorization: Bearer
                       token).
                     </p>
                   ) : (
                     <div className="space-y-2">
                       {formData.headers.map((header, index) => (
-                        <div key={index} className="flex gap-2">
+                        <div key={index} className="flex gap-2 items-center">
                           <input
                             type="text"
                             placeholder="Nom de l'en-tête"
-                            className="flex-1 py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                                      focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            className="flex-1 py-2.5 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                                      focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent hover:border-blue-700 transition-colors"
                             value={header.key}
                             onChange={e => handleHeaderChange(index, 'key', e.target.value)}
                           />
                           <input
                             type="text"
                             placeholder="Valeur"
-                            className="flex-1 py-2 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
-                                      focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent"
+                            className="flex-1 py-2.5 px-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                                      focus:outline-none focus:ring-2 focus:ring-blue-600 focus:border-transparent hover:border-blue-700 transition-colors"
                             value={header.value}
                             onChange={e => handleHeaderChange(index, 'value', e.target.value)}
                           />
                           <button
                             type="button"
                             onClick={() => handleRemoveHeader(index)}
-                            className="p-2 rounded-md bg-red-900/20 hover:bg-red-900/30 text-red-400 border border-red-900/50 transition-colors">
+                            className="p-2 rounded-md bg-red-900/20 hover:bg-red-900/30 text-red-400 border border-red-900/50 transition-all hover:shadow-[0_0_8px_rgba(220,38,38,0.2)]">
                             <svg
                               xmlns="http://www.w3.org/2000/svg"
                               className="h-4 w-4"
@@ -536,23 +609,25 @@ export const McpServerOptions = () => {
                   )}
                 </div>
 
-                <div className="flex items-center">
-                  <div className="relative inline-flex h-5 w-10 items-center">
-                    <input
-                      type="checkbox"
-                      id="useNodeEventSource"
-                      checked={formData.useNodeEventSource}
-                      onChange={e => handleFormChange('useNodeEventSource', e.target.checked)}
-                      className="peer sr-only"
-                    />
-                    <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
-                    <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
-                  </div>
-                  <label htmlFor="useNodeEventSource" className="ml-3 block text-sm text-gray-300 select-none">
-                    Utiliser Node.js EventSource
+                <div className="flex items-center py-2">
+                  <label htmlFor="useNodeEventSource" className="flex items-center cursor-pointer group">
+                    <div className="relative inline-flex h-7 w-14 items-center">
+                      <input
+                        type="checkbox"
+                        id="useNodeEventSource"
+                        checked={formData.useNodeEventSource}
+                        onChange={e => handleFormChange('useNodeEventSource', e.target.checked)}
+                        className="peer sr-only"
+                      />
+                      <div className="h-6 w-12 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-2 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-800 group-hover:bg-opacity-80 transition-all"></div>
+                      <div className="absolute left-1 h-4 w-4 rounded-full bg-gray-400 transition-all duration-300 peer-checked:left-7 peer-checked:bg-blue-400 peer-checked:h-4 peer-checked:w-4 group-hover:shadow-[0_0_8px_rgba(59,130,246,0.5)]"></div>
+                    </div>
+                    <span className="ml-3 text-sm text-gray-300 select-none group-hover:text-blue-300 transition-colors">
+                      Utiliser Node.js EventSource
+                    </span>
                   </label>
                 </div>
-                <p className="text-xs text-gray-500 -mt-3">
+                <p className="text-xs text-gray-500 -mt-2">
                   Améliore le support des en-têtes, mais peu utile dans les extensions Chrome.
                 </p>
 
@@ -560,12 +635,12 @@ export const McpServerOptions = () => {
                   <button
                     type="button"
                     onClick={handleCancel}
-                    className="px-4 py-2 rounded-md border border-gray-700 text-gray-300 text-sm font-medium bg-gray-800 hover:bg-gray-700 transition-colors">
+                    className="px-4 py-2 rounded-md border border-gray-700 text-gray-300 text-sm font-medium bg-gray-800 hover:bg-gray-700 transition-all">
                     Annuler
                   </button>
                   <button
                     type="submit"
-                    className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-colors">
+                    className="px-4 py-2 rounded-md bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium transition-all shadow-md hover:shadow-[0_0_10px_rgba(59,130,246,0.5)]">
                     {editingServer ? 'Mettre à jour' : 'Ajouter'}
                   </button>
                 </div>
