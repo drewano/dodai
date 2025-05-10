@@ -198,10 +198,21 @@ export class MessageHandler {
         model: result.model,
       });
 
+      // Supprimer les points de suspension en début de complétion
+      let processedCompletion = result.completion;
+      if (processedCompletion.trim().startsWith('...')) {
+        const originalLength = processedCompletion.length;
+        processedCompletion = processedCompletion.replace(/^\s*\.\.\.+\s*/, '');
+        logger.debug('Points de suspension supprimés en début de complétion:', {
+          avant: originalLength,
+          après: processedCompletion.length,
+        });
+      }
+
       return {
         type: MessageType.GET_INLINE_COMPLETION_RESPONSE,
         success: true,
-        completion: result.completion,
+        completion: processedCompletion,
         model: result.model,
       };
     } catch (error) {
