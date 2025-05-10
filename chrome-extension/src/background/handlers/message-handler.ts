@@ -366,10 +366,16 @@ export class MessageHandler {
   private async handleCheckAgentStatus(_message: BaseRuntimeMessage): Promise<AgentStatusResponse> {
     try {
       const isReady = await agentService.isAgentReady();
-      return { success: true, isReady };
+      const isServerRunning = await agentService.isOllamaServerRunning();
+      return { success: true, isReady, isServerRunning };
     } catch (error: unknown) {
       logger.error("Erreur lors de la vérification de l'état de l'agent:", error);
-      return { success: false, isReady: false, error: error instanceof Error ? error.message : String(error) };
+      return {
+        success: false,
+        isReady: false,
+        isServerRunning: false,
+        error: error instanceof Error ? error.message : String(error),
+      };
     }
   }
 

@@ -63,11 +63,56 @@ export class AgentService {
     try {
       const settings = await aiAgentStorage.get();
 
-      // Si l'agent est désactivé dans les paramètres
-      if (!settings.isEnabled) {
-        logger.info('Agent IA désactivé dans les paramètres');
+      // Rate limit checks to avoid excessive requests
+      const now = Date.now();
+      if (now - this.lastCheckTime < this.CHECK_INTERVAL) {
+        // Si nous avons vérifié récemment, retourner le résultat mis en cache
+        return this.availableModels.length > 0 && settings.isEnabled;
+      }
+
+      this.lastCheckTime = now;
+
+      // Vérifie si le serveur Ollama est en cours d'exécution
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 2000);
+
+      try {
+        const response = await fetch(`${settings.baseUrl}/api/version`, {
+          signal: controller.signal,
+          mode: 'cors',
+          headers: {
+            Accept: 'application/json',
+          },
+        });
+        clearTimeout(timeoutId);
+
+        if (response.ok) {
+          // Si le serveur est en cours d'exécution, actualiser les modèles disponibles
+          await this.refreshAvailableModels(settings.baseUrl);
+
+          // Le serveur est prêt si nous avons au moins un modèle ET que l'agent est activé
+          return this.availableModels.length > 0 && settings.isEnabled;
+        }
+
+        logger.warn('Serveur Ollama non disponible');
+        return false;
+      } catch (error) {
+        clearTimeout(timeoutId);
+        logger.error('Erreur de connexion au serveur Ollama:', error);
         return false;
       }
+    } catch (error) {
+      logger.error("Erreur lors de la vérification de l'état de l'agent:", error);
+      return false;
+    }
+  }
+
+  /**
+   * Vérifie si le serveur Ollama est en cours d'exécution, indépendamment de l'état d'activation de l'agent
+   */
+  async isOllamaServerRunning(): Promise<boolean> {
+    try {
+      const settings = await aiAgentStorage.get();
 
       // Rate limit checks to avoid excessive requests
       const now = Date.now();
@@ -96,7 +141,7 @@ export class AgentService {
           // Si le serveur est en cours d'exécution, actualiser les modèles disponibles
           await this.refreshAvailableModels(settings.baseUrl);
 
-          // Le serveur est prêt si nous avons au moins un modèle
+          // Le serveur est disponible si nous avons au moins un modèle
           return this.availableModels.length > 0;
         }
 
@@ -108,7 +153,7 @@ export class AgentService {
         return false;
       }
     } catch (error) {
-      logger.error("Erreur lors de la vérification de l'état de l'agent:", error);
+      logger.error("Erreur lors de la vérification de l'état du serveur Ollama:", error);
       return false;
     }
   }

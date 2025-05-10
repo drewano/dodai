@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { aiAgentStorage } from '@extension/storage';
 import { useStorage } from '@extension/shared';
 import { MessageType } from '../../../chrome-extension/src/background/types';
@@ -20,8 +20,13 @@ export const AIAgentOptions = () => {
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [error, setError] = useState<string | null>(null);
   const [isRefreshing, setIsRefreshing] = useState<boolean>(false);
+  const refreshInProgressRef = useRef<boolean>(false);
 
   const checkOllamaServer = useCallback(async () => {
+    // Empêcher les appels simultanés
+    if (refreshInProgressRef.current) return;
+
+    refreshInProgressRef.current = true;
     setIsRefreshing(true);
     setError(null);
 
@@ -32,9 +37,9 @@ export const AIAgentOptions = () => {
       });
 
       if (statusResponse && statusResponse.success) {
-        setIsServerRunning(statusResponse.isReady);
+        setIsServerRunning(statusResponse.isServerRunning || false);
 
-        if (statusResponse.isReady) {
+        if (statusResponse.isServerRunning) {
           // Récupérer les modèles disponibles via le background script
           const modelsResponse = await chrome.runtime.sendMessage({
             type: MessageType.GET_AVAILABLE_MODELS,
@@ -64,6 +69,7 @@ export const AIAgentOptions = () => {
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
+      refreshInProgressRef.current = false;
     }
   }, [settings.baseUrl]);
 
@@ -72,13 +78,13 @@ export const AIAgentOptions = () => {
 
     // Auto-refresh every 10 seconds
     const interval = setInterval(() => {
-      if (!isRefreshing) {
+      if (!refreshInProgressRef.current) {
         checkOllamaServer();
       }
     }, 10000);
 
     return () => clearInterval(interval);
-  }, [checkOllamaServer, isRefreshing]);
+  }, [checkOllamaServer]);
 
   const handleModelChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     aiAgentStorage.updateModel(e.target.value);
@@ -111,6 +117,7 @@ export const AIAgentOptions = () => {
   };
 
   const handleRefresh = () => {
+    if (isRefreshing || refreshInProgressRef.current) return;
     setIsLoading(true);
     checkOllamaServer();
   };
@@ -237,7 +244,26 @@ export const AIAgentOptions = () => {
           </div>
         )}
 
-        {isServerRunning && (
+        {isServerRunning && !settings.isEnabled && !error && (
+          <div className="mb-4 rounded-lg border border-yellow-700/50 bg-yellow-800/20 text-yellow-400 overflow-hidden">
+            <div className="p-3 flex items-center">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                className="h-5 w-5 mr-3 flex-shrink-0 text-yellow-500"
+                viewBox="0 0 20 20"
+                fill="currentColor">
+                <path
+                  fillRule="evenodd"
+                  d="M8.257 3.099c.765-1.36 2.722-1.36 3.486 0l5.58 9.92c.75 1.334-.213 2.98-1.742 2.98H4.42c-1.53 0-2.493-1.646-1.743-2.98l5.58-9.92zM11 13a1 1 0 11-2 0 1 1 0 012 0zm-1-8a1 1 0 00-1 1v3a1 1 0 002 0V6a1 1 0 00-1-1z"
+                  clipRule="evenodd"
+                />
+              </svg>
+              <p className="text-sm">L'Agent IA est désactivé mais le serveur Ollama est disponible.</p>
+            </div>
+          </div>
+        )}
+
+        {isServerRunning && settings.isEnabled && !error && (
           <div className="mb-4 rounded-lg border border-green-800/50 bg-green-900/20 text-green-400 overflow-hidden">
             <div className="p-3 flex items-center">
               <svg
@@ -255,20 +281,20 @@ export const AIAgentOptions = () => {
 
         <div className="grid gap-6">
           <div className="flex items-center">
-            <div className="relative inline-flex h-5 w-10 items-center">
-              <input
-                type="checkbox"
-                id="enable-agent"
-                checked={settings.isEnabled}
-                onChange={handleEnableToggle}
-                disabled={!isServerRunning}
-                className="peer sr-only"
-              />
-              <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
-              <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
-            </div>
-            <label htmlFor="enable-agent" className="ml-3 text-sm font-medium text-gray-300 select-none">
-              Activer l'Agent IA
+            <label htmlFor="enable-agent" className="flex items-center cursor-pointer">
+              <div className="relative inline-flex h-5 w-10 items-center">
+                <input
+                  type="checkbox"
+                  id="enable-agent"
+                  checked={settings.isEnabled}
+                  onChange={handleEnableToggle}
+                  disabled={!isServerRunning}
+                  className="peer sr-only"
+                />
+                <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
+                <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
+              </div>
+              <span className="ml-3 text-sm font-medium text-gray-300 select-none">Activer l'Agent IA</span>
             </label>
           </div>
 
@@ -366,20 +392,22 @@ export const AIAgentOptions = () => {
             <h3 className="text-md font-medium text-blue-400 mb-4">Autocomplétion Inline</h3>
 
             <div className="flex items-center mb-4">
-              <div className="relative inline-flex h-5 w-10 items-center">
-                <input
-                  type="checkbox"
-                  id="enable-inline-assist"
-                  checked={settings.inlineAssistEnabled}
-                  onChange={handleInlineAssistToggle}
-                  disabled={!isServerRunning || !settings.isEnabled}
-                  className="peer sr-only"
-                />
-                <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
-                <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
-              </div>
-              <label htmlFor="enable-inline-assist" className="ml-3 text-sm font-medium text-gray-300 select-none">
-                Activer l'autocomplétion inline
+              <label htmlFor="enable-inline-assist" className="flex items-center cursor-pointer">
+                <div className="relative inline-flex h-5 w-10 items-center">
+                  <input
+                    type="checkbox"
+                    id="enable-inline-assist"
+                    checked={settings.inlineAssistEnabled}
+                    onChange={handleInlineAssistToggle}
+                    disabled={!isServerRunning || !settings.isEnabled}
+                    className="peer sr-only"
+                  />
+                  <div className="h-4 w-9 rounded-full bg-gray-700 peer-focus:ring-2 peer-focus:ring-blue-600 peer-focus:ring-offset-1 peer-focus:ring-offset-gray-900 peer-checked:bg-blue-900"></div>
+                  <div className="absolute left-0.5 h-3.5 w-3.5 rounded-full bg-gray-400 transition-all peer-checked:left-5 peer-checked:bg-blue-400"></div>
+                </div>
+                <span className="ml-3 text-sm font-medium text-gray-300 select-none">
+                  Activer l'autocomplétion inline
+                </span>
               </label>
             </div>
 

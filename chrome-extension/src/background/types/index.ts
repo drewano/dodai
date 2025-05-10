@@ -168,6 +168,7 @@ export interface CheckAgentStatusMessage extends BaseRuntimeMessage {
 export interface AgentStatusResponse {
   success: boolean;
   isReady: boolean;
+  isServerRunning?: boolean;
   error?: string;
 }
 
