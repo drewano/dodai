@@ -31,6 +31,51 @@ interface TagGraphViewProps {
   onClearFilter: () => void;
 }
 
+// Utilitaire pour déterminer si une couleur est claire ou foncée
+const getColorBrightness = (color: string): number => {
+  // Extraire les valeurs RGB
+  let r = 0,
+    g = 0,
+    b = 0;
+
+  // Gestion des formats rgba et rgb
+  if (color.startsWith('rgba')) {
+    const parts = color.match(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*([\d.]+)\)/);
+    if (parts) {
+      r = parseInt(parts[1], 10);
+      g = parseInt(parts[2], 10);
+      b = parseInt(parts[3], 10);
+    }
+  } else if (color.startsWith('rgb')) {
+    const parts = color.match(/rgb\((\d+),\s*(\d+),\s*(\d+)\)/);
+    if (parts) {
+      r = parseInt(parts[1], 10);
+      g = parseInt(parts[2], 10);
+      b = parseInt(parts[3], 10);
+    }
+  } else if (color.startsWith('#')) {
+    if (color.length === 7) {
+      r = parseInt(color.substring(1, 3), 16);
+      g = parseInt(color.substring(3, 5), 16);
+      b = parseInt(color.substring(5, 7), 16);
+    } else if (color.length === 4) {
+      r = parseInt(color.substring(1, 2), 16) * 17;
+      g = parseInt(color.substring(2, 3), 16) * 17;
+      b = parseInt(color.substring(3, 4), 16) * 17;
+    }
+  }
+
+  // Formule pour calculer la luminance perçue selon WCAG
+  // https://www.w3.org/TR/WCAG20-TECHS/G17.html
+  return (r * 0.299 + g * 0.587 + b * 0.114) / 255;
+};
+
+// Déterminer la couleur du texte en fonction de la luminance de la couleur de fond
+const getContrastTextColor = (backgroundColor: string): string => {
+  const brightness = getColorBrightness(backgroundColor);
+  return brightness > 0.5 ? '#000000' : '#ffffff';
+};
+
 const TagGraphView: FC<TagGraphViewProps> = ({ tagData, activeTag, onTagSelect, onClearFilter }) => {
   // On utilise un type plus simple pour la référence
   const fgRef = useRef<ForceGraphInstance>(null);
@@ -52,40 +97,40 @@ const TagGraphView: FC<TagGraphViewProps> = ({ tagData, activeTag, onTagSelect, 
     };
   }, []);
 
-  // Couleurs pour les noeuds
+  // Couleurs pour les noeuds - palette améliorée
   const nodeColor = (node: NodeObject) => {
     const nodeId = node.id as string;
 
     if (activeTag && nodeId === activeTag) {
-      return '#3b82f6'; // blue-500 (sélectionné)
+      return '#4f46e5'; // indigo-600 (sélectionné) - plus foncé pour meilleur contraste
     }
 
     if (hoveredNode === nodeId) {
-      return '#60a5fa'; // blue-400 (survol)
+      return '#818cf8'; // indigo-400 (survol) - plus contrasté
     }
 
     // Valeur du noeud pour déterminer la nuance (plus de connexions = plus intense)
-    const intensity = Math.min(0.4 + (node.val as number) * 0.1, 0.9);
+    const intensity = Math.min(0.5 + (node.val as number) * 0.1, 0.95);
     return `rgba(148, 163, 184, ${intensity})`; // slate-400 avec intensité variable
   };
 
-  // Couleurs pour les liens
+  // Couleurs pour les liens - palette améliorée
   const linkColor = (link: LinkObject) => {
     const sourceId = typeof link.source === 'object' ? (link.source as NodeObject).id : link.source;
     const targetId = typeof link.target === 'object' ? (link.target as NodeObject).id : link.target;
 
     // Si le lien est connecté au nœud actif, le mettre en évidence
     if (activeTag && (sourceId === activeTag || targetId === activeTag)) {
-      return 'rgba(59, 130, 246, 0.7)'; // blue-500 semi-transparent
+      return 'rgba(79, 70, 229, 0.7)'; // indigo-600 semi-transparent
     }
 
     // Si le lien est connecté au nœud survolé, le mettre en évidence
     if (hoveredNode && (sourceId === hoveredNode || targetId === hoveredNode)) {
-      return 'rgba(96, 165, 250, 0.6)'; // blue-400 semi-transparent
+      return 'rgba(129, 140, 248, 0.6)'; // indigo-400 semi-transparent
     }
 
     // Valeur du lien pour déterminer l'opacité
-    const opacity = 0.2 + Math.min((link.value as number) * 0.1, 0.3);
+    const opacity = 0.25 + Math.min((link.value as number) * 0.1, 0.35);
     return `rgba(71, 85, 105, ${opacity})`; // slate-600 avec opacité variable
   };
 
@@ -168,35 +213,50 @@ const TagGraphView: FC<TagGraphViewProps> = ({ tagData, activeTag, onTagSelect, 
             onEngineStop={() => fgRef.current && fgRef.current.zoomToFit(400, 50)}
             nodeCanvasObject={(node, ctx, globalScale) => {
               const label = node.name as string;
-              const fontSize = 12 / globalScale;
-              ctx.font = `${fontSize}px Sans-Serif`;
+              const fontSize = 14 / globalScale; // Taille de police augmentée pour meilleure lisibilité
+              ctx.font = `${Math.max(fontSize, 4)}px 'Source Sans Pro', Sans-Serif`; // Utilisation de la police du thème global
               const radius = Math.sqrt((node.val as number) * 20) || 5;
 
               // Dessiner le nœud avec un halo
-              const nodeColor = node.color as string;
+              const calculatedNodeColor = nodeColor(node);
+              node.color = calculatedNodeColor; // Stocker la couleur calculée pour l'utiliser plus tard
+
               ctx.beginPath();
               if (node.id === activeTag || node.id === hoveredNode) {
-                ctx.shadowColor = 'rgba(59, 130, 246, 0.6)';
+                ctx.shadowColor = 'rgba(79, 70, 229, 0.6)'; // indigo-600 avec transparence
                 ctx.shadowBlur = 10;
               }
               ctx.arc(node.x as number, node.y as number, radius, 0, 2 * Math.PI);
-              ctx.fillStyle = nodeColor;
+              ctx.fillStyle = calculatedNodeColor;
               ctx.fill();
               ctx.shadowColor = 'transparent';
               ctx.shadowBlur = 0;
 
+              // Déterminer la couleur du texte en fonction de la couleur du nœud
+              const textColor = getContrastTextColor(calculatedNodeColor);
+
               if (globalScale > 2.5) {
                 // Afficher le texte uniquement quand on zoome suffisamment
-                ctx.fillStyle = 'white';
+                ctx.fillStyle = textColor;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(label, node.x as number, node.y as number);
               } else if ((node.id === activeTag || node.id === hoveredNode) && globalScale > 1) {
                 // Toujours afficher le texte pour le nœud actif/survolé
-                ctx.fillStyle = 'white';
+                ctx.fillStyle = textColor;
                 ctx.textAlign = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(label, node.x as number, node.y as number);
+
+                // Optionnellement, ajouter un halo autour du texte pour améliorer la lisibilité
+                if (globalScale < 2) {
+                  const haloColor = textColor === '#ffffff' ? 'rgba(0,0,0,0.5)' : 'rgba(255,255,255,0.5)';
+                  ctx.shadowColor = haloColor;
+                  ctx.shadowBlur = 3;
+                  ctx.fillText(label, node.x as number, node.y as number);
+                  ctx.shadowColor = 'transparent';
+                  ctx.shadowBlur = 0;
+                }
               }
             }}
           />
