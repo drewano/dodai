@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect } from 'react';
 import type { NoteEntry } from '@extension/storage';
 
 export function useNoteEditing(
@@ -11,8 +11,6 @@ export function useNoteEditing(
   const [tagInput, setTagInput] = useState<string>('');
   const [isEditing, setIsEditing] = useState<boolean>(false);
   const [showPreview, setShowPreview] = useState<boolean>(false);
-
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
 
   // Update form when selected note changes
   useEffect(() => {
@@ -96,7 +94,6 @@ export function useNoteEditing(
     tagInput,
     isEditing,
     showPreview,
-    textareaRef,
     setEditedTitle,
     setEditedContent,
     setEditedTags,

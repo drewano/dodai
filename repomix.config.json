@@ -4,8 +4,7 @@
     "filePath": "repomix.md",
     "directoryStructure": true,
     "removeComments": false,
-    "showLineNumbers": false,
-    "compress": true
+    "showLineNumbers": false
   },
   "ignore": {
     "customPatterns": ["**/*.svg"]

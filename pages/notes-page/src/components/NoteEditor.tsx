@@ -1,10 +1,17 @@
 import type React from 'react';
+import { useEffect } from 'react';
+// import ReactMarkdown from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
-import MarkdownToolbar from './MarkdownToolbar';
+// import MarkdownToolbar from './MarkdownToolbar';
 import TagEditor from './TagEditor';
+import { useCreateBlockNote } from '@blocknote/react';
+import { BlockNoteView } from '@blocknote/mantine';
+import '@blocknote/core/fonts/inter.css';
+import '@blocknote/mantine/style.css';
+import type { NoteEntry } from '@extension/storage';
 
 interface NoteEditorProps {
   editedTitle: string;
@@ -12,9 +19,11 @@ interface NoteEditorProps {
   editedTags: string[];
   tagInput: string;
   showPreview: boolean;
-  textareaRef: React.RefObject<HTMLTextAreaElement>;
+  selectedNote: NoteEntry | null;
+  isEditing: boolean;
+  // textareaRef: React.RefObject<HTMLTextAreaElement>;
   onTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  onContentChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
+  // onContentChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onTagInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTagInputKeyDown: (e: React.KeyboardEvent) => void;
   onAddTag: () => void;
@@ -23,9 +32,9 @@ interface NoteEditorProps {
   onSave: () => void;
   onCancel: () => void;
   onExport: () => void;
-  insertMarkdown: (before: string, after?: string) => void;
-  handleInsertLink: () => void;
-  handleInsertImage: () => void;
+  // insertMarkdown: (before: string, after?: string) => void;
+  // handleInsertLink: () => void;
+  // handleInsertImage: () => void;
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -34,9 +43,11 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   editedTags,
   tagInput,
   showPreview,
-  textareaRef,
+  selectedNote,
+  isEditing,
+  // textareaRef,
   onTitleChange,
-  onContentChange,
+  // onContentChange,
   onTagInputChange,
   onTagInputKeyDown,
   onAddTag,
@@ -45,10 +56,41 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onSave,
   onCancel,
   onExport,
-  insertMarkdown,
-  handleInsertLink,
-  handleInsertImage,
+  // insertMarkdown,
+  // handleInsertLink,
+  // handleInsertImage,
 }) => {
+  const editor = useCreateBlockNote();
+
+  useEffect(() => {
+    if (!editor) return;
+
+    if (showPreview) {
+      // Si l'aperçu est montré, on ne fait rien au contenu de BlockNote ici,
+      // car il n'est pas visible.
+      return;
+    }
+
+    // L'éditeur BlockNote est visible
+    if (isEditing && selectedNote) {
+      const markdownToLoad = selectedNote.content || '';
+      const loadIntoEditor = async () => {
+        try {
+          const blocks = await editor.tryParseMarkdownToBlocks(markdownToLoad);
+          editor.replaceBlocks(editor.document, blocks.length > 0 ? blocks : [{ type: 'paragraph', content: '' }]);
+        } catch (error) {
+          console.error('Failed to parse Markdown to blocks:', error);
+          editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: 'Error loading content.' }]);
+        }
+      };
+      loadIntoEditor();
+    } else {
+      // Pas en mode édition, ou pas de note sélectionnée, ou création d'une nouvelle note
+      // On vide l'éditeur ou on met un état par défaut.
+      editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: '' }]);
+    }
+  }, [editor, selectedNote, isEditing, showPreview]);
+
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Header toolbar with action buttons */}
@@ -198,21 +240,16 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             />
 
             {/* Markdown toolbar */}
-            <MarkdownToolbar
+            {/* <MarkdownToolbar
               onInsertMarkdown={insertMarkdown}
               onInsertLink={handleInsertLink}
               onInsertImage={handleInsertImage}
-            />
+            /> */}
 
-            {/* Content textarea */}
-            <textarea
-              id="content"
-              ref={textareaRef}
-              value={editedContent}
-              onChange={onContentChange}
-              className="flex-1 w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed"
-              placeholder="Commencez à écrire ici... Vous pouvez utiliser la syntaxe Markdown pour mettre en forme votre contenu."
-            />
+            {/* Content editor */}
+            <div className="flex-1 w-full bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed">
+              <BlockNoteView editor={editor} theme="dark" />
+            </div>
           </div>
         )}
       </div>

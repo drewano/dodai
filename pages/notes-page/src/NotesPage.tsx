@@ -7,7 +7,7 @@ import { useNotes } from './hooks/useNotes';
 import { useFilterAndSort } from './hooks/useFilterAndSort';
 import { useNoteSelection } from './hooks/useNoteSelection';
 import { useNoteEditing } from './hooks/useNoteEditing';
-import { useMarkdownTools } from './hooks/useMarkdownTools';
+// import { useMarkdownTools } from './hooks/useMarkdownTools'; // Commenté
 
 // Components
 import Header from './components/Header';
@@ -82,8 +82,6 @@ const NotesPage = () => {
     tagInput,
     isEditing,
     showPreview,
-    textareaRef,
-    setEditedContent,
     setTagInput,
     setShowPreview,
     handleEditMode,
@@ -94,10 +92,10 @@ const NotesPage = () => {
     handleTagInputKeyDown,
   } = useNoteEditing(selectedNote, updateNote);
 
-  const { insertMarkdown, handleInsertLink, handleInsertImage } = useMarkdownTools(
-    textareaRef as React.RefObject<HTMLTextAreaElement>,
-    setEditedContent,
-  );
+  // const { insertMarkdown, handleInsertLink, handleInsertImage } = useMarkdownTools(
+  //   textareaRef as React.RefObject<HTMLTextAreaElement>,
+  //   setEditedContent,
+  // ); // Commenté
 
   // Toggle sidebars with animation
   const toggleLeftSidebar = useCallback(() => {
@@ -297,20 +295,18 @@ const NotesPage = () => {
             tagInput={tagInput}
             isEditing={isEditing}
             showPreview={showPreview}
-            textareaRef={textareaRef as React.RefObject<HTMLTextAreaElement>}
             onEditMode={handleEditMode}
             onSaveChanges={handleSaveChanges}
             onCancelEdit={handleCancelEdit}
             onDeleteNote={handleDeleteNote}
-            onContentChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setEditedContent(e.target.value)}
             onTagInputChange={(e: React.ChangeEvent<HTMLInputElement>) => setTagInput(e.target.value)}
             onTagInputKeyDown={handleTagInputKeyDown}
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
             onTogglePreview={() => setShowPreview(prev => !prev)}
-            insertMarkdown={insertMarkdown}
-            handleInsertLink={handleInsertLink}
-            handleInsertImage={handleInsertImage}
+            insertMarkdown={() => {}}
+            handleInsertLink={() => {}}
+            handleInsertImage={() => {}}
           />
         </div>
 
