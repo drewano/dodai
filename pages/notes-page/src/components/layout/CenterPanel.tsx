@@ -5,7 +5,6 @@ import type { NoteEntry } from '@extension/storage';
 import { chatHistoryStorage } from '@extension/storage';
 import { ChatMessage } from '../common/ChatMessage';
 import NoteEditor from '../note/NoteEditor';
-import NoteViewer from '../note/NoteViewer';
 
 interface CenterPanelProps {
   selectedItemType: 'note' | 'chat';
@@ -14,8 +13,6 @@ interface CenterPanelProps {
   editedTitle: string;
   editedTags: string[];
   tagInput: string;
-  isEditing: boolean;
-  onEditMode: () => void;
   onSaveChanges: (newContentJSON: string) => Promise<void>;
   onCancelEdit: () => void;
   onDeleteNote: () => Promise<void>;
@@ -33,8 +30,6 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   editedTitle,
   editedTags,
   tagInput,
-  isEditing,
-  onEditMode,
   onSaveChanges,
   onCancelEdit,
   onDeleteNote,
@@ -101,27 +96,23 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
       return renderEmptyState();
     }
 
-    if (isEditing) {
-      return (
-        <NoteEditor
-          selectedNote={selectedNote}
-          editedTitle={editedTitle}
-          editedTags={editedTags}
-          tagInput={tagInput}
-          isEditing={isEditing}
-          onTitleChange={onTitleChange}
-          onTagInputChange={onTagInputChange}
-          onTagInputKeyDown={onTagInputKeyDown}
-          onAddTag={onAddTag}
-          onRemoveTag={onRemoveTag}
-          onSave={onSaveChanges}
-          onCancel={onCancelEdit}
-          onExport={handleExportNote}
-        />
-      );
-    } else {
-      return <NoteViewer note={selectedNote} onEdit={onEditMode} onDelete={onDeleteNote} onExport={handleExportNote} />;
-    }
+    return (
+      <NoteEditor
+        selectedNote={selectedNote}
+        editedTitle={editedTitle}
+        editedTags={editedTags}
+        tagInput={tagInput}
+        onTitleChange={onTitleChange}
+        onTagInputChange={onTagInputChange}
+        onTagInputKeyDown={onTagInputKeyDown}
+        onAddTag={onAddTag}
+        onRemoveTag={onRemoveTag}
+        onSave={onSaveChanges}
+        onCancel={onCancelEdit}
+        onExport={handleExportNote}
+        onDelete={onDeleteNote}
+      />
+    );
   }
 
   function renderChatView() {

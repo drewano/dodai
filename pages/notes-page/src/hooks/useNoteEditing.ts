@@ -6,34 +6,23 @@ export function useNoteEditing(
   updateNote: (id: string, updates: Partial<Omit<NoteEntry, 'id'>>) => Promise<void>,
 ) {
   const [editedTitle, setEditedTitle] = useState<string>('');
-  const [editedContent, setEditedContent] = useState<string>('');
   const [editedTags, setEditedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>('');
-  const [isEditing, setIsEditing] = useState<boolean>(false);
 
   // Update form when selected note changes
   useEffect(() => {
     if (selectedNote) {
       setEditedTitle(selectedNote.title);
-      setEditedContent(selectedNote.content);
       setEditedTags(selectedNote.tags || []);
     } else {
       setEditedTitle('');
-      setEditedContent('');
       setEditedTags([]);
-      setIsEditing(false);
     }
   }, [selectedNote]);
-
-  // Enter edit mode
-  const handleEditMode = () => {
-    setIsEditing(true);
-  };
 
   // Save changes to note
   const handleSaveChanges = async (newContentJSON: string) => {
     if (!selectedNote) {
-      setIsEditing(false);
       return;
     }
 
@@ -48,17 +37,14 @@ export function useNoteEditing(
         tags: editedTags,
       });
     }
-    setIsEditing(false);
   };
 
   // Cancel editing
   const handleCancelEdit = () => {
     if (selectedNote) {
       setEditedTitle(selectedNote.title);
-      setEditedContent(selectedNote.content);
       setEditedTags(selectedNote.tags || []);
     }
-    setIsEditing(false);
   };
 
   // Tag management
@@ -91,16 +77,11 @@ export function useNoteEditing(
 
   return {
     editedTitle,
-    editedContent,
     editedTags,
     tagInput,
-    isEditing,
     setEditedTitle,
-    setEditedContent,
     setEditedTags,
     setTagInput,
-    setIsEditing,
-    handleEditMode,
     handleSaveChanges,
     handleCancelEdit,
     handleAddTag,

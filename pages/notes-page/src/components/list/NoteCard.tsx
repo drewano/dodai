@@ -5,6 +5,28 @@ import { fr } from 'date-fns/locale';
 import type { NoteEntry } from '@extension/storage';
 import { useDraggable } from '@dnd-kit/core';
 
+interface StyledText {
+  type: 'text';
+  text: string;
+  styles: Record<string, string | boolean | number>; // Simplifié
+}
+
+interface Link {
+  type: 'link';
+  content: StyledText[];
+  href: string;
+}
+
+type InlineContent = StyledText | Link;
+
+interface PartialBlock {
+  id?: string;
+  type?: string;
+  props?: Record<string, unknown>;
+  content?: string | InlineContent[]; // Peut être une chaîne (Markdown) ou un tableau d'InlineContent
+  children?: PartialBlock[];
+}
+
 interface NoteCardProps {
   note: NoteEntry;
   isSelected: boolean;
@@ -30,6 +52,69 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
   // Format the date for display
   const formatDate = (timestamp: number) => {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: fr });
+  };
+
+  const extractTextFromBlockNoteContent = (contentJson: string): string => {
+    if (!contentJson) {
+      return 'Contenu vide';
+    }
+
+    try {
+      // Essayons d'abord de voir si c'est une chaîne simple qui n'est pas du JSON
+      if (
+        typeof contentJson === 'string' &&
+        contentJson.length < 200 && // Arbitraire, pour éviter de parser de grosses chaînes non JSON
+        !contentJson.trim().startsWith('[') &&
+        !contentJson.trim().startsWith('{')
+      ) {
+        // Si ce n'est pas du JSON (ne commence pas par [ ou {), retourner directement si c'est court
+        const preview = contentJson.substring(0, 150);
+        return preview.length === 150 ? preview + '...' : preview;
+      }
+
+      const blocks = JSON.parse(contentJson) as PartialBlock[];
+      if (!Array.isArray(blocks)) {
+        return 'Aperçu non disponible (format)';
+      }
+
+      let extractedText = '';
+      for (const block of blocks) {
+        if (block.content && Array.isArray(block.content)) {
+          for (const item of block.content) {
+            if (item.type === 'text') {
+              extractedText += item.text + ' ';
+            } else if (item.type === 'link' && item.content) {
+              for (const linkTextItem of item.content) {
+                if (linkTextItem.type === 'text') {
+                  extractedText += linkTextItem.text + ' ';
+                }
+              }
+            }
+          }
+        } else if (typeof block.content === 'string') {
+          extractedText += block.content + ' ';
+        }
+      }
+
+      if (!extractedText.trim()) {
+        return 'Note vide';
+      }
+
+      const preview = extractedText.trim().substring(0, 150);
+      return preview.length === 150 ? preview + '...' : preview;
+    } catch {
+      // console.warn('[NoteCard] Erreur parsing JSON du contenu:', error);
+      // Si le parsing échoue, et que la chaîne originale est courte et ne ressemble pas à du JSON, l'afficher
+      if (
+        typeof contentJson === 'string' &&
+        contentJson.length < 150 &&
+        !contentJson.trim().startsWith('[') &&
+        !contentJson.trim().startsWith('{')
+      ) {
+        return contentJson;
+      }
+      return 'Aperçu indisponible';
+    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -83,10 +168,7 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
         </h3>
       </div>
 
-      <p className="text-slate-400 text-sm mt-2 line-clamp-2 ml-7">
-        {note.content.substring(0, 100)}
-        {note.content.length > 100 ? '...' : ''}
-      </p>
+      <p className="text-slate-400 text-sm mt-2 line-clamp-2 ml-7">{extractTextFromBlockNoteContent(note.content)}</p>
 
       {/* Footer avec métadonnées */}
       <div className="mt-3 ml-7 flex flex-wrap items-center gap-y-2">

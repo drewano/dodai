@@ -79,10 +79,8 @@ const NotesPage = () => {
     editedTitle,
     editedTags,
     tagInput,
-    isEditing,
     setEditedTitle,
     setTagInput,
-    handleEditMode,
     handleSaveChanges,
     handleCancelEdit,
     handleAddTag,
@@ -290,9 +288,7 @@ const NotesPage = () => {
             editedTitle={editedTitle}
             editedTags={editedTags}
             tagInput={tagInput}
-            isEditing={isEditing}
             onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
-            onEditMode={handleEditMode}
             onSaveChanges={handleSaveChanges}
             onCancelEdit={handleCancelEdit}
             onDeleteNote={handleDeleteNote}
