@@ -10,7 +10,6 @@ export function useNoteEditing(
   const [editedTags, setEditedTags] = useState<string[]>([]);
   const [tagInput, setTagInput] = useState<string>('');
   const [isEditing, setIsEditing] = useState<boolean>(false);
-  const [showPreview, setShowPreview] = useState<boolean>(false);
 
   // Update form when selected note changes
   useEffect(() => {
@@ -29,26 +28,23 @@ export function useNoteEditing(
   // Enter edit mode
   const handleEditMode = () => {
     setIsEditing(true);
-    setShowPreview(false);
   };
 
   // Save changes to note
-  const handleSaveChanges = async (newContentFromEditor?: string) => {
+  const handleSaveChanges = async (newContentJSON: string) => {
     if (!selectedNote) {
       setIsEditing(false);
       return;
     }
 
-    const currentContentToSave = newContentFromEditor !== undefined ? newContentFromEditor : selectedNote.content;
-
     const hasTitleChanged = editedTitle !== selectedNote.title;
-    const hasContentChanged = newContentFromEditor !== undefined && newContentFromEditor !== selectedNote.content;
+    const hasContentChanged = newContentJSON !== selectedNote.content;
     const haveTagsChanged = !arraysEqual(editedTags, selectedNote.tags || []);
 
     if (hasTitleChanged || hasContentChanged || haveTagsChanged) {
       await updateNote(selectedNote.id, {
         title: editedTitle,
-        content: currentContentToSave,
+        content: newContentJSON,
         tags: editedTags,
       });
     }
@@ -99,13 +95,11 @@ export function useNoteEditing(
     editedTags,
     tagInput,
     isEditing,
-    showPreview,
     setEditedTitle,
     setEditedContent,
     setEditedTags,
     setTagInput,
     setIsEditing,
-    setShowPreview,
     handleEditMode,
     handleSaveChanges,
     handleCancelEdit,

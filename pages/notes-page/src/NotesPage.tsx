@@ -77,15 +77,11 @@ const NotesPage = () => {
 
   const {
     editedTitle,
-    editedContent,
     editedTags,
     tagInput,
     isEditing,
-    showPreview,
     setEditedTitle,
     setTagInput,
-    setEditedContent,
-    setShowPreview,
     handleEditMode,
     handleSaveChanges,
     handleCancelEdit,
@@ -292,12 +288,9 @@ const NotesPage = () => {
             selectedNote={selectedNote}
             selectedChatId={selectedChatId}
             editedTitle={editedTitle}
-            editedContent={editedContent}
             editedTags={editedTags}
             tagInput={tagInput}
             isEditing={isEditing}
-            showPreview={showPreview}
-            setEditedContentForPreview={setEditedContent}
             onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
             onEditMode={handleEditMode}
             onSaveChanges={handleSaveChanges}
@@ -307,7 +300,6 @@ const NotesPage = () => {
             onTagInputKeyDown={handleTagInputKeyDown}
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
-            onTogglePreview={() => setShowPreview(prev => !prev)}
           />
         </div>
 

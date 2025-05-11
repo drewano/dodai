@@ -1,28 +1,20 @@
 import type React from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { fr } from 'date-fns/locale';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
 import { exportNoteToMarkdown, useStorage } from '@extension/shared';
 
 import type { NoteEntry } from '@extension/storage';
 import { chatHistoryStorage } from '@extension/storage';
 import { ChatMessage } from './ChatMessage';
 import NoteEditor from './NoteEditor';
+import NoteViewer from './NoteViewer';
 
 interface CenterPanelProps {
   selectedItemType: 'note' | 'chat';
   selectedNote: NoteEntry | null;
   selectedChatId: string | null;
   editedTitle: string;
-  editedContent: string;
   editedTags: string[];
   tagInput: string;
   isEditing: boolean;
-  showPreview: boolean;
-  textareaRef?: React.RefObject<HTMLTextAreaElement>;
   onEditMode: () => void;
   onSaveChanges: (newContentJSON: string) => Promise<void>;
   onCancelEdit: () => void;
@@ -31,8 +23,6 @@ interface CenterPanelProps {
   onTagInputKeyDown: (e: React.KeyboardEvent) => void;
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
-  onTogglePreview: () => void;
-  setEditedContentForPreview: (markdown: string) => void;
   onTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
@@ -41,12 +31,9 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   selectedNote,
   selectedChatId,
   editedTitle,
-  editedContent,
   editedTags,
   tagInput,
   isEditing,
-  showPreview,
-  textareaRef,
   onEditMode,
   onSaveChanges,
   onCancelEdit,
@@ -55,8 +42,6 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   onTagInputKeyDown,
   onAddTag,
   onRemoveTag,
-  onTogglePreview,
-  setEditedContentForPreview,
   onTitleChange,
 }) => {
   // Auto-save timer for notes (entièrement commenté)
@@ -101,12 +86,6 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
     }
   };
 
-  // Format the date for display
-  const formatDate = (timestamp: number) => {
-    return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: fr });
-  };
-
-  // Pour le rendu des conversations de chat
   const selectedChat = useChatConversation(selectedChatId);
 
   if (selectedItemType === 'note') {
@@ -125,241 +104,23 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
     if (isEditing) {
       return (
         <NoteEditor
+          selectedNote={selectedNote}
           editedTitle={editedTitle}
-          editedContent={editedContent}
           editedTags={editedTags}
           tagInput={tagInput}
-          showPreview={showPreview}
-          selectedNote={selectedNote}
           isEditing={isEditing}
           onTitleChange={onTitleChange}
           onTagInputChange={onTagInputChange}
           onTagInputKeyDown={onTagInputKeyDown}
           onAddTag={onAddTag}
           onRemoveTag={onRemoveTag}
-          onTogglePreview={onTogglePreview}
           onSave={onSaveChanges}
           onCancel={onCancelEdit}
           onExport={handleExportNote}
-          setEditedContentForPreview={setEditedContentForPreview}
         />
       );
     } else {
-      return (
-        <div className="flex flex-col h-full">
-          {/* Header actions */}
-          <div className="p-4 pb-2 border-b border-gray-700 mb-3">
-            <div className="flex justify-between items-center mb-3">
-              <div className="flex items-center">
-                {/* Affichage du statut de sauvegarde commenté */}
-                {/* {saveStatus === 'saving' && ( ... )} */}
-                {/* {saveStatus === 'saved' && ( ... )} */}
-                {/* {saveStatus === 'error' && ( ... )} */}
-              </div>
-
-              <div className="flex gap-2">
-                {/* Les boutons Aperçu, Sauvegarder, Annuler sont gérés par NoteEditor quand isEditing est true */}
-                {/* Donc, ici, quand isEditing est false, on montre seulement Modifier, Exporter, Supprimer */}
-                <button
-                  onClick={onEditMode}
-                  className="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-700 rounded text-white text-sm transition-colors flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                    />
-                  </svg>
-                  <span>Modifier</span>
-                </button>
-
-                <button
-                  onClick={handleExportNote}
-                  className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 rounded text-white text-sm transition-colors flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-                    />
-                  </svg>
-                  <span>Exporter</span>
-                </button>
-
-                <button
-                  onClick={onDeleteNote}
-                  className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition-colors flex items-center gap-1">
-                  <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    className="h-4 w-4"
-                    fill="none"
-                    viewBox="0 0 24 24"
-                    stroke="currentColor">
-                    <path
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                      strokeWidth={2}
-                      d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-                    />
-                  </svg>
-                  <span>Supprimer</span>
-                </button>
-              </div>
-            </div>
-
-            {/* Date info */}
-            <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
-              <span>Modifié {formatDate(selectedNote.updatedAt)}</span>
-              <span>Créé {formatDate(selectedNote.createdAt)}</span>
-            </div>
-
-            {/* Source URL if present */}
-            {selectedNote.sourceUrl && (
-              <div className="py-2 px-3 bg-gray-800 rounded text-sm mb-3">
-                <span className="text-gray-400">Source: </span>
-                <a
-                  href={selectedNote.sourceUrl}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-indigo-400 hover:underline">
-                  {selectedNote.sourceUrl}
-                </a>
-              </div>
-            )}
-          </div>
-
-          {/* Note content */}
-          <div className="flex-1 flex flex-col px-4 pb-4 overflow-hidden">
-            {isEditing ? (
-              <div className="flex-1 flex flex-col">
-                {/* Title field */}
-                <div className="mb-4">
-                  <input
-                    type="text"
-                    value={editedTitle}
-                    onChange={() => {
-                      /* Handled elsewhere */
-                    }}
-                    disabled
-                    className="w-full px-3 py-3 bg-gray-800 border-0 border-b border-gray-700 text-white text-xl font-medium focus:outline-none focus:border-indigo-500 transition-colors mb-3"
-                  />
-                </div>
-
-                {/* Tags display */}
-                <div className="mb-4">
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {editedTags.map(tag => (
-                      <div
-                        key={tag}
-                        className="flex items-center bg-indigo-900/40 text-indigo-300 px-3 py-1.5 rounded-full text-sm transition-colors hover:bg-indigo-800/50">
-                        <span className="mr-1">#</span>
-                        {tag}
-                        <button
-                          onClick={() => onRemoveTag(tag)}
-                          className="ml-1.5 text-indigo-300/70 hover:text-indigo-100 transition-colors"
-                          aria-label="Supprimer ce tag">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-3.5 w-3.5"
-                            viewBox="0 0 20 20"
-                            fill="currentColor">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      </div>
-                    ))}
-                    <div className="flex items-center bg-gray-800 text-gray-300 px-3 py-1.5 rounded-full text-sm">
-                      <input
-                        type="text"
-                        value={tagInput}
-                        onChange={onTagInputChange}
-                        onKeyDown={onTagInputKeyDown}
-                        placeholder="Ajouter un tag"
-                        className="bg-transparent border-none outline-none w-24 text-sm"
-                      />
-                      {tagInput && (
-                        <button onClick={onAddTag} className="ml-1 text-indigo-400 hover:text-indigo-300">
-                          <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            className="h-4 w-4"
-                            viewBox="0 0 20 20"
-                            fill="currentColor">
-                            <path
-                              fillRule="evenodd"
-                              d="M10 5a1 1 0 011 1v3h3a1 1 0 110 2h-3v3a1 1 0 11-2 0v-3H6a1 1 0 110-2h3V6a1 1 0 011-1z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                {showPreview ? (
-                  <div className="flex-1 prose prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none bg-gray-800 rounded-md p-6 overflow-y-auto">
-                    <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
-                      {editedContent}
-                    </ReactMarkdown>
-                  </div>
-                ) : (
-                  <div className="flex-1 flex flex-col">
-                    <textarea
-                      ref={textareaRef}
-                      value={editedContent}
-                      onChange={() => {
-                        /* Handled elsewhere */
-                      }}
-                      className="flex-1 w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed"
-                      placeholder="Commencez à écrire ici..."
-                    />
-                  </div>
-                )}
-              </div>
-            ) : (
-              // View mode (not editing)
-              <div className="flex-1 flex flex-col overflow-auto">
-                {/* Title */}
-                <h1 className="text-2xl font-bold text-white mb-4">{selectedNote.title || 'Sans titre'}</h1>
-
-                {/* Tags */}
-                {selectedNote?.tags && selectedNote.tags.length > 0 && (
-                  <div className="flex flex-wrap gap-2 mb-6">
-                    {selectedNote.tags.map(tag => (
-                      <span key={tag} className="bg-indigo-900/40 text-indigo-300 px-3 py-1 rounded-full text-sm">
-                        #{tag}
-                      </span>
-                    ))}
-                  </div>
-                )}
-
-                {/* Content */}
-                <div className="prose prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none">
-                  <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
-                    {selectedNote.content}
-                  </ReactMarkdown>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      );
+      return <NoteViewer note={selectedNote} onEdit={onEditMode} onDelete={onDeleteNote} onExport={handleExportNote} />;
     }
   }
 
