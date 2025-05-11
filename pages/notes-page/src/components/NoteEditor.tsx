@@ -1,13 +1,12 @@
 import type React from 'react';
 import { useEffect } from 'react';
-// import ReactMarkdown from 'react-markdown';
 import ReactMarkdown from 'react-markdown';
 import rehypeRaw from 'rehype-raw';
 import rehypeSanitize from 'rehype-sanitize';
 import remarkGfm from 'remark-gfm';
-// import MarkdownToolbar from './MarkdownToolbar';
 import TagEditor from './TagEditor';
 import { useCreateBlockNote } from '@blocknote/react';
+import { type PartialBlock, type InlineContent } from '@blocknote/core';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
@@ -21,9 +20,7 @@ interface NoteEditorProps {
   showPreview: boolean;
   selectedNote: NoteEntry | null;
   isEditing: boolean;
-  // textareaRef: React.RefObject<HTMLTextAreaElement>;
   onTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
-  // onContentChange: (e: React.ChangeEvent<HTMLTextAreaElement>) => void;
   onTagInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTagInputKeyDown: (e: React.KeyboardEvent) => void;
   onAddTag: () => void;
@@ -33,9 +30,6 @@ interface NoteEditorProps {
   onCancel: () => void;
   onExport: () => void;
   setEditedContentForPreview: (markdown: string) => void;
-  // insertMarkdown: (before: string, after?: string) => void;
-  // handleInsertLink: () => void;
-  // handleInsertImage: () => void;
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({
@@ -46,9 +40,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   showPreview,
   selectedNote,
   isEditing,
-  // textareaRef,
   onTitleChange,
-  // onContentChange,
   onTagInputChange,
   onTagInputKeyDown,
   onAddTag,
@@ -58,50 +50,88 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onCancel,
   onExport,
   setEditedContentForPreview,
-  // insertMarkdown,
-  // handleInsertLink,
-  // handleInsertImage,
 }) => {
-  const editor = useCreateBlockNote({
-    // Ici, on pourrait vouloir configurer les toolbars si on ne veut pas des valeurs par défaut
-    // Par exemple, pour désactiver certaines fonctionnalités spécifiques.
-    // Pour l'instant, on garde les valeurs par défaut qui incluent la barre de formatage et le slash menu.
-  });
+  const editor = useCreateBlockNote({});
 
   useEffect(() => {
     if (!editor) return;
 
     if (showPreview) {
-      // Si l'aperçu est montré, on ne fait rien au contenu de BlockNote ici,
-      // car il n'est pas visible.
       return;
     }
 
-    // L'éditeur BlockNote est visible
     if (isEditing && selectedNote) {
-      const markdownToLoad = selectedNote.content || '';
-      const loadIntoEditor = async () => {
+      const contentToLoad = selectedNote.content || '';
+      let newBlocks: PartialBlock[] = [];
+      let successfullyParsedAsBlocks = false;
+
+      if (contentToLoad) {
         try {
-          const blocks = await editor.tryParseMarkdownToBlocks(markdownToLoad);
-          editor.replaceBlocks(editor.document, blocks.length > 0 ? blocks : [{ type: 'paragraph', content: '' }]);
-        } catch (error) {
-          console.error('Failed to parse Markdown to blocks:', error);
-          editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: 'Error loading content.' }]);
+          const parsedJson = JSON.parse(contentToLoad);
+          if (Array.isArray(parsedJson)) {
+            if (
+              parsedJson.length === 0 ||
+              (parsedJson.length > 0 &&
+                typeof parsedJson[0] === 'object' &&
+                parsedJson[0] !== null &&
+                'type' in parsedJson[0])
+            ) {
+              newBlocks = parsedJson as PartialBlock[];
+              successfullyParsedAsBlocks = true;
+            }
+          } else if (typeof parsedJson === 'object' && parsedJson !== null && 'type' in parsedJson) {
+            newBlocks = [parsedJson as PartialBlock];
+            successfullyParsedAsBlocks = true;
+          }
+        } catch (_e) {
+          // Nom de variable d'erreur modifié pour indiquer qu'elle n'est pas utilisée
+        }
+      } else {
+        successfullyParsedAsBlocks = true;
+      }
+
+      const loadContentIntoEditor = async () => {
+        if (successfullyParsedAsBlocks) {
+          if (JSON.stringify(editor.document) !== JSON.stringify(newBlocks)) {
+            editor.replaceBlocks(editor.document, newBlocks);
+          }
+        } else {
+          try {
+            const markdownBlocks = await editor.tryParseMarkdownToBlocks(contentToLoad);
+            if (JSON.stringify(editor.document) !== JSON.stringify(markdownBlocks)) {
+              editor.replaceBlocks(
+                editor.document,
+                markdownBlocks.length > 0 ? markdownBlocks : [{ type: 'paragraph', content: '' }],
+              );
+            }
+          } catch (error) {
+            console.error('Failed to parse Markdown to blocks in NoteEditor:', error);
+            const fallbackText = contentToLoad || 'Erreur lors du chargement du contenu.';
+            editor.replaceBlocks(editor.document, [
+              { type: 'paragraph', content: [{ type: 'text', text: fallbackText, styles: {} }] },
+            ]);
+          }
         }
       };
-      loadIntoEditor();
-    } else {
-      // Pas en mode édition, ou pas de note sélectionnée, ou création d'une nouvelle note
-      // On vide l'éditeur ou on met un état par défaut.
-      editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: '' }]);
+      loadContentIntoEditor();
+    } else if (!isEditing || !selectedNote) {
+      const currentContent = editor.document[0]?.content as InlineContent[] | undefined;
+      const isEmptyDefault =
+        editor.document.length === 1 &&
+        editor.document[0]?.type === 'paragraph' &&
+        (currentContent === undefined ||
+          currentContent.length === 0 ||
+          (currentContent.length === 1 && currentContent[0].type === 'text' && currentContent[0].text === ''));
+
+      if (!isEmptyDefault) {
+        editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: '' }]);
+      }
     }
   }, [editor, selectedNote, isEditing, showPreview]);
 
   const handleSaveClick = async () => {
     if (!editor) return;
     if (showPreview || !isEditing) {
-      // Le bouton sauvegarder devrait idéalement être désactivé ou se comporter différemment en mode aperçu.
-      // Pour l'instant, on part du principe que editor.document contient l'état à sauvegarder.
       console.warn(
         'Sauvegarde tentée en mode aperçu ou sans édition active. Utilisation du contenu actuel de BlockNote.',
       );
@@ -127,7 +157,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      {/* Header toolbar with action buttons */}
       <div className="flex items-center justify-end gap-2 pb-4 border-b border-gray-700 mb-5">
         <button
           onClick={handleTogglePreviewClick}
@@ -222,15 +251,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
         </button>
       </div>
 
-      {/* Main editor content */}
       <div className="flex-1 flex flex-col overflow-hidden">
         {showPreview ? (
           <div className="flex-1 overflow-auto">
-            {/* Title preview */}
             <div className="mb-6">
               <h1 className="text-2xl font-bold text-white mb-4">{editedTitle || 'Sans titre'}</h1>
 
-              {/* Tags preview */}
               {editedTags.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-6">
                   {editedTags.map(tag => (
@@ -242,7 +268,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               )}
             </div>
 
-            {/* Content preview */}
             <div className="prose prose-invert prose-sm sm:prose-base lg:prose-lg max-w-none">
               <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
                 {editedContent}
@@ -251,7 +276,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           </div>
         ) : (
           <div className="flex-1 flex flex-col">
-            {/* Title field */}
             <div className="mb-5">
               <input
                 type="text"
@@ -263,7 +287,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               />
             </div>
 
-            {/* Tag editor */}
             <TagEditor
               tags={editedTags}
               tagInput={tagInput}
@@ -273,14 +296,6 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
               onTagInputKeyDown={onTagInputKeyDown}
             />
 
-            {/* Markdown toolbar */}
-            {/* <MarkdownToolbar
-              onInsertMarkdown={insertMarkdown}
-              onInsertLink={handleInsertLink}
-              onInsertImage={handleInsertImage}
-            /> */}
-
-            {/* Content editor */}
             <div className="flex-1 w-full bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed">
               <BlockNoteView editor={editor} theme="dark" editable={!showPreview} />
             </div>
