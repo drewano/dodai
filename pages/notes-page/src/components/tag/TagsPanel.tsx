@@ -3,7 +3,7 @@ import type { FC } from 'react';
 import RightSidebar from './RightSidebar';
 import TagGraphView from './TagGraphView';
 import type { NoteEntry } from '@extension/storage';
-import { useTagGraph } from '../hooks/useTagGraph';
+import { useTagGraph } from '../../hooks/useTagGraph';
 
 interface TagsPanelProps {
   notes: NoteEntry[] | null;

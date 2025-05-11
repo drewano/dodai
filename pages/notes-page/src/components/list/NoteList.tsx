@@ -4,9 +4,9 @@ import type { NoteEntry } from '@extension/storage';
 import NoteCard from './NoteCard';
 import FolderCard from './FolderCard';
 import ScratchpadCard from './ScratchpadCard';
-import FolderBreadcrumb from './FolderBreadcrumb';
+import FolderBreadcrumb from '../common/FolderBreadcrumb';
 import SortOptions from './SortOptions';
-import type { SortOption } from '../hooks/useFilterAndSort';
+import type { SortOption } from '../../hooks/useFilterAndSort';
 import type { DragEndEvent } from '@dnd-kit/core';
 import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 

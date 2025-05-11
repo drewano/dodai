@@ -1,6 +1,6 @@
 import type React from 'react';
 import { useEffect } from 'react';
-import TagEditor from './TagEditor';
+import TagEditor from '../tag/TagEditor';
 import { useCreateBlockNote } from '@blocknote/react';
 import { type PartialBlock } from '@blocknote/core';
 import { BlockNoteView } from '@blocknote/mantine';

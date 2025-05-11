@@ -1,5 +1,5 @@
 import type React from 'react';
-import type { SortOption } from '../hooks/useFilterAndSort';
+import type { SortOption } from '../../hooks/useFilterAndSort';
 
 interface SortOptionsProps {
   value: SortOption;

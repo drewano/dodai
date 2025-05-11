@@ -3,9 +3,9 @@ import { exportNoteToMarkdown, useStorage } from '@extension/shared';
 
 import type { NoteEntry } from '@extension/storage';
 import { chatHistoryStorage } from '@extension/storage';
-import { ChatMessage } from './ChatMessage';
-import NoteEditor from './NoteEditor';
-import NoteViewer from './NoteViewer';
+import { ChatMessage } from '../common/ChatMessage';
+import NoteEditor from '../note/NoteEditor';
+import NoteViewer from '../note/NoteViewer';
 
 interface CenterPanelProps {
   selectedItemType: 'note' | 'chat';

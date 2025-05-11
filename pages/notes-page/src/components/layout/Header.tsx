@@ -1,5 +1,5 @@
 import type React from 'react';
-import FolderBreadcrumb from './FolderBreadcrumb';
+import FolderBreadcrumb from '../common/FolderBreadcrumb';
 import type { NoteEntry } from '@extension/storage';
 
 interface HeaderProps {

@@ -10,10 +10,10 @@ import { useNoteEditing } from './hooks/useNoteEditing';
 // import { useMarkdownTools } from './hooks/useMarkdownTools'; // Commenté
 
 // Components
-import Header from './components/Header';
-import LeftSidebar from './components/LeftSidebar.js';
-import CenterPanel from './components/CenterPanel';
-import TagsPanel from './components/TagsPanel';
+import Header from './components/layout/Header';
+import LeftSidebar from './components/layout/LeftSidebar';
+import CenterPanel from './components/layout/CenterPanel';
+import TagsPanel from './components/tag/TagsPanel';
 
 // Types
 import type { NoteEntry } from '@extension/storage';

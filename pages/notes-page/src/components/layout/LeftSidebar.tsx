@@ -1,11 +1,11 @@
 import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import type { NoteEntry, ChatConversation } from '@extension/storage';
-import NoteCard from './NoteCard';
-import FolderCard from './FolderCard';
-import ScratchpadCard from './ScratchpadCard';
-import SortOptions from './SortOptions';
-import type { SortOption } from '../hooks/useFilterAndSort';
+import NoteCard from '../list/NoteCard';
+import FolderCard from '../list/FolderCard';
+import ScratchpadCard from '../list/ScratchpadCard';
+import SortOptions from '../list/SortOptions';
+import type { SortOption } from '../../hooks/useFilterAndSort';
 import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
 
