@@ -33,16 +33,22 @@ export function useNoteEditing(
   };
 
   // Save changes to note
-  const handleSaveChanges = async () => {
-    if (
-      selectedNote &&
-      (editedTitle !== selectedNote.title ||
-        editedContent !== selectedNote.content ||
-        !arraysEqual(editedTags, selectedNote.tags || []))
-    ) {
+  const handleSaveChanges = async (newContentFromEditor?: string) => {
+    if (!selectedNote) {
+      setIsEditing(false);
+      return;
+    }
+
+    const currentContentToSave = newContentFromEditor !== undefined ? newContentFromEditor : selectedNote.content;
+
+    const hasTitleChanged = editedTitle !== selectedNote.title;
+    const hasContentChanged = newContentFromEditor !== undefined && newContentFromEditor !== selectedNote.content;
+    const haveTagsChanged = !arraysEqual(editedTags, selectedNote.tags || []);
+
+    if (hasTitleChanged || hasContentChanged || haveTagsChanged) {
       await updateNote(selectedNote.id, {
         title: editedTitle,
-        content: editedContent,
+        content: currentContentToSave,
         tags: editedTags,
       });
     }

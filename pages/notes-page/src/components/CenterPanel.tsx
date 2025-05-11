@@ -1,5 +1,4 @@
 import type React from 'react';
-import { useState, useEffect, useRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import ReactMarkdown from 'react-markdown';
@@ -25,7 +24,7 @@ interface CenterPanelProps {
   showPreview: boolean;
   textareaRef?: React.RefObject<HTMLTextAreaElement>;
   onEditMode: () => void;
-  onSaveChanges: () => Promise<void>;
+  onSaveChanges: (newContentJSON: string) => Promise<void>;
   onCancelEdit: () => void;
   onDeleteNote: () => Promise<void>;
   onTagInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
@@ -33,9 +32,8 @@ interface CenterPanelProps {
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
   onTogglePreview: () => void;
-  insertMarkdown?: (before: string, after?: string) => void;
-  handleInsertLink?: () => void;
-  handleInsertImage?: () => void;
+  setEditedContentForPreview: (markdown: string) => void;
+  onTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
 }
 
 const CenterPanel: React.FC<CenterPanelProps> = ({
@@ -58,14 +56,14 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   onAddTag,
   onRemoveTag,
   onTogglePreview,
-  insertMarkdown,
-  handleInsertLink,
-  handleInsertImage,
+  setEditedContentForPreview,
+  onTitleChange,
 }) => {
+  // Auto-save timer for notes (entièrement commenté)
+  /*
   const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
   const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-save timer for notes
   useEffect(() => {
     if (isEditing && (selectedNote?.title !== editedTitle || selectedNote?.content !== editedContent)) {
       if (autoSaveTimerRef.current) {
@@ -75,9 +73,8 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
       setSaveStatus('saving');
       autoSaveTimerRef.current = setTimeout(async () => {
         try {
-          await onSaveChanges();
-          setSaveStatus('saved');
-          setTimeout(() => setSaveStatus(null), 2000);
+          console.warn("Auto-save désactivé car il nécessite une refonte pour BlockNote.");
+          setSaveStatus(null);
         } catch {
           setSaveStatus('error');
         }
@@ -90,6 +87,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
       }
     };
   }, [editedTitle, editedContent, isEditing, selectedNote, onSaveChanges]);
+  */
 
   // Handle note export
   const handleExportNote = async () => {
@@ -134,9 +132,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           showPreview={showPreview}
           selectedNote={selectedNote}
           isEditing={isEditing}
-          onTitleChange={() => {
-            /* Géré par useNoteEditing */
-          }}
+          onTitleChange={onTitleChange}
           onTagInputChange={onTagInputChange}
           onTagInputKeyDown={onTagInputKeyDown}
           onAddTag={onAddTag}
@@ -145,6 +141,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           onSave={onSaveChanges}
           onCancel={onCancelEdit}
           onExport={handleExportNote}
+          setEditedContentForPreview={setEditedContentForPreview}
         />
       );
     } else {
@@ -154,52 +151,10 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
           <div className="p-4 pb-2 border-b border-gray-700 mb-3">
             <div className="flex justify-between items-center mb-3">
               <div className="flex items-center">
-                {saveStatus === 'saving' && (
-                  <span className="flex items-center text-gray-400 text-sm">
-                    <svg
-                      className="animate-spin -ml-1 mr-2 h-4 w-4 text-gray-400"
-                      xmlns="http://www.w3.org/2000/svg"
-                      fill="none"
-                      viewBox="0 0 24 24">
-                      <circle
-                        className="opacity-25"
-                        cx="12"
-                        cy="12"
-                        r="10"
-                        stroke="currentColor"
-                        strokeWidth="4"></circle>
-                      <path
-                        className="opacity-75"
-                        fill="currentColor"
-                        d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                    </svg>
-                    Sauvegarde...
-                  </span>
-                )}
-                {saveStatus === 'saved' && (
-                  <span className="flex items-center text-green-500 text-sm">
-                    <svg className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Sauvegardé
-                  </span>
-                )}
-                {saveStatus === 'error' && (
-                  <span className="flex items-center text-red-500 text-sm">
-                    <svg className="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
-                      <path
-                        fillRule="evenodd"
-                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                        clipRule="evenodd"
-                      />
-                    </svg>
-                    Erreur
-                  </span>
-                )}
+                {/* Affichage du statut de sauvegarde commenté */}
+                {/* {saveStatus === 'saving' && ( ... )} */}
+                {/* {saveStatus === 'saved' && ( ... )} */}
+                {/* {saveStatus === 'error' && ( ... )} */}
               </div>
 
               <div className="flex gap-2">

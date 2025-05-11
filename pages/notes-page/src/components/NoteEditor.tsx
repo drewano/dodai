@@ -29,9 +29,10 @@ interface NoteEditorProps {
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
   onTogglePreview: () => void;
-  onSave: () => void;
+  onSave: (newContentJSON: string) => void;
   onCancel: () => void;
   onExport: () => void;
+  setEditedContentForPreview: (markdown: string) => void;
   // insertMarkdown: (before: string, after?: string) => void;
   // handleInsertLink: () => void;
   // handleInsertImage: () => void;
@@ -56,6 +57,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onSave,
   onCancel,
   onExport,
+  setEditedContentForPreview,
   // insertMarkdown,
   // handleInsertLink,
   // handleInsertImage,
@@ -91,12 +93,40 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     }
   }, [editor, selectedNote, isEditing, showPreview]);
 
+  const handleSaveClick = async () => {
+    if (!editor) return;
+    if (showPreview || !isEditing) {
+      // Le bouton sauvegarder devrait idéalement être désactivé ou se comporter différemment en mode aperçu.
+      // Pour l'instant, on part du principe que editor.document contient l'état à sauvegarder.
+      console.warn(
+        'Sauvegarde tentée en mode aperçu ou sans édition active. Utilisation du contenu actuel de BlockNote.',
+      );
+    }
+
+    const currentBlocks = editor.document;
+    const contentToSave = JSON.stringify(currentBlocks);
+    onSave(contentToSave);
+  };
+
+  const handleTogglePreviewClick = async () => {
+    if (!editor) {
+      onTogglePreview();
+      return;
+    }
+
+    if (!showPreview) {
+      const markdownContent = await editor.blocksToMarkdownLossy(editor.document);
+      setEditedContentForPreview(markdownContent);
+    }
+    onTogglePreview();
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full">
       {/* Header toolbar with action buttons */}
       <div className="flex items-center justify-end gap-2 pb-4 border-b border-gray-700 mb-5">
         <button
-          onClick={onTogglePreview}
+          onClick={handleTogglePreviewClick}
           className={`px-3 py-1.5 rounded text-sm transition-colors flex items-center gap-1 ${
             showPreview ? 'bg-gray-700 hover:bg-gray-600 text-gray-200' : 'bg-indigo-600 hover:bg-indigo-700 text-white'
           }`}>
@@ -143,7 +173,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
           )}
         </button>
         <button
-          onClick={onSave}
+          onClick={handleSaveClick}
           className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded text-white text-sm transition-colors flex items-center gap-1">
           <svg
             xmlns="http://www.w3.org/2000/svg"

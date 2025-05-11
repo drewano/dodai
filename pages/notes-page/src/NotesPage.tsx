@@ -12,7 +12,7 @@ import { useNoteEditing } from './hooks/useNoteEditing';
 // Components
 import Header from './components/Header';
 import LeftSidebar from './components/LeftSidebar.js';
-import CenterPanel from './components/CenterPanel.js';
+import CenterPanel from './components/CenterPanel';
 import TagsPanel from './components/TagsPanel';
 
 // Types
@@ -82,7 +82,9 @@ const NotesPage = () => {
     tagInput,
     isEditing,
     showPreview,
+    setEditedTitle,
     setTagInput,
+    setEditedContent,
     setShowPreview,
     handleEditMode,
     handleSaveChanges,
@@ -295,6 +297,8 @@ const NotesPage = () => {
             tagInput={tagInput}
             isEditing={isEditing}
             showPreview={showPreview}
+            setEditedContentForPreview={setEditedContent}
+            onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
             onEditMode={handleEditMode}
             onSaveChanges={handleSaveChanges}
             onCancelEdit={handleCancelEdit}
@@ -304,9 +308,6 @@ const NotesPage = () => {
             onAddTag={handleAddTag}
             onRemoveTag={handleRemoveTag}
             onTogglePreview={() => setShowPreview(prev => !prev)}
-            insertMarkdown={() => {}}
-            handleInsertLink={() => {}}
-            handleInsertImage={() => {}}
           />
         </div>
 
