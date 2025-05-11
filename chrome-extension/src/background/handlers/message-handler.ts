@@ -21,6 +21,10 @@ import type {
   SaveMessageAsNoteResponse,
   GetInlineCompletionRequestMessage,
   GetInlineCompletionResponseMessage,
+  GenerateDodaiCanvasArtifactRequest,
+  GenerateDodaiCanvasArtifactResponse,
+  ModifyDodaiCanvasArtifactRequest,
+  ModifyDodaiCanvasArtifactResponse,
 } from '../types';
 import { convertChatHistory, MessageType } from '../types';
 import { stateService } from '../services/state-service';
@@ -69,6 +73,10 @@ export class MessageHandler {
       this.handleSaveMessageAsNote(message as SaveMessageAsNoteMessage),
     [MessageType.GET_INLINE_COMPLETION_REQUEST]: (message: BaseRuntimeMessage) =>
       this.handleGetInlineCompletion(message as GetInlineCompletionRequestMessage),
+    [MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleGenerateDodaiCanvasArtifact(message as GenerateDodaiCanvasArtifactRequest),
+    [MessageType.MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleModifyDodaiCanvasArtifact(message as ModifyDodaiCanvasArtifactRequest),
   };
 
   /**
@@ -831,6 +839,144 @@ export class MessageHandler {
       return {
         success: false,
         error: error instanceof Error ? error.message : "Une erreur s'est produite lors de la sauvegarde de la note.",
+      };
+    }
+  }
+
+  /**
+   * Gestionnaire pour la génération d'artefacts Markdown dans Dodai Canvas
+   */
+  private async handleGenerateDodaiCanvasArtifact(
+    message: GenerateDodaiCanvasArtifactRequest,
+  ): Promise<GenerateDodaiCanvasArtifactResponse> {
+    logger.debug("Traitement de la requête de génération d'artefact pour Dodai Canvas", {
+      promptLength: message.prompt.length,
+      historyLength: message.history?.length || 0,
+    });
+
+    try {
+      // Vérifier si le modèle est disponible
+      const isReady = await agentService.isAgentReady();
+      if (!isReady) {
+        return {
+          success: false,
+          error: "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        };
+      }
+
+      // Convertir l'historique du chat si présent
+      const history = message.history ? convertChatHistory(message.history) : [];
+
+      // Construire le prompt système pour la génération d'artefacts
+      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère 
+      un document Markdown complet et bien structuré. Ta réponse DOIT être uniquement le contenu Markdown, 
+      sans introduction ni conclusion supplémentaire, sans explications ni commentaires.
+      
+      Utilise la syntaxe Markdown appropriée pour structurer ton document avec des titres, sous-titres, 
+      listes, tableaux, citations, code, etc. selon les besoins du contenu.
+      
+      N'ajoute pas de backticks triples autour du contenu - ton message entier est déjà considéré comme du Markdown.
+      
+      Demande utilisateur : ${message.prompt}`;
+
+      // Appeler le LLM pour générer l'artefact
+      const artifact = await agentService.invokeLLM(systemPrompt, history);
+
+      if (!artifact) {
+        return {
+          success: false,
+          error: 'Impossible de générer un artefact pour cette demande.',
+        };
+      }
+
+      logger.debug('Artefact généré avec succès', {
+        artifactLength: artifact.length,
+      });
+
+      return {
+        success: true,
+        artifact,
+      };
+    } catch (error) {
+      logger.error("Erreur lors de la génération d'artefact pour Dodai Canvas:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Une erreur s'est produite lors de la génération de l'artefact.",
+      };
+    }
+  }
+
+  /**
+   * Gestionnaire pour la modification d'artefacts Markdown dans Dodai Canvas
+   */
+  private async handleModifyDodaiCanvasArtifact(
+    message: ModifyDodaiCanvasArtifactRequest,
+  ): Promise<ModifyDodaiCanvasArtifactResponse> {
+    logger.debug("Traitement de la requête de modification d'artefact pour Dodai Canvas", {
+      promptLength: message.prompt.length,
+      artifactType: message.artifactType,
+      currentArtifactLength: message.currentArtifact.length,
+      historyLength: message.history?.length || 0,
+    });
+
+    try {
+      // Vérifier si le modèle est disponible
+      const isReady = await agentService.isAgentReady();
+      if (!isReady) {
+        return {
+          success: false,
+          error: "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+        };
+      }
+
+      // Convertir l'historique du chat si présent
+      const history = message.history ? convertChatHistory(message.history) : [];
+
+      // Construire le prompt système pour la modification d'artefacts
+      const systemPrompt = `Tu es un assistant expert en rédaction. Voici un document ${
+        message.artifactType === 'text' ? 'Markdown' : 'de code'
+      } existant.
+      
+      Modifie-le en te basant sur la demande suivante. Ta réponse DOIT être uniquement le nouveau contenu ${
+        message.artifactType === 'text' ? 'Markdown' : 'de code'
+      } complet et modifié, sans introduction ni conclusion supplémentaire, sans explications ni commentaires.
+      
+      Si le document est du Markdown, utilise la syntaxe Markdown appropriée pour structurer ton document avec des titres, sous-titres, 
+      listes, tableaux, citations, code, etc. selon les besoins du contenu.
+      
+      N'ajoute pas de backticks triples autour du contenu - ton message entier est déjà considéré comme du contenu Markdown ou du code.
+      
+      Document existant:
+      
+      ${message.currentArtifact}
+      
+      Demande utilisateur: ${message.prompt}`;
+
+      // Appeler le LLM pour modifier l'artefact
+      const modifiedArtifact = await agentService.invokeLLM(systemPrompt, history);
+
+      if (!modifiedArtifact) {
+        return {
+          success: false,
+          error: 'Impossible de modifier cet artefact pour cette demande.',
+        };
+      }
+
+      logger.debug('Artefact modifié avec succès', {
+        modifiedArtifactLength: modifiedArtifact.length,
+      });
+
+      return {
+        success: true,
+        artifact: modifiedArtifact,
+      };
+    } catch (error) {
+      logger.error("Erreur lors de la modification d'artefact pour Dodai Canvas:", error);
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Une erreur s'est produite lors de la modification de l'artefact.",
       };
     }
   }

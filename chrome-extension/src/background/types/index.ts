@@ -100,6 +100,12 @@ export enum MessageType {
   // Nouveaux types de messages pour l'autocomplétion inline
   GET_INLINE_COMPLETION_REQUEST = 'GET_INLINE_COMPLETION_REQUEST',
   GET_INLINE_COMPLETION_RESPONSE = 'GET_INLINE_COMPLETION_RESPONSE',
+
+  // Nouveau type de message pour la génération d'artefacts dans Dodai Canvas
+  GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST = 'GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST',
+
+  // Nouveau type pour modifier un artefact existant
+  MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST = 'MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST',
 }
 
 /**
@@ -329,4 +335,33 @@ export interface RagChatResponse {
   streaming?: boolean; // True if streaming was initiated
   error?: string;
   model?: string; // Nom du modèle qui a généré la réponse
+}
+
+// Interfaces pour Dodai Canvas
+export interface GenerateDodaiCanvasArtifactRequest extends BaseRuntimeMessage {
+  type: MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST;
+  prompt: string;
+  history?: ChatHistoryMessage[];
+}
+
+export interface GenerateDodaiCanvasArtifactResponse {
+  success: boolean;
+  artifact?: string;
+  error?: string;
+}
+
+// Interface pour la requête de modification d'artefact
+export interface ModifyDodaiCanvasArtifactRequest extends BaseRuntimeMessage {
+  type: MessageType.MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST;
+  prompt: string;
+  currentArtifact: string;
+  artifactType: 'text' | 'code';
+  history?: ChatHistoryMessage[];
+}
+
+// Interface pour la réponse de modification d'artefact
+export interface ModifyDodaiCanvasArtifactResponse {
+  success: boolean;
+  artifact?: string;
+  error?: string;
 }

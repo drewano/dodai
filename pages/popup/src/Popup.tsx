@@ -338,6 +338,20 @@ const Popup = () => {
             </svg>
             Voir mes notes
           </button>
+
+          <button
+            className="mt-2 w-full py-3 px-4 rounded-lg bg-purple-100 dark:bg-purple-900/30 hover:bg-purple-200 dark:hover:bg-purple-800/50 text-purple-800 dark:text-purple-200 font-medium transition-colors shadow-sm flex items-center justify-center"
+            onClick={() => chrome.tabs.create({ url: chrome.runtime.getURL('dodai-canvas/index.html') })}>
+            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+              <path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v2a1 1 0 01-1 1H4a1 1 0 01-1-1V4z" />
+              <path
+                fillRule="evenodd"
+                d="M3 8h14v7a2 2 0 01-2 2H5a2 2 0 01-2-2V8zm5 3a1 1 0 011-1h2a1 1 0 110 2H9a1 1 0 01-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+            Ouvrir Canvas
+          </button>
         </div>
       </div>
     </div>
