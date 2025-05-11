@@ -1,11 +1,13 @@
 import type React from 'react';
+import { useEffect } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
-import ReactMarkdown from 'react-markdown';
-import rehypeRaw from 'rehype-raw';
-import rehypeSanitize from 'rehype-sanitize';
-import remarkGfm from 'remark-gfm';
 import type { NoteEntry } from '@extension/storage';
+import { useCreateBlockNote } from '@blocknote/react';
+import { type PartialBlock } from '@blocknote/core';
+import { BlockNoteView } from '@blocknote/mantine';
+import '@blocknote/core/style.css';
+import '@blocknote/mantine/style.css';
 
 interface NoteViewerProps {
   note: NoteEntry;
@@ -19,6 +21,67 @@ const NoteViewer: React.FC<NoteViewerProps> = ({ note, onEdit, onDelete, onExpor
   const formatDate = (timestamp: number) => {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: fr });
   };
+
+  const editor = useCreateBlockNote();
+
+  useEffect(() => {
+    if (note && editor) {
+      let blocksToLoad: PartialBlock[] = [];
+      if (note.content) {
+        try {
+          const parsedContent = JSON.parse(note.content);
+          if (Array.isArray(parsedContent) && parsedContent.length > 0 && 'type' in parsedContent[0]) {
+            blocksToLoad = parsedContent as PartialBlock[];
+          } else if (typeof parsedContent === 'object' && parsedContent !== null && 'type' in parsedContent) {
+            blocksToLoad = [parsedContent as PartialBlock];
+          } else {
+            console.warn(
+              "[NoteViewer] Le contenu JSON n'est pas un tableau de blocks valide, tentative de conversion Markdown.",
+            );
+            editor
+              .tryParseMarkdownToBlocks(note.content)
+              .then(mdBlocks => {
+                if (JSON.stringify(editor.document) !== JSON.stringify(mdBlocks)) {
+                  editor.replaceBlocks(editor.document, mdBlocks);
+                }
+              })
+              .catch(e => {
+                console.error('[NoteViewer] Erreur de parsing Markdown après échec JSON:', e);
+                const fallbackBlock: PartialBlock = {
+                  type: 'paragraph',
+                  content: [{ type: 'text', text: note.content || '', styles: {} }],
+                };
+                editor.replaceBlocks(editor.document, [fallbackBlock]);
+              });
+            return;
+          }
+        } catch (e) {
+          console.warn('[NoteViewer] Échec du parsing JSON, tentative de conversion Markdown :', e);
+          editor
+            .tryParseMarkdownToBlocks(note.content)
+            .then(mdBlocks => {
+              if (JSON.stringify(editor.document) !== JSON.stringify(mdBlocks)) {
+                editor.replaceBlocks(editor.document, mdBlocks);
+              }
+            })
+            .catch(error => {
+              console.error('[NoteViewer] Erreur de parsing Markdown :', error);
+              const fallbackBlock: PartialBlock = {
+                type: 'paragraph',
+                content: [{ type: 'text', text: note.content || '', styles: {} }],
+              };
+              editor.replaceBlocks(editor.document, [fallbackBlock]);
+            });
+          return;
+        }
+      }
+
+      const currentBlocks = editor.document;
+      if (JSON.stringify(currentBlocks) !== JSON.stringify(blocksToLoad)) {
+        editor.replaceBlocks(currentBlocks, Array.isArray(blocksToLoad) ? blocksToLoad : []);
+      }
+    }
+  }, [note, editor]);
 
   return (
     <div className="flex flex-col h-full overflow-hidden">
@@ -146,13 +209,9 @@ const NoteViewer: React.FC<NoteViewerProps> = ({ note, onEdit, onDelete, onExpor
         )}
       </div>
 
-      {/* Markdown content */}
-      <div className="flex-1 overflow-auto px-4 pb-4">
-        <div className="prose prose-invert prose-headings:mt-5 prose-headings:mb-3 prose-h1:text-2xl prose-h2:text-xl prose-h3:text-lg prose-headings:text-indigo-300 prose-pre:bg-gray-800 prose-pre:border prose-pre:border-gray-700 prose-code:text-teal-300 prose-blockquote:border-l-4 prose-blockquote:border-indigo-500 prose-blockquote:bg-gray-800 prose-blockquote:pl-4 prose-blockquote:py-1 prose-blockquote:italic prose-a:text-indigo-400 hover:prose-a:text-indigo-300 prose-a:no-underline hover:prose-a:underline prose-strong:text-indigo-200 prose-img:rounded-lg prose-img:shadow-md max-w-none">
-          <ReactMarkdown rehypePlugins={[rehypeRaw, rehypeSanitize]} remarkPlugins={[remarkGfm]}>
-            {note.content}
-          </ReactMarkdown>
-        </div>
+      {/* Content area */}
+      <div className="flex-1 overflow-auto px-4 pb-4 bn-container">
+        {editor && <BlockNoteView editor={editor} editable={false} theme="dark" />}
       </div>
     </div>
   );

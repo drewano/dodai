@@ -62,7 +62,11 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   // handleInsertLink,
   // handleInsertImage,
 }) => {
-  const editor = useCreateBlockNote();
+  const editor = useCreateBlockNote({
+    // Ici, on pourrait vouloir configurer les toolbars si on ne veut pas des valeurs par défaut
+    // Par exemple, pour désactiver certaines fonctionnalités spécifiques.
+    // Pour l'instant, on garde les valeurs par défaut qui incluent la barre de formatage et le slash menu.
+  });
 
   useEffect(() => {
     if (!editor) return;
@@ -278,7 +282,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
 
             {/* Content editor */}
             <div className="flex-1 w-full bg-gray-800 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed">
-              <BlockNoteView editor={editor} theme="dark" />
+              <BlockNoteView editor={editor} theme="dark" editable={!showPreview} />
             </div>
           </div>
         )}
