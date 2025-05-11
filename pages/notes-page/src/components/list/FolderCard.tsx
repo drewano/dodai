@@ -12,10 +12,11 @@ interface FolderCardProps {
   onSelect: (folder: NoteEntry) => void;
   onOpen: (folder: NoteEntry) => void;
   notesCount: number;
+  onContextMenu: (event: React.MouseEvent, folder: NoteEntry) => void;
 }
 
 const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
-  ({ folder, isSelected, isOpen = false, onSelect, onOpen, notesCount }) => {
+  ({ folder, isSelected, isOpen = false, onSelect, onOpen, notesCount, onContextMenu }) => {
     // Configuration du draggable
     const {
       attributes,
@@ -87,7 +88,8 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
         tabIndex={0}
         role="button"
         aria-pressed={isSelected}
-        style={style}>
+        style={style}
+        onContextMenu={e => onContextMenu(e, folder)}>
         {/* Sélection marker */}
         {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-md" />}
 

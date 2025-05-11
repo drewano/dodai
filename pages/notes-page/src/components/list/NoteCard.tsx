@@ -31,9 +31,10 @@ interface NoteCardProps {
   note: NoteEntry;
   isSelected: boolean;
   onSelect: (note: NoteEntry) => void;
+  onContextMenu: (event: React.MouseEvent, note: NoteEntry) => void;
 }
 
-const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, onSelect }) => {
+const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, onSelect, onContextMenu }) => {
   // Configuration du draggable
   const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
     id: note.id,
@@ -142,7 +143,8 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       tabIndex={0}
       role="button"
       aria-pressed={isSelected}
-      style={style}>
+      style={style}
+      onContextMenu={e => onContextMenu(e, note)}>
       {/* Sélection marker */}
       {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-md" />}
 

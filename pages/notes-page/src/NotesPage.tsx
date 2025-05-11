@@ -258,6 +258,7 @@ const NotesPage = () => {
             onSortChange={handleSortChange}
             getChildrenOf={getChildrenOf}
             activeTag={activeTag}
+            onDeleteItem={deleteNote}
           />
         </div>
 

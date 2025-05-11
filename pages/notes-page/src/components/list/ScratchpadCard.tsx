@@ -8,9 +8,16 @@ interface ScratchpadCardProps {
   isSelected: boolean;
   onSelect: (note: NoteEntry) => void;
   onClear: () => void;
+  onContextMenu: (event: React.MouseEvent, note: NoteEntry) => void;
 }
 
-const ScratchpadCard: React.FC<ScratchpadCardProps> = ({ scratchpad, isSelected, onSelect, onClear }) => {
+const ScratchpadCard: React.FC<ScratchpadCardProps> = ({
+  scratchpad,
+  isSelected,
+  onSelect,
+  onClear,
+  onContextMenu,
+}) => {
   // Format the date for display
   const formatDate = (timestamp: number) => {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: fr });
@@ -38,7 +45,8 @@ const ScratchpadCard: React.FC<ScratchpadCardProps> = ({ scratchpad, isSelected,
       onKeyDown={handleKeyDown}
       tabIndex={0}
       role="button"
-      aria-pressed={isSelected}>
+      aria-pressed={isSelected}
+      onContextMenu={e => onContextMenu(e, scratchpad)}>
       <div className="flex justify-between items-center">
         <h3 className="font-semibold flex items-center text-blue-100">
           <svg

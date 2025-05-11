@@ -1,6 +1,7 @@
 import type React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import type { NoteEntry, ChatConversation } from '@extension/storage';
+import { exportNoteToMarkdown } from '@extension/shared';
 import NoteCard from '../list/NoteCard';
 import FolderCard from '../list/FolderCard';
 import ScratchpadCard from '../list/ScratchpadCard';
@@ -8,6 +9,7 @@ import SortOptions from '../list/SortOptions';
 import type { SortOption } from '../../hooks/useFilterAndSort';
 import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
 import type { DragEndEvent } from '@dnd-kit/core';
+import ContextMenu from '../common/ContextMenu';
 
 // Types pour les données de drag-and-drop
 interface DragDataNote {
@@ -45,6 +47,16 @@ interface LeftSidebarProps {
   onCreateFolderFromNotes: (noteAId: string, noteBId: string, folderTitle: string) => Promise<string | null>;
   onSortChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   getChildrenOf: (folderId: string) => NoteEntry[];
+  onDeleteItem: (id: string) => Promise<void>;
+}
+
+// Ajouté : Type pour l'état du menu contextuel
+interface ContextMenuState {
+  isVisible: boolean;
+  x: number;
+  y: number;
+  targetItem: NoteEntry | null;
+  isFolder: boolean;
 }
 
 const LeftSidebar: React.FC<LeftSidebarProps> = ({
@@ -69,12 +81,22 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   onCreateFolderFromNotes,
   onSortChange,
   getChildrenOf,
+  onDeleteItem,
 }) => {
   const [folderNameInput, setFolderNameInput] = useState('');
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
   const [showCreateMenu, setShowCreateMenu] = useState(false);
   const createMenuRef = useRef<HTMLDivElement>(null);
   const createButtonRef = useRef<HTMLButtonElement>(null);
+
+  // Ajouté : État pour le menu contextuel
+  const [contextMenu, setContextMenu] = useState<ContextMenuState>({
+    isVisible: false,
+    x: 0,
+    y: 0,
+    targetItem: null,
+    isFolder: false,
+  });
 
   // Gérer la fermeture du menu lors d'un clic à l'extérieur
   useEffect(() => {
@@ -93,6 +115,23 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     document.addEventListener('mousedown', handleClickOutside);
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, [showCreateMenu]);
+
+  // Ajouté : Gérer la fermeture du menu contextuel lors d'un clic à l'extérieur
+  useEffect(() => {
+    const handleClickOutsideContextMenu = () => {
+      if (contextMenu.isVisible) {
+        setContextMenu(prev => ({ ...prev, isVisible: false }));
+      }
+    };
+    if (contextMenu.isVisible) {
+      document.addEventListener('click', handleClickOutsideContextMenu);
+      document.addEventListener('contextmenu', handleClickOutsideContextMenu, true); // Pour fermer sur un autre clic droit
+    }
+    return () => {
+      document.removeEventListener('click', handleClickOutsideContextMenu);
+      document.removeEventListener('contextmenu', handleClickOutsideContextMenu, true);
+    };
+  }, [contextMenu.isVisible]);
 
   // Configurar les sensors pour DnD
   const mouseSensor = useSensor(MouseSensor, {
@@ -183,6 +222,66 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
   const handleNewFolderInputMount = (inputElement: HTMLInputElement | null) => {
     if (inputElement) {
       inputElement.focus();
+    }
+  };
+
+  // Ajouté : Gérer l'ouverture du menu contextuel
+  const handleOpenContextMenu = (event: React.MouseEvent, item: NoteEntry, isFolderItem: boolean = false) => {
+    event.preventDefault();
+    event.stopPropagation(); // Pour éviter que le clic ne ferme immédiatement le menu s'il était déjà ouvert sur un autre item.
+    setContextMenu({
+      isVisible: true,
+      x: event.clientX,
+      y: event.clientY,
+      targetItem: item,
+      isFolder: isFolderItem || item.type === 'folder',
+    });
+  };
+
+  // Ajouté : Gérer l'exportation d'un item
+  const handleExportItem = async () => {
+    if (contextMenu.targetItem && contextMenu.targetItem.type !== 'folder') {
+      try {
+        await exportNoteToMarkdown(contextMenu.targetItem);
+      } catch (error) {
+        console.error("Erreur lors de l'export via menu contextuel:", error);
+        alert("Erreur lors de l'exportation.");
+      }
+    }
+    // Pour les dossiers, l'export n'est pas géré ici ou est désactivé dans ContextMenu.
+    // Si on voulait exporter un dossier (ex: en ZIP), on ajouterait la logique ici.
+  };
+
+  // Ajouté : Gérer la suppression d'un item
+  const handleDeleteItem = async () => {
+    if (contextMenu.targetItem) {
+      const itemToDelete = contextMenu.targetItem;
+      const confirmMessage =
+        itemToDelete.id === '@Scratchpad'
+          ? 'Êtes-vous sûr de vouloir vider le Scratchpad ?'
+          : `Êtes-vous sûr de vouloir supprimer "${itemToDelete.title || 'cet élément'}" ?`;
+
+      if (window.confirm(confirmMessage)) {
+        try {
+          if (itemToDelete.id === '@Scratchpad') {
+            await onClearScratchpad();
+          } else {
+            await onDeleteItem(itemToDelete.id);
+
+            // Si l'élément supprimé était sélectionné, le désélectionner
+            if (selectedNoteId === itemToDelete.id || selectedChatId === itemToDelete.id) {
+              onSelectNote(null as any); // Ceci devrait idéalement être une action plus propre comme clearSelection
+              // Si c'était un chat, il faudrait aussi gérer la désélection du chat.
+              // Pour l'instant, on se concentre sur les notes/dossiers.
+            }
+            // Il n'est pas nécessaire de rafraîchir la liste manuellement si useStorage fonctionne correctement,
+            // car la suppression via notesStorage devrait provoquer une mise à jour de `notes` et donc un re-render.
+          }
+        } catch (error) {
+          console.error('Erreur lors de la suppression via menu contextuel:', error);
+          alert('Erreur lors de la suppression.');
+        }
+      }
     }
   };
 
@@ -336,6 +435,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                     const result = await onClearScratchpad();
                     return result || null;
                   }}
+                  onContextMenu={(event, item) => handleOpenContextMenu(event, item)}
                 />
               )}
 
@@ -380,6 +480,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                           onSelect={onSelectNote}
                           onOpen={folder => onNavigateToFolder(folder.id)}
                           notesCount={children.length}
+                          onContextMenu={(event, item) => handleOpenContextMenu(event, item, true)}
                         />
                       );
                     } else {
@@ -389,6 +490,7 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
                           note={item}
                           isSelected={selectedNoteId === item.id}
                           onSelect={onSelectNote}
+                          onContextMenu={(event, item) => handleOpenContextMenu(event, item)}
                         />
                       );
                     }
@@ -518,6 +620,17 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
           </button>
         </div>
       )}
+
+      {/* Ajouté : Affichage du menu contextuel */}
+      <ContextMenu
+        isVisible={contextMenu.isVisible}
+        x={contextMenu.x}
+        y={contextMenu.y}
+        isFolder={contextMenu.isFolder}
+        onClose={() => setContextMenu(prev => ({ ...prev, isVisible: false }))}
+        onExport={handleExportItem}
+        onDelete={handleDeleteItem}
+      />
     </div>
   );
 };

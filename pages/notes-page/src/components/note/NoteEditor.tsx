@@ -128,68 +128,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
     <div className="flex-1 flex flex-col h-full">
       {selectedNote && (
         <div className="flex items-center justify-end gap-2 pb-4 border-b border-gray-700 mb-5">
-          <button
-            onClick={handleSaveClick}
-            className="px-3 py-1.5 bg-green-600 hover:bg-green-700 rounded text-white text-sm transition-colors flex items-center gap-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-            </svg>
-            <span>Sauvegarder</span>
-          </button>
-          <button
-            onClick={onCancel}
-            className="px-3 py-1.5 bg-gray-700 hover:bg-gray-600 rounded text-white text-sm transition-colors flex items-center gap-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-            </svg>
-            <span>Annuler</span>
-          </button>
-          <button
-            onClick={onExport}
-            className="px-3 py-1.5 bg-teal-600 hover:bg-teal-700 rounded text-white text-sm transition-colors flex items-center gap-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"
-              />
-            </svg>
-            <span>Exporter</span>
-          </button>
-          <button
-            onClick={onDelete}
-            className="px-3 py-1.5 bg-red-600 hover:bg-red-700 rounded text-white text-sm transition-colors flex items-center gap-1">
-            <svg
-              xmlns="http://www.w3.org/2000/svg"
-              className="h-4 w-4"
-              fill="none"
-              viewBox="0 0 24 24"
-              stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"
-              />
-            </svg>
-            <span>Supprimer</span>
-          </button>
+          {/* Les boutons Sauvegarder, Annuler, Exporter, Supprimer étaient ici et ont été enlevés */}
         </div>
       )}
 
