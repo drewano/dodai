@@ -4,6 +4,7 @@ import RightSidebar from './RightSidebar';
 import TagGraphView from './TagGraphView';
 import type { NoteEntry } from '@extension/storage';
 import { useTagGraph } from '../../hooks/useTagGraph';
+import { List, GitBranch } from 'lucide-react';
 
 interface TagsPanelProps {
   notes: NoteEntry[] | null;
@@ -18,57 +19,31 @@ const TagsPanel: FC<TagsPanelProps> = ({ notes, allTags, activeTag, onTagSelect,
   const tagGraphData = useTagGraph(notes);
 
   return (
-    <div className="h-full flex flex-col bg-gray-900">
+    <div className="h-full flex flex-col bg-slate-800 text-slate-100">
       {/* Navigation tabs */}
-      <div className="border-b border-gray-700/50">
-        <div className="flex">
+      <div className="border-b border-slate-700/70 flex-shrink-0">
+        <div className="flex px-2 pt-1">
           <button
             onClick={() => setViewMode('list')}
-            className={`px-5 py-3 text-sm font-medium transition-colors duration-200 relative ${
-              viewMode === 'list' ? 'text-blue-400' : 'text-gray-400 hover:text-gray-200'
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors duration-150 rounded-t-md focus:outline-none focus:ring-1 focus:ring-blue-500/50 relative ${
+              viewMode === 'list'
+                ? 'text-slate-100 bg-slate-850'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
             }`}>
-            <span className="flex items-center">
-              <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M8 6H21M8 12H21M8 18H21M3 6H3.01M3 12H3.01M3 18H3.01"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                />
-              </svg>
-              Liste
-            </span>
-            {viewMode === 'list' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></span>}
+            <List size={16} />
+            Liste
+            {viewMode === 'list' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"></div>}
           </button>
           <button
             onClick={() => setViewMode('graph')}
-            className={`px-5 py-3 text-sm font-medium transition-colors duration-200 relative ${
-              viewMode === 'graph' ? 'text-blue-400' : 'text-gray-400 hover:text-gray-200'
+            className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium transition-colors duration-150 rounded-t-md focus:outline-none focus:ring-1 focus:ring-blue-500/50 relative ${
+              viewMode === 'graph'
+                ? 'text-slate-100 bg-slate-850'
+                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
             }`}>
-            <span className="flex items-center">
-              <svg className="w-4 h-4 mr-1.5" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                <path
-                  d="M17 7C17 8.10457 16.1046 9 15 9C13.8954 9 13 8.10457 13 7C13 5.89543 13.8954 5 15 5C16.1046 5 17 5.89543 17 7Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M7 12C7 13.1046 6.10457 14 5 14C3.89543 14 3 13.1046 3 12C3 10.8954 3.89543 10 5 10C6.10457 10 7 10.8954 7 12Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path
-                  d="M14 18C14 19.1046 13.1046 20 12 20C10.8954 20 10 19.1046 10 18C10 16.8954 10.8954 16 12 16C13.1046 16 14 16.8954 14 18Z"
-                  stroke="currentColor"
-                  strokeWidth="2"
-                />
-                <path d="M13.5 8.5L6.5 11" stroke="currentColor" strokeWidth="2" />
-                <path d="M11 16.5L6.5 13" stroke="currentColor" strokeWidth="2" />
-              </svg>
-              Graphe
-            </span>
-            {viewMode === 'graph' && <span className="absolute bottom-0 left-0 w-full h-0.5 bg-blue-400"></span>}
+            <GitBranch size={16} />
+            Graphe
+            {viewMode === 'graph' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"></div>}
           </button>
         </div>
       </div>

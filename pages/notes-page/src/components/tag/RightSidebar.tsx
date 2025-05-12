@@ -1,4 +1,5 @@
 import type React from 'react';
+import { XCircle, Info, Tag, Check } from 'lucide-react';
 
 interface RightSidebarProps {
   allTags: string[];
@@ -22,72 +23,54 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ allTags, activeTag, onTagSe
   const sortedGroups = Object.keys(groupedTags).sort();
 
   return (
-    <div className="h-full flex flex-col p-5 overflow-hidden">
-      <div className="mb-5 flex justify-between items-center">
-        <h2 className="text-lg font-semibold text-blue-400">Tags</h2>
+    <div className="h-full flex flex-col p-4 overflow-hidden text-slate-200">
+      <div className="mb-4 flex justify-between items-center flex-shrink-0">
+        <h2 className="text-base font-semibold text-slate-100 flex items-center gap-2">
+          <Tag size={18} className="text-blue-400" />
+          Tags
+        </h2>
 
         {activeTag && (
           <button
             onClick={onClearFilter}
-            className="text-xs bg-blue-500/20 hover:bg-blue-500/30 text-blue-300 px-2 py-1 rounded-md transition-colors flex items-center">
-            <svg className="w-3 h-3 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-              <path
-                fillRule="evenodd"
-                d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
-                clipRule="evenodd"
-              />
-            </svg>
-            Effacer le filtre
+            className="text-xs bg-slate-600 hover:bg-slate-500 text-slate-200 px-2.5 py-1 rounded-md transition-colors flex items-center gap-1">
+            <XCircle size={14} />
+            Effacer
           </button>
         )}
       </div>
 
-      <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar">
+      <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar -mr-2">
         {allTags.length === 0 ? (
-          <div className="text-center py-8 text-gray-500 bg-gray-800/30 rounded-lg border border-gray-700/50">
-            <svg className="w-8 h-8 mx-auto mb-2 text-gray-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={1.5}
-                d="M7 7h.01M7 12h.01M7 17h.01M11 7h6M11 12h6M11 17h6"
-              />
-            </svg>
-            <p className="font-medium">Aucun tag disponible</p>
-            <p className="text-xs mt-2 px-4">Ajoutez des tags à vos notes pour les voir apparaître ici</p>
+          <div className="text-center py-10 px-4 text-slate-500 bg-slate-850/60 rounded-lg border border-slate-700/50 mt-4">
+            <Tag size={24} className="w-10 h-10 mx-auto mb-3 text-slate-600" strokeWidth={1.5} />
+            <p className="font-medium text-slate-400">Aucun tag disponible</p>
+            <p className="text-xs mt-1.5">Ajoutez des tags à vos notes pour les voir apparaître ici</p>
           </div>
         ) : (
-          <div className="space-y-5">
+          <div className="space-y-4">
             {sortedGroups.map(group => (
-              <div key={group} className="mb-2">
-                <h3 className="text-xs uppercase tracking-wider text-gray-500 font-medium mb-2 ml-1">{group}</h3>
-                <div className="space-y-1.5">
+              <div key={group}>
+                <h3 className="text-xs uppercase tracking-wider text-slate-500 font-semibold mb-2 px-1">{group}</h3>
+                <div className="space-y-1">
                   {groupedTags[group].sort().map(tag => (
                     <button
                       key={tag}
                       onClick={() => onTagSelect(tag)}
-                      className={`block w-full text-left px-3 py-2 rounded-md text-sm font-medium transition-all duration-200 group ${
+                      className={`block w-full text-left px-3 py-1.5 rounded-md text-sm transition-all duration-150 group focus:outline-none focus:ring-1 focus:ring-blue-500/50 ${
                         activeTag === tag
-                          ? 'bg-blue-600/90 text-white shadow-md shadow-blue-900/30'
-                          : 'bg-gray-800/80 text-gray-300 hover:bg-gray-700/80 hover:text-white hover:shadow-sm'
+                          ? 'bg-blue-600 text-white font-medium'
+                          : 'bg-slate-700/50 text-slate-300 hover:bg-slate-700 hover:text-slate-100'
                       }`}>
                       <div className="flex items-center justify-between">
-                        <span className="flex items-center">
+                        <span className="flex items-center gap-2">
                           <span
-                            className={`inline-block w-1.5 h-1.5 rounded-full mr-2 ${
-                              activeTag === tag ? 'bg-blue-200' : 'bg-gray-500 group-hover:bg-gray-400'
+                            className={`inline-block w-1.5 h-1.5 rounded-full ${
+                              activeTag === tag ? 'bg-white/70' : 'bg-slate-500 group-hover:bg-slate-400'
                             }`}></span>
-                          #{tag}
+                          {tag}
                         </span>
-                        {activeTag === tag && (
-                          <svg className="w-4 h-4 text-blue-200" viewBox="0 0 20 20" fill="currentColor">
-                            <path
-                              fillRule="evenodd"
-                              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
-                              clipRule="evenodd"
-                            />
-                          </svg>
-                        )}
+                        {activeTag === tag && <Check size={16} className="text-blue-100" />}
                       </div>
                     </button>
                   ))}
@@ -98,16 +81,10 @@ const RightSidebar: React.FC<RightSidebarProps> = ({ allTags, activeTag, onTagSe
         )}
       </div>
 
-      <div className="pt-4 border-t border-gray-700/50 mt-4">
-        <div className="text-xs text-gray-500 flex items-center">
-          <svg className="w-3 h-3 mr-1.5" viewBox="0 0 20 20" fill="currentColor">
-            <path
-              fillRule="evenodd"
-              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2h-1V9a1 1 0 00-1-1z"
-              clipRule="evenodd"
-            />
-          </svg>
-          <p>Cliquez sur un tag pour filtrer les notes</p>
+      <div className="pt-3 border-t border-slate-700/70 mt-4 flex-shrink-0">
+        <div className="text-xs text-slate-400 flex items-center gap-1.5">
+          <Info size={14} />
+          Cliquez sur un tag pour filtrer les notes
         </div>
       </div>
     </div>

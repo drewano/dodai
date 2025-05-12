@@ -302,8 +302,8 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
     if (contextMenu.targetItem) {
       const itemToDelete = contextMenu.targetItem;
       const confirmMessage = `Êtes-vous sûr de vouloir supprimer "${itemToDelete.title || (itemToDelete.type === 'folder' ? 'ce dossier' : 'cette note')}"${
-            itemToDelete.type === 'folder' ? ' et tout son contenu' : ''
-          } ?`;
+        itemToDelete.type === 'folder' ? ' et tout son contenu' : ''
+      } ?`;
 
       if (window.confirm(confirmMessage)) {
         try {

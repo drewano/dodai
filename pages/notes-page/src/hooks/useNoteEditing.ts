@@ -46,7 +46,12 @@ export function useNoteEditing(
   const [isDirty, setIsDirty] = useState<boolean>(false);
   const [editedSourceUrl, setEditedSourceUrlInternal] = useState<string | undefined>(undefined);
 
-  const initialNoteStateRef = useRef<{ title: string; tags: string[]; content: string; sourceUrl: string | undefined } | null>(null);
+  const initialNoteStateRef = useRef<{
+    title: string;
+    tags: string[];
+    content: string;
+    sourceUrl: string | undefined;
+  } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef<boolean>(false);
   const editorContentChangedSinceLastSaveRef = useRef<boolean>(false);
@@ -297,7 +302,17 @@ export function useNoteEditing(
         unsubscribeEditorOnChange();
       }
     };
-  }, [editor, selectedNote, editedTitle, editedTags, editedSourceUrl, performSave, _updateIsDirty, saveStatus, isDirty]);
+  }, [
+    editor,
+    selectedNote,
+    editedTitle,
+    editedTags,
+    editedSourceUrl,
+    performSave,
+    _updateIsDirty,
+    saveStatus,
+    isDirty,
+  ]);
   // saveStatus et isDirty sont toujours là car ils peuvent influencer si on schedule ou si performSave s'exécute.
 
   // Force save (e.g., when changing note or closing)
@@ -368,7 +383,7 @@ export function useNoteEditing(
       setEditedSourceUrlInternal(url);
       // _updateIsDirty will be called by useEffect on editedSourceUrl
     },
-    [] // No direct dependency on _updateIsDirty here, it happens in useEffect
+    [], // No direct dependency on _updateIsDirty here, it happens in useEffect
   );
 
   return {
