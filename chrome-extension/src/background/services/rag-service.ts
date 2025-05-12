@@ -7,6 +7,10 @@ import { Document } from '@langchain/core/documents';
 // import type { BaseMessage as LangchainBaseMessage } from '@langchain/core/messages'; // Unused
 import { createStuffDocumentsChain } from 'langchain/chains/combine_documents';
 import { createRetrievalChain } from 'langchain/chains/retrieval';
+// Importe les types nécessaires pour la conversion BlockNote
+// import { ServerBlockNoteEditor } from '@blocknote/server-util';
+// Importer Block depuis @blocknote/core
+import type { Block } from '@blocknote/core';
 // ChatOllama is imported from @langchain/ollama already
 // import type { ChatOllama } from '@langchain/ollama';
 
@@ -45,6 +49,43 @@ Answer:
 `;
 
 const DEFAULT_EMBEDDING_MODEL = 'nomic-embed-text';
+
+// Interfaces locales simplifiées pour le type-checking interne
+// sans importer la complexité des génériques BlockNote complets
+interface SimpleInlineContent {
+  type: string;
+  text?: string; // Rendre optionnel car pas toujours présent (ex: link)
+  content?: SimpleInlineContent[]; // Pour les liens qui contiennent du contenu
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function extractTextFromBlocks(blocks: Block<any, any, any>[] | undefined): string {
+  if (!blocks) return '';
+  let text = '';
+  for (const block of blocks) {
+    if (block.content && Array.isArray(block.content)) {
+      // Utiliser notre interface simplifiée
+      (block.content as SimpleInlineContent[]).forEach((inline: SimpleInlineContent) => {
+        if (inline.type === 'text' && typeof inline.text === 'string') {
+          text += inline.text;
+        } else if (inline.type === 'link' && inline.content && Array.isArray(inline.content)) {
+          // Extrait le texte du contenu d'un lien
+          inline.content.forEach((linkInline: SimpleInlineContent) => {
+            // Utiliser SimpleInlineContent ici aussi
+            if (linkInline.type === 'text' && typeof linkInline.text === 'string') {
+              text += linkInline.text;
+            }
+          });
+        }
+      });
+      text += '\n';
+    }
+    if (block.children && block.children.length > 0) {
+      text += extractTextFromBlocks(block.children);
+    }
+  }
+  return text.trim();
+}
 
 export class RagService {
   private vectorStore: MemoryVectorStore | null = null;
@@ -119,25 +160,64 @@ export class RagService {
       // 3. Créer les documents
       const documents: Document[] = [];
       for (const note of noteEntries) {
-        if (note.content && typeof note.content === 'string') {
-          // Ensure content exists and is a string
-          const chunks = await this.textSplitter.splitText(note.content);
-          chunks.forEach(chunk => {
-            documents.push(
-              new Document({
-                pageContent: chunk,
-                metadata: {
-                  id: note.id,
-                  title: note.title,
-                  sourceUrl: note.sourceUrl,
-                  createdAt: note.createdAt,
-                  updatedAt: note.updatedAt,
-                },
-              }),
-            );
-          });
+        let textContent: string | null = null;
+
+        if (note.content && typeof note.content === 'string' && note.content.trim() !== '') {
+          try {
+            // Tenter de parser le contenu comme JSON BlockNote
+            const blocks: Block[] = JSON.parse(note.content);
+
+            if (Array.isArray(blocks) && blocks.length > 0) {
+              // Utiliser la fonction helper pour extraire le texte
+              textContent = extractTextFromBlocks(blocks);
+              if (!textContent || textContent.trim() === '') {
+                logger.warn(`[RAG Service] Note ${note.id} resulted in empty text content after extraction. Skipping.`);
+                continue; // Skip this note if extraction is empty
+              }
+            } else {
+              logger.warn(`[RAG Service] Note ${note.id} content parsed to empty/invalid Block array. Skipping.`);
+              continue; // Skip note if parsed blocks are empty/invalid
+            }
+          } catch (parseError) {
+            // Si ce n'est pas du JSON BlockNote, ou si le parsing échoue
+            const trimmedContent = note.content.trim();
+            if (!trimmedContent.startsWith('{') && !trimmedContent.startsWith('[')) {
+              logger.info(`[RAG Service] Note ${note.id} content is not JSON, indexing as plain text.`);
+              textContent = note.content; // Utiliser comme texte brut
+            } else {
+              // Log l'erreur de parsing JSON spécifiquement pour le contenu ressemblant à du JSON
+              logger.warn(
+                `[RAG Service] Failed to parse potentially JSON content for note ${note.id}. Skipping. Error: ${parseError instanceof Error ? parseError.message : String(parseError)}`,
+              );
+              continue; // Skip note on JSON parse error for JSON-like content
+            }
+          }
         } else {
-          logger.warn(`[RAG Service] Note with id ${note.id} has no content or content is not a string.`);
+          logger.warn(`[RAG Service] Note ${note.id} has empty or invalid content. Skipping.`);
+          continue; // Skip note if content is missing or not a non-empty string
+        }
+
+        // Si on a obtenu du contenu textuel (brut ou extrait) et qu'il n'est pas vide
+        if (textContent && textContent.trim().length > 0) {
+          try {
+            const chunks = await this.textSplitter.splitText(textContent);
+            chunks.forEach(chunk => {
+              documents.push(
+                new Document({
+                  pageContent: chunk,
+                  metadata: {
+                    id: note.id,
+                    title: note.title || 'Untitled Note', // Add fallback for title
+                    sourceUrl: note.sourceUrl,
+                    createdAt: note.createdAt,
+                    updatedAt: note.updatedAt,
+                  },
+                }),
+              );
+            });
+          } catch (splitError) {
+            logger.error(`[RAG Service] Error splitting text for note ${note.id}:`, splitError);
+          }
         }
       }
 
