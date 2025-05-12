@@ -18,22 +18,19 @@ const TagEditor: React.FC<TagEditorProps> = ({
   onTagInputKeyDown,
 }) => {
   return (
-    <div className="mb-3">
-      <label htmlFor="tags" className="block text-sm font-medium text-gray-300 mb-2">
-        Tags
-      </label>
-      <div className="flex flex-wrap gap-2 mb-3">
+    <div>
+      <div className="flex flex-wrap gap-1 mb-1.5">
         {tags.map(tag => (
           <div
             key={tag}
-            className="flex items-center bg-indigo-900/40 text-indigo-300 px-3 py-1.5 rounded-full text-sm transition-colors hover:bg-indigo-800/50">
-            <span className="mr-1">#</span>
+            className="flex items-center bg-indigo-900/40 text-indigo-300 px-2 py-0.5 rounded-full text-xs transition-colors hover:bg-indigo-800/50">
+            <span className="mr-0.5">#</span>
             {tag}
             <button
               onClick={() => onRemoveTag(tag)}
-              className="ml-1.5 text-indigo-300/70 hover:text-indigo-100 transition-colors"
+              className="ml-1 text-indigo-300/70 hover:text-indigo-100 transition-colors"
               aria-label="Supprimer ce tag">
-              <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" viewBox="0 0 20 20" fill="currentColor">
+              <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3" viewBox="0 0 20 20" fill="currentColor">
                 <path
                   fillRule="evenodd"
                   d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
@@ -46,8 +43,8 @@ const TagEditor: React.FC<TagEditorProps> = ({
       </div>
       <div className="flex">
         <div className="relative flex-grow">
-          <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
-            <span className="text-gray-400">#</span>
+          <div className="absolute inset-y-0 left-0 pl-2.5 flex items-center pointer-events-none">
+            <span className="text-gray-400 text-sm">#</span>
           </div>
           <input
             type="text"
@@ -55,18 +52,18 @@ const TagEditor: React.FC<TagEditorProps> = ({
             value={tagInput}
             onChange={onTagInputChange}
             onKeyDown={onTagInputKeyDown}
-            placeholder="Ajouter un tag..."
-            className="block w-full pl-7 pr-3 py-2 bg-gray-800 border border-gray-700 rounded-l-md text-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+            placeholder="#tag"
+            className="block w-full pl-6 pr-2 py-1 bg-gray-800 border border-gray-700 rounded-l-md text-white text-sm focus:outline-none focus:ring-1 focus:ring-indigo-500 focus:border-transparent transition-all"
           />
         </div>
         <button
           onClick={onAddTag}
           disabled={!tagInput.trim()}
-          className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed rounded-r-md text-white transition-colors"
+          className="px-2.5 py-1 bg-indigo-600 hover:bg-indigo-700 disabled:bg-gray-700 disabled:text-gray-500 disabled:cursor-not-allowed rounded-r-md text-white transition-colors"
           aria-label="Ajouter un tag">
           <svg
             xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
+            className="h-4 w-4"
             fill="none"
             viewBox="0 0 24 24"
             stroke="currentColor"
@@ -75,7 +72,6 @@ const TagEditor: React.FC<TagEditorProps> = ({
           </svg>
         </button>
       </div>
-      <p className="text-xs text-gray-400 mt-1.5">Appuyez sur Entrée pour ajouter rapidement un tag</p>
     </div>
   );
 };

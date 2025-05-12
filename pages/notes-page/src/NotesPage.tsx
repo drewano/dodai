@@ -91,7 +91,6 @@ const NotesPage = () => {
     handleCancelEdit,
     handleAddTag,
     handleRemoveTag,
-    handleTagInputKeyDown,
     syncInitialContent,
   } = useNoteEditing(selectedNote, updateNote, editor);
 
@@ -254,6 +253,19 @@ const NotesPage = () => {
         folderPath={folderPath}
         navigateToFolder={navigateToFolder}
         currentFolderId={currentFolderId}
+        editedTitle={editedTitle}
+        setEditedTitle={setEditedTitle}
+        editedTags={editedTags}
+        setEditedTags={setEditedTags}
+        tagInput={tagInput}
+        setTagInput={setTagInput}
+        saveStatus={saveStatus}
+        lastError={lastError}
+        isDirty={isDirty}
+        handleAddTag={handleAddTag}
+        handleRemoveTag={handleRemoveTag}
+        handleSaveChanges={handleSaveChanges}
+        handleCancelEdit={handleCancelEdit}
       />
 
       {/* Main Content - Using CSS Grid for responsive layout */}
@@ -322,20 +334,7 @@ const NotesPage = () => {
             selectedItemType={selectedItemType}
             selectedNote={selectedNote}
             selectedChatId={selectedChatId}
-            editedTitle={editedTitle}
-            editedTags={editedTags}
-            tagInput={tagInput}
-            saveStatus={saveStatus}
-            lastError={lastError}
-            onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
-            onSetEditedTags={setEditedTags}
-            onSaveChanges={handleSaveChanges}
-            onCancelEdit={handleCancelEdit}
             onSyncInitialContent={syncInitialContent}
-            onTagInputChange={(e: React.ChangeEvent<HTMLInputElement>) => setTagInput(e.target.value)}
-            onTagInputKeyDown={handleTagInputKeyDown}
-            onAddTag={handleAddTag}
-            onRemoveTag={handleRemoveTag}
           />
         </div>
 

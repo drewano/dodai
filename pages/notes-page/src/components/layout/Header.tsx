@@ -1,6 +1,7 @@
-import type React from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import FolderBreadcrumb from '../common/FolderBreadcrumb';
 import type { NoteEntry } from '@extension/storage';
+import type { SaveStatus } from '../../hooks/useNoteEditing';
 
 interface HeaderProps {
   showLeftSidebar: boolean;
@@ -12,6 +13,20 @@ interface HeaderProps {
   folderPath: NoteEntry[];
   navigateToFolder: (folderId: string | null) => void;
   currentFolderId: string | null;
+
+  editedTitle: string;
+  setEditedTitle: (title: string) => void;
+  editedTags: string[];
+  setEditedTags: (tagsOrCallback: string[] | ((prevTags: string[]) => string[])) => void;
+  tagInput: string;
+  setTagInput: (input: string) => void;
+  saveStatus: SaveStatus;
+  lastError: string | null;
+  isDirty: boolean;
+  handleAddTag: () => void;
+  handleRemoveTag: (tagToRemove: string) => void;
+  handleSaveChanges: () => Promise<void>;
+  handleCancelEdit: () => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -24,17 +39,171 @@ const Header: React.FC<HeaderProps> = ({
   folderPath,
   navigateToFolder,
   currentFolderId,
+  editedTitle,
+  setEditedTitle,
+  editedTags,
+  tagInput,
+  setTagInput,
+  saveStatus,
+  lastError,
+  handleAddTag,
+  handleRemoveTag,
 }) => {
+  const [isEditingTitle, setIsEditingTitle] = useState(false);
+  const titleInputRef = useRef<HTMLInputElement>(null);
+  const [isAddingTag, setIsAddingTag] = useState(false);
+  const tagInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (isEditingTitle && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditingTitle]);
+
+  useEffect(() => {
+    if (isAddingTag && tagInputRef.current) {
+      tagInputRef.current.focus();
+    }
+  }, [isAddingTag]);
+
+  const handleTitleClick = () => {
+    if (selectedItemType === 'note' && selectedNote) {
+      setIsEditingTitle(true);
+    }
+  };
+
+  const handleTitleDivKeyDown = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      handleTitleClick();
+    }
+  };
+
+  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setEditedTitle(e.target.value);
+  };
+
+  const handleTitleBlur = () => {
+    setIsEditingTitle(false);
+  };
+
+  const handleTitleInputKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.currentTarget.blur();
+    } else if (e.key === 'Escape') {
+      setIsEditingTitle(false);
+      e.currentTarget.blur();
+    }
+  };
+
+  const openTagInput = () => {
+    setIsAddingTag(true);
+  };
+
+  const handleNewTagInputBlur = () => {
+    if (tagInput.trim()) {
+      handleAddTag();
+    }
+    setIsAddingTag(false);
+  };
+
+  const handleNewTagKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === 'Enter') {
+      e.preventDefault();
+      if (tagInput.trim()) {
+        handleAddTag();
+      }
+      setIsAddingTag(false);
+    } else if (e.key === 'Escape') {
+      setTagInput('');
+      setIsAddingTag(false);
+    }
+  };
+
+  const SaveStatusIndicator: React.FC = () => {
+    if (selectedItemType !== 'note' || !selectedNote || saveStatus === 'idle') {
+      return null;
+    }
+    let statusText = '';
+    let textColor = 'text-gray-400';
+    let icon = null;
+
+    switch (saveStatus) {
+      case 'modified':
+        statusText = 'Modifications...';
+        textColor = 'text-yellow-400';
+        icon = (
+          <svg className="w-3 h-3 mr-1 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+            <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+            <path
+              fillRule="evenodd"
+              d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+        break;
+      case 'saving':
+        statusText = 'Sauvegarde...';
+        textColor = 'text-blue-400';
+        icon = (
+          <svg
+            className="animate-spin h-3 w-3 mr-1.5 text-blue-400"
+            xmlns="http://www.w3.org/2000/svg"
+            fill="none"
+            viewBox="0 0 24 24">
+            <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+            <path
+              className="opacity-75"
+              fill="currentColor"
+              d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+          </svg>
+        );
+        break;
+      case 'saved':
+        statusText = 'Enregistré';
+        textColor = 'text-green-400';
+        icon = (
+          <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+        break;
+      case 'error':
+        statusText = `Erreur ${lastError ? ': ' + lastError : ''}`;
+        textColor = 'text-red-400';
+        icon = (
+          <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+            <path
+              fillRule="evenodd"
+              d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+              clipRule="evenodd"
+            />
+          </svg>
+        );
+        break;
+    }
+
+    return (
+      <div className={`flex items-center text-xs ${textColor} px-1.5 py-0.5 rounded-md bg-slate-700/50 flex-shrink-0`}>
+        {icon}
+        {statusText}
+      </div>
+    );
+  };
+
   return (
-    <header className="sticky top-0 z-20 bg-slate-800/85 backdrop-blur-lg border-b border-slate-700/50 shadow-sm py-3 px-4 flex items-center gap-3">
-      {/* Logo et boutons de bascule des barres latérales */}
-      <div className="flex items-center gap-3">
+    <header className="sticky top-0 z-30 bg-slate-800/85 backdrop-blur-lg border-b border-slate-700/50 shadow-sm py-1.5 px-4 flex items-center gap-3">
+      <div className="flex items-center gap-3 flex-shrink-0">
         <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-blue-500 text-transparent bg-clip-text tracking-tight">
           DoDai Notes
         </span>
-
         <div className="flex items-center gap-1.5">
-          {/* Bouton pour bascule de la barre latérale gauche */}
           <button
             onClick={toggleLeftSidebar}
             className={`p-1.5 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
@@ -63,8 +232,6 @@ const Header: React.FC<HeaderProps> = ({
               )}
             </svg>
           </button>
-
-          {/* Bouton pour bascule de la barre latérale droite */}
           <button
             onClick={toggleRightSidebar}
             className={`p-1.5 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
@@ -96,34 +263,107 @@ const Header: React.FC<HeaderProps> = ({
         </div>
       </div>
 
-      {/* Séparateur vertical */}
-      <div className="h-6 w-px bg-slate-700/50 mx-1"></div>
+      <div className="h-6 w-px bg-slate-700/50 mx-1 flex-shrink-0"></div>
 
-      {/* Fil d'Ariane et titre de la note */}
-      <div className="flex-1 flex flex-col">
-        {/* Fil d'Ariane si on est dans un dossier */}
-        {currentFolderId && (
-          <div className="text-sm">
+      <div className="flex-1 flex items-center gap-2 min-w-0 overflow-hidden">
+        {currentFolderId && selectedItemType === 'note' && (
+          <div className="text-sm flex-shrink-0">
             <FolderBreadcrumb path={folderPath} onNavigate={navigateToFolder} />
+            <span className="text-slate-500">/</span>
           </div>
         )}
 
-        {/* Titre de la note sélectionnée */}
-        {selectedItemType === 'note' && selectedNote && (
-          <div className="font-medium text-lg text-slate-100 truncate mt-0.5">{selectedNote.title}</div>
-        )}
+        {selectedItemType === 'note' && selectedNote ? (
+          <React.Fragment>
+            {isEditingTitle ? (
+              <input
+                type="text"
+                value={editedTitle}
+                onChange={handleTitleChange}
+                onBlur={handleTitleBlur}
+                onKeyDown={handleTitleInputKeyDown}
+                placeholder="Sans titre"
+                className="font-medium text-base text-slate-100 bg-transparent px-2 py-1 focus:outline-none min-w-[100px] flex-grow"
+                ref={titleInputRef}
+              />
+            ) : (
+              <div
+                className="font-medium text-base text-slate-100 truncate cursor-text px-2 py-1 min-w-[100px] flex-grow"
+                onClick={handleTitleClick}
+                onKeyDown={handleTitleDivKeyDown}
+                role="button"
+                tabIndex={0}
+                title={editedTitle || 'Sans titre'}>
+                {editedTitle || 'Sans titre'}
+              </div>
+            )}
 
-        {/* Titre pour l'affichage d'un chat */}
-        {selectedItemType === 'chat' && <div className="font-medium text-lg text-slate-100 mt-0.5">Conversation</div>}
+            <div className="flex items-center gap-1.5 flex-wrap flex-shrink-0 ml-2">
+              {editedTags.map(tag => (
+                <div
+                  key={tag}
+                  className="flex items-center bg-violet-600/80 hover:bg-violet-500/80 text-white px-2.5 py-1 rounded-lg text-sm cursor-default">
+                  <span>{tag}</span>
+                  <button
+                    onClick={() => handleRemoveTag(tag)}
+                    className="ml-2 text-violet-200 hover:text-white focus:outline-none"
+                    aria-label={`Supprimer le tag ${tag}`}>
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-3.5 w-3.5"
+                      viewBox="0 0 20 20"
+                      fill="currentColor">
+                      <path
+                        fillRule="evenodd"
+                        d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                        clipRule="evenodd"
+                      />
+                    </svg>
+                  </button>
+                </div>
+              ))}
+            </div>
 
-        {/* Message par défaut si rien n'est sélectionné */}
-        {!selectedNote && selectedItemType === 'note' && (
-          <div className="font-medium text-lg text-slate-400 mt-0.5">Sélectionnez une note</div>
+            <div className="flex-shrink-0">
+              {isAddingTag ? (
+                <input
+                  ref={tagInputRef}
+                  type="text"
+                  value={tagInput}
+                  onChange={e => setTagInput(e.target.value)}
+                  onKeyDown={handleNewTagKeyDown}
+                  onBlur={handleNewTagInputBlur}
+                  placeholder="#nouveau-tag"
+                  className="text-sm bg-slate-700/60 text-slate-100 placeholder-slate-400 px-2.5 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-500 w-36"
+                />
+              ) : (
+                <button
+                  onClick={openTagInput}
+                  className="p-1.5 rounded-md text-violet-400 hover:text-violet-300 hover:bg-violet-600/30 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                  title="Ajouter un tag">
+                  <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    className="h-5 w-5"
+                    fill="none"
+                    viewBox="0 0 24 24"
+                    stroke="currentColor"
+                    strokeWidth="2">
+                    <path strokeLinecap="round" strokeLinejoin="round" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                  </svg>
+                </button>
+              )}
+            </div>
+
+            <SaveStatusIndicator />
+          </React.Fragment>
+        ) : selectedItemType === 'chat' ? (
+          <div className="font-medium text-lg text-slate-100 truncate">Conversation</div>
+        ) : (
+          <div className="font-medium text-lg text-slate-400 truncate">Sélectionnez une note</div>
         )}
       </div>
 
-      {/* Espace pour d'autres actions ou menus */}
-      <div className="flex items-center gap-2">{/* Emplacement pour des actions futures */}</div>
+      <div className="flex items-center gap-2 flex-shrink-0">{/* Emplacement pour des actions futures */}</div>
     </header>
   );
 };

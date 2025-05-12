@@ -17,7 +17,6 @@ export interface UseNoteEditingReturn {
   handleCancelEdit: () => void;
   handleAddTag: () => void;
   handleRemoveTag: (tagToRemove: string) => void;
-  handleTagInputKeyDown: (e: React.KeyboardEvent) => void;
   syncInitialContent: (contentJSON: string) => void;
   isDirty: boolean;
 }
@@ -350,13 +349,6 @@ export function useNoteEditing(
     });
   }, []);
 
-  const handleTagInputKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && tagInput.trim()) {
-      e.preventDefault();
-      handleAddTag();
-    }
-  };
-
   return {
     editedTitle,
     editedTags,
@@ -370,7 +362,6 @@ export function useNoteEditing(
     handleCancelEdit,
     handleAddTag,
     handleRemoveTag,
-    handleTagInputKeyDown,
     syncInitialContent,
     isDirty,
   };
