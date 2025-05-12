@@ -1,35 +1,40 @@
 import type { ReactNode } from 'react';
 import type React from 'react';
 import { createContext, useContext, useState } from 'react';
-import { v4 as uuidv4 } from 'uuid';
-import type { Message, Artifact } from '../types';
+import { v4 as uuidv4 } from 'uuid'; // Besoin pour les IDs de messages
+import type { Message, ArtifactV3, ArtifactMarkdownV3 } from '../types';
+import { MessageType } from '../../../../chrome-extension/src/background/types'; // Importer MessageType
+import type {
+  GenerateDodaiCanvasArtifactResponse,
+  ChatHistoryMessage,
+} from '../../../../chrome-extension/src/background/types'; // Formatage import
 
 interface DodaiContextType {
   messages: Message[];
   setMessages: React.Dispatch<React.SetStateAction<Message[]>>;
-  input: string;
-  setInput: React.Dispatch<React.SetStateAction<string>>;
-  artifact: Artifact;
-  setArtifact: React.Dispatch<React.SetStateAction<Artifact>>;
+  chatInput: string;
+  setChatInput: React.Dispatch<React.SetStateAction<string>>;
+  currentArtifact: ArtifactV3 | null;
+  setCurrentArtifact: React.Dispatch<React.SetStateAction<ArtifactV3 | null>>;
+  artifactHistory: ArtifactV3[];
+  setArtifactHistory: React.Dispatch<React.SetStateAction<ArtifactV3[]>>;
   isLoading: boolean;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
-  sendMessage: (content: string, forceNewArtifact?: boolean) => Promise<void>;
+  sendPromptAndGenerateArtifact: (prompt: string) => Promise<void>; // Nouvelle fonction
 }
 
 const defaultContext: DodaiContextType = {
   messages: [],
   setMessages: () => {},
-  input: '',
-  setInput: () => {},
-  artifact: {
-    type: 'text',
-    title: 'Bienvenue',
-    fullMarkdown: '',
-  },
-  setArtifact: () => {},
+  chatInput: '',
+  setChatInput: () => {},
+  currentArtifact: null,
+  setCurrentArtifact: () => {},
+  artifactHistory: [],
+  setArtifactHistory: () => {},
   isLoading: false,
   setIsLoading: () => {},
-  sendMessage: async () => {},
+  sendPromptAndGenerateArtifact: async () => {}, // Initialisation
 };
 
 const DodaiContext = createContext<DodaiContextType>(defaultContext);
@@ -41,132 +46,108 @@ interface DodaiProviderProps {
 }
 
 export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: uuidv4(),
-      role: 'assistant',
-      content: "Bonjour ! Je suis l'assistant Dodai Canvas. Comment puis-je vous aider aujourd'hui ?",
-      timestamp: Date.now(),
-    },
-  ]);
-  const [input, setInput] = useState('');
-  const [artifact, setArtifact] = useState<Artifact>({
-    type: 'text',
-    title: 'Bienvenue sur Dodai Canvas',
-    fullMarkdown:
-      '# Bienvenue sur Dodai Canvas\n\nCet espace vous permet de créer et éditer du contenu Markdown.\n\n## Fonctionnalités\n\n- Édition Markdown\n- Prévisualisation en temps réel\n- Support de la syntaxe GitHub Flavored Markdown\n\n```javascript\n// Exemple de code\nfunction helloWorld() {\n  console.log("Hello, Dodai!");\n}\n```',
-  });
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [chatInput, setChatInput] = useState('');
+  const [currentArtifact, setCurrentArtifact] = useState<ArtifactV3 | null>(null);
+  const [artifactHistory, setArtifactHistory] = useState<ArtifactV3[]>([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const sendMessage = async (content: string, forceNewArtifact: boolean = false) => {
-    // Ignorer les messages vides
-    if (!content.trim()) return;
+  // Fonction pour envoyer le prompt et générer/modifier l'artefact
+  const sendPromptAndGenerateArtifact = async (prompt: string) => {
+    if (!prompt.trim()) return;
 
-    // Ajouter le message de l'utilisateur
     const userMessage: Message = {
       id: uuidv4(),
       role: 'user',
-      content,
+      content: prompt,
       timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
-    setInput(''); // Vider le champ de saisie
+    // Ajouter le message user et un message placeholder pour l'assistant
+    const assistantPlaceholderId = uuidv4();
+    const assistantPlaceholderMessage: Message = {
+      id: assistantPlaceholderId,
+      role: 'assistant',
+      content: '...', // Placeholder pendant la génération
+      timestamp: Date.now() + 1, // Légèrement après le message user
+    };
+
+    setMessages(prev => [...prev, userMessage, assistantPlaceholderMessage]);
+    setChatInput(''); // Vider l'input après envoi
     setIsLoading(true);
 
     try {
-      // Préparer l'historique des messages pour l'envoi au service worker
-      const chatHistory = messages.map(msg => ({
-        role: msg.role,
+      // Préparer l'historique pour le backend
+      const historyToSend: ChatHistoryMessage[] = messages.map(msg => ({
+        role: msg.role === 'user' ? 'user' : 'assistant', // Simplification role
         content: msg.content,
       }));
 
-      // Déterminer s'il s'agit d'une génération initiale ou d'une modification
-      // Si l'artefact a déjà un contenu non vide et qu'on ne force pas une nouvelle génération, c'est une modification
-      const hasExistingContent =
-        artifact.type === 'text'
-          ? (artifact as { fullMarkdown: string }).fullMarkdown.trim().length > 0
-          : (artifact as { code: string }).code.trim().length > 0;
-
-      const shouldModify = hasExistingContent && !forceNewArtifact;
-
-      // Définir le type de requête et les données à envoyer
-      const messageType = shouldModify
-        ? 'MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST'
-        : 'GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST';
-
-      // Construire la requête de base
-      const request: Record<string, unknown> = {
-        type: messageType,
-        prompt: content,
-        history: chatHistory,
-      };
-
-      // Si c'est une modification, ajouter le contenu actuel de l'artefact
-      if (shouldModify) {
-        request.currentArtifact =
-          artifact.type === 'text'
-            ? (artifact as { fullMarkdown: string }).fullMarkdown
-            : (artifact as { code: string }).code;
-        request.artifactType = artifact.type;
-      }
-
-      // Envoyer la requête au service worker
-      const response = await chrome.runtime.sendMessage(request);
+      // Envoyer la requête au background script
+      // Pour l'instant, on appelle toujours GENERATE, la modification viendra plus tard
+      const response: GenerateDodaiCanvasArtifactResponse = await chrome.runtime.sendMessage({
+        type: MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST,
+        payload: {
+          prompt: prompt,
+          history: historyToSend,
+        },
+      });
 
       if (response.success && response.artifact) {
-        // Mettre à jour l'artefact avec le contenu généré ou modifié
-        if (forceNewArtifact || !hasExistingContent) {
-          // Pour un nouvel artefact, définir le type comme text par défaut
-          setArtifact({
-            type: 'text',
-            title: forceNewArtifact ? 'Nouvel artefact' : 'Artefact généré',
-            fullMarkdown: response.artifact,
-          });
-        } else if (artifact.type === 'text') {
-          // Pour une modification d'un artefact text existant
-          setArtifact({
-            ...artifact,
-            fullMarkdown: response.artifact,
-          });
-        } else if (artifact.type === 'code') {
-          // Pour une modification d'un artefact code existant
-          setArtifact({
-            ...artifact,
-            code: response.artifact,
-          });
-        }
+        // Créer le nouvel artefact
+        const artifactContent: ArtifactMarkdownV3 = {
+          type: 'text', // TODO: Détecter le type (code/text) plus tard
+          title: response.artifact.substring(0, 30).split('\n')[0] || 'Nouvel Artefact', // Titre simple
+          fullMarkdown: response.artifact,
+          // language: 'plaintext', // Pourrait être ajouté si type 'code'
+        };
 
-        // Ajouter la réponse de l'assistant
-        const assistantMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: shouldModify
-            ? "J'ai modifié l'artefact selon votre demande. Vous pouvez consulter les changements dans le panneau de droite."
-            : "J'ai généré un nouvel artefact basé sur votre demande. Vous pouvez le consulter dans le panneau de droite.",
-          timestamp: Date.now(),
+        const newArtifact: ArtifactV3 = {
+          currentIndex: artifactHistory.length, // Simple index basé sur l'historique
+          contents: [artifactContent], // Pour l'instant, un seul contenu par artefact
         };
-        setMessages(prev => [...prev, assistantMessage]);
+
+        // Mettre à jour les états
+        setCurrentArtifact(newArtifact);
+        setArtifactHistory(prev => [...prev, newArtifact]);
+
+        // Mettre à jour le message de l'assistant avec une confirmation
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === assistantPlaceholderId
+              ? {
+                  ...msg,
+                  content: `Artefact généré avec succès ! (Modèle: ${response.model || 'inconnu'})\n\nVous pouvez le consulter dans le panneau de droite.`,
+                }
+              : msg,
+          ),
+        );
       } else {
-        // Gérer les erreurs
-        const errorMessage: Message = {
-          id: uuidv4(),
-          role: 'assistant',
-          content: `Désolé, je n'ai pas pu ${shouldModify ? 'modifier' : 'générer'} l'artefact : ${response.error || "Une erreur s'est produite."}`,
-          timestamp: Date.now(),
-        };
-        setMessages(prev => [...prev, errorMessage]);
+        // Gérer l'erreur
+        setMessages(prev =>
+          prev.map(msg =>
+            msg.id === assistantPlaceholderId
+              ? {
+                  ...msg,
+                  content: `Désolé, une erreur est survenue: ${response.error || 'Erreur inconnue'}`,
+                }
+              : msg,
+          ),
+        );
       }
     } catch (error) {
-      console.error('Erreur lors de la communication avec le service worker:', error);
-      // Ajouter un message d'erreur
-      const errorMessage: Message = {
-        id: uuidv4(),
-        role: 'assistant',
-        content: "Une erreur s'est produite lors de la communication avec le service worker. Veuillez réessayer.",
-        timestamp: Date.now(),
-      };
-      setMessages(prev => [...prev, errorMessage]);
+      console.error("Erreur lors de l'envoi du message au background:", error);
+      // Gérer l'erreur de communication
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.id === assistantPlaceholderId
+            ? {
+                ...msg,
+                content: `Erreur de communication avec l'extension: ${error instanceof Error ? error.message : String(error)}`,
+              }
+            : msg,
+        ),
+      );
     } finally {
       setIsLoading(false);
     }
@@ -175,13 +156,15 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
   const value = {
     messages,
     setMessages,
-    input,
-    setInput,
-    artifact,
-    setArtifact,
+    chatInput,
+    setChatInput,
+    currentArtifact,
+    setCurrentArtifact,
+    artifactHistory,
+    setArtifactHistory,
     isLoading,
     setIsLoading,
-    sendMessage,
+    sendPromptAndGenerateArtifact, // Exposer la nouvelle fonction
   };
 
   return <DodaiContext.Provider value={value}>{children}</DodaiContext.Provider>;

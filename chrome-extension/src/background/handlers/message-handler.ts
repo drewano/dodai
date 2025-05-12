@@ -32,7 +32,7 @@ import { agentService } from '../services/agent-service';
 import { mcpService } from '../services/mcp-service';
 import { streamingService } from '../services/streaming-service';
 import { ragService } from '../services/rag-service';
-import { mcpLoadedToolsStorage, notesStorage } from '@extension/storage';
+import { mcpLoadedToolsStorage, notesStorage, aiAgentStorage } from '@extension/storage';
 
 // Désactiver la vérification des variables non utilisées qui commencent par '_'
 /* eslint-disable @typescript-eslint/no-unused-vars */
@@ -73,10 +73,10 @@ export class MessageHandler {
       this.handleSaveMessageAsNote(message as SaveMessageAsNoteMessage),
     [MessageType.GET_INLINE_COMPLETION_REQUEST]: (message: BaseRuntimeMessage) =>
       this.handleGetInlineCompletion(message as GetInlineCompletionRequestMessage),
-    [MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage) =>
-      this.handleGenerateDodaiCanvasArtifact(message as GenerateDodaiCanvasArtifactRequest),
-    [MessageType.MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage) =>
-      this.handleModifyDodaiCanvasArtifact(message as ModifyDodaiCanvasArtifactRequest),
+    [MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage, sender) =>
+      this.handleGenerateDodaiCanvasArtifact(message as GenerateDodaiCanvasArtifactRequest, sender),
+    [MessageType.MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage, sender) =>
+      this.handleModifyDodaiCanvasArtifact(message as ModifyDodaiCanvasArtifactRequest, sender),
   };
 
   /**
@@ -844,141 +844,95 @@ export class MessageHandler {
   }
 
   /**
-   * Gestionnaire pour la génération d'artefacts Markdown dans Dodai Canvas
+   * Gestionnaire pour la génération d'artefacts Markdown/Code pour Dodai Canvas.
+   * Note: Pour un vrai streaming, il faudrait utiliser chrome.runtime.connect et gérer un port,
+   * comme dans handleAiChatRequest ou handleRagChatRequest.
+   * Ici, nous allons collecter la réponse complète du stream LLM et l'envoyer en une fois.
    */
   private async handleGenerateDodaiCanvasArtifact(
     message: GenerateDodaiCanvasArtifactRequest,
+    sender: chrome.runtime.MessageSender,
   ): Promise<GenerateDodaiCanvasArtifactResponse> {
-    logger.debug("Traitement de la requête de génération d'artefact pour Dodai Canvas", {
-      promptLength: message.prompt.length,
-      historyLength: message.history?.length || 0,
+    const { prompt, history: chatHistoryPayload } = message.payload;
+    logger.debug("[DodaiCanvas] Traitement de la requête de génération d'artefact", {
+      promptLength: prompt.length,
+      historyLength: chatHistoryPayload?.length || 0,
     });
 
     try {
-      // Vérifier si le modèle est disponible
       const isReady = await agentService.isAgentReady();
       if (!isReady) {
         return {
           success: false,
-          error: "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
+          error: "L'agent IA n'est pas prêt. Vérifiez les paramètres.",
         };
       }
 
-      // Convertir l'historique du chat si présent
-      const history = message.history ? convertChatHistory(message.history) : [];
+      const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
+      const settings = await aiAgentStorage.get();
+      const modelName = settings.selectedModel;
 
-      // Construire le prompt système pour la génération d'artefacts
-      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère 
-      un document Markdown complet et bien structuré. Ta réponse DOIT être uniquement le contenu Markdown, 
-      sans introduction ni conclusion supplémentaire, sans explications ni commentaires.
-      
-      Utilise la syntaxe Markdown appropriée pour structurer ton document avec des titres, sous-titres, 
-      listes, tableaux, citations, code, etc. selon les besoins du contenu.
-      
-      N'ajoute pas de backticks triples autour du contenu - ton message entier est déjà considéré comme du Markdown.
-      
-      Demande utilisateur : ${message.prompt}`;
+      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré. Ta réponse DOIT être uniquement le contenu Markdown, sans introduction ni conclusion supplémentaire, sans explications ni commentaires. Si la demande semble être du code, génère uniquement le code sans explication ni backticks autour.
 
-      // Appeler le LLM pour générer l'artefact
-      const artifact = await agentService.invokeLLM(systemPrompt, history);
+Demande utilisateur: ${prompt}`;
 
-      if (!artifact) {
+      const llm = await agentService.createLLMInstance();
+      const stream = await llm.stream([
+        ...history,
+        { type: 'system', content: systemPrompt },
+        { type: 'human', content: prompt },
+      ]);
+
+      let fullArtifact = '';
+      for await (const chunk of stream) {
+        if (typeof chunk.content === 'string') {
+          fullArtifact += chunk.content;
+        }
+      }
+
+      if (!fullArtifact.trim()) {
         return {
           success: false,
-          error: 'Impossible de générer un artefact pour cette demande.',
+          error: 'Aucun contenu généré par le modèle.',
+          model: modelName,
         };
       }
 
-      logger.debug('Artefact généré avec succès', {
-        artifactLength: artifact.length,
+      logger.debug('[DodaiCanvas] Artefact généré avec succès', {
+        artifactLength: fullArtifact.length,
+        model: modelName,
       });
 
       return {
         success: true,
-        artifact,
+        artifact: fullArtifact,
+        model: modelName,
       };
     } catch (error) {
-      logger.error("Erreur lors de la génération d'artefact pour Dodai Canvas:", error);
+      logger.error("[DodaiCanvas] Erreur lors de la génération d'artefact:", error);
       return {
         success: false,
-        error:
-          error instanceof Error ? error.message : "Une erreur s'est produite lors de la génération de l'artefact.",
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la génération.',
       };
     }
   }
 
   /**
-   * Gestionnaire pour la modification d'artefacts Markdown dans Dodai Canvas
+   * Gestionnaire pour la modification d'artefacts pour Dodai Canvas.
+   * Placeholder pour l'instant.
    */
   private async handleModifyDodaiCanvasArtifact(
     message: ModifyDodaiCanvasArtifactRequest,
+    sender: chrome.runtime.MessageSender,
   ): Promise<ModifyDodaiCanvasArtifactResponse> {
-    logger.debug("Traitement de la requête de modification d'artefact pour Dodai Canvas", {
-      promptLength: message.prompt.length,
-      artifactType: message.artifactType,
-      currentArtifactLength: message.currentArtifact.length,
-      historyLength: message.history?.length || 0,
-    });
-
-    try {
-      // Vérifier si le modèle est disponible
-      const isReady = await agentService.isAgentReady();
-      if (!isReady) {
-        return {
-          success: false,
-          error: "L'agent IA n'est pas prêt ou est désactivé. Vérifiez que le serveur Ollama est en cours d'exécution.",
-        };
-      }
-
-      // Convertir l'historique du chat si présent
-      const history = message.history ? convertChatHistory(message.history) : [];
-
-      // Construire le prompt système pour la modification d'artefacts
-      const systemPrompt = `Tu es un assistant expert en rédaction. Voici un document ${
-        message.artifactType === 'text' ? 'Markdown' : 'de code'
-      } existant.
-      
-      Modifie-le en te basant sur la demande suivante. Ta réponse DOIT être uniquement le nouveau contenu ${
-        message.artifactType === 'text' ? 'Markdown' : 'de code'
-      } complet et modifié, sans introduction ni conclusion supplémentaire, sans explications ni commentaires.
-      
-      Si le document est du Markdown, utilise la syntaxe Markdown appropriée pour structurer ton document avec des titres, sous-titres, 
-      listes, tableaux, citations, code, etc. selon les besoins du contenu.
-      
-      N'ajoute pas de backticks triples autour du contenu - ton message entier est déjà considéré comme du contenu Markdown ou du code.
-      
-      Document existant:
-      
-      ${message.currentArtifact}
-      
-      Demande utilisateur: ${message.prompt}`;
-
-      // Appeler le LLM pour modifier l'artefact
-      const modifiedArtifact = await agentService.invokeLLM(systemPrompt, history);
-
-      if (!modifiedArtifact) {
-        return {
-          success: false,
-          error: 'Impossible de modifier cet artefact pour cette demande.',
-        };
-      }
-
-      logger.debug('Artefact modifié avec succès', {
-        modifiedArtifactLength: modifiedArtifact.length,
-      });
-
-      return {
-        success: true,
-        artifact: modifiedArtifact,
-      };
-    } catch (error) {
-      logger.error("Erreur lors de la modification d'artefact pour Dodai Canvas:", error);
-      return {
-        success: false,
-        error:
-          error instanceof Error ? error.message : "Une erreur s'est produite lors de la modification de l'artefact.",
-      };
-    }
+    logger.debug("[DodaiCanvas] Traitement de la requête de modification d'artefact", message.payload);
+    // TODO: Implémenter la logique de modification similaire à handleGenerateDodaiCanvasArtifact
+    // en utilisant message.payload.currentArtifact et message.payload.artifactType
+    // Pour l'instant, on retourne une erreur ou un succès vide.
+    return {
+      success: false,
+      error: "La modification d'artifact n'est pas encore implémentée.",
+    };
   }
 }
 

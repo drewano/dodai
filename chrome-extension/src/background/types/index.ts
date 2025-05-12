@@ -340,23 +340,28 @@ export interface RagChatResponse {
 // Interfaces pour Dodai Canvas
 export interface GenerateDodaiCanvasArtifactRequest extends BaseRuntimeMessage {
   type: MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST;
-  prompt: string;
-  history?: ChatHistoryMessage[];
+  payload: {
+    prompt: string;
+    history?: ChatHistoryMessage[];
+  };
 }
 
 export interface GenerateDodaiCanvasArtifactResponse {
   success: boolean;
   artifact?: string;
   error?: string;
+  model?: string;
 }
 
 // Interface pour la requête de modification d'artefact
 export interface ModifyDodaiCanvasArtifactRequest extends BaseRuntimeMessage {
   type: MessageType.MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST;
-  prompt: string;
-  currentArtifact: string;
-  artifactType: 'text' | 'code';
-  history?: ChatHistoryMessage[];
+  payload: {
+    prompt: string;
+    currentArtifact: string;
+    artifactType: 'text' | 'code';
+    history?: ChatHistoryMessage[];
+  };
 }
 
 // Interface pour la réponse de modification d'artefact
@@ -364,4 +369,5 @@ export interface ModifyDodaiCanvasArtifactResponse {
   success: boolean;
   artifact?: string;
   error?: string;
+  model?: string;
 }
