@@ -461,6 +461,59 @@ export const AIAgentOptions = () => {
             </div>
           </div>
 
+          {/* Section Modèle d'Embedding RAG */}
+          <div className="pt-4">
+            <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-purple-400 to-purple-300 mb-4">
+              Configuration RAG (Notes)
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 py-6 border-b border-gray-800/50">
+              <div>
+                <h3 className="text-lg font-medium text-gray-200">Modèle d'Embedding</h3>
+                <p className="text-sm text-gray-400 mt-1">
+                  Modèle utilisé pour vectoriser les notes pour la recherche RAG.
+                </p>
+              </div>
+              <div>
+                <div className="relative">
+                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-gray-500">
+                    <svg
+                      xmlns="http://www.w3.org/2000/svg"
+                      className="h-4 w-4"
+                      fill="none"
+                      viewBox="0 0 24 24"
+                      stroke="currentColor">
+                      <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"
+                      />
+                    </svg>
+                  </div>
+                  <select
+                    id="embedding-model-select"
+                    value={settings.embeddingModel || ''}
+                    onChange={e => aiAgentStorage.updateEmbeddingModel(e.target.value || null)}
+                    className="w-full py-2.5 pl-10 pr-3 rounded-md border border-gray-700 bg-gray-800 text-gray-300 text-sm
+                              focus:outline-none focus:ring-2 focus:ring-purple-600 focus:border-transparent
+                              disabled:opacity-60 disabled:cursor-not-allowed hover:border-purple-700 transition-colors"
+                    disabled={!isServerRunning || !settings.isEnabled}>
+                    <option value="">nomic-embed-text (Défaut)</option>
+                    {availableModels.map(model => (
+                      <option key={model.id} value={model.name}>
+                        {model.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <p className="text-xs text-gray-500 mt-2">
+                  Sélectionnez un modèle optimisé pour les embeddings (ex: nomic-embed-text, mxbai-embed-large). Laissez
+                  vide pour utiliser la valeur par défaut.
+                </p>
+              </div>
+            </div>
+          </div>
+
           {/* Section Autocomplétion Inline */}
           <div className="pt-4">
             <h3 className="text-lg font-semibold text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-blue-300 mb-4">

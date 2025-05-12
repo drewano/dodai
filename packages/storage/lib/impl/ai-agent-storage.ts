@@ -9,6 +9,7 @@ export interface AIAgentSettings {
   contextSize: number;
   inlineAssistEnabled: boolean;
   inlineAssistModel: string | null;
+  embeddingModel: string | null;
 }
 
 const defaultAgentSettings: AIAgentSettings = {
@@ -18,7 +19,8 @@ const defaultAgentSettings: AIAgentSettings = {
   isEnabled: true,
   contextSize: 4096,
   inlineAssistEnabled: true,
-  inlineAssistModel: null, // Null signifie que le modèle par défaut sera utilisé
+  inlineAssistModel: null,
+  embeddingModel: 'nomic-embed-text',
 };
 
 type AIAgentStorageType = BaseStorage<AIAgentSettings> & {
@@ -29,6 +31,7 @@ type AIAgentStorageType = BaseStorage<AIAgentSettings> & {
   updateContextSize: (contextSize: number) => Promise<void>;
   toggleInlineAssistEnabled: () => Promise<void>;
   updateInlineAssistModel: (model: string | null) => Promise<void>;
+  updateEmbeddingModel: (model: string | null) => Promise<void>;
 };
 
 const storage = createStorage<AIAgentSettings>('ai-agent-settings', defaultAgentSettings, {
@@ -79,6 +82,12 @@ export const aiAgentStorage: AIAgentStorageType = {
     await storage.set(settings => ({
       ...settings,
       inlineAssistModel: model,
+    }));
+  },
+  updateEmbeddingModel: async (model: string | null) => {
+    await storage.set(settings => ({
+      ...settings,
+      embeddingModel: model,
     }));
   },
 };
