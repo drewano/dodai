@@ -28,13 +28,12 @@ const NotesPage = () => {
   const rightResizeHandleRef = useRef<HTMLButtonElement>(null);
 
   // States for UI control
-  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(220);
+  const [leftSidebarWidth, setLeftSidebarWidth] = useState<number>(240);
   const [rightSidebarWidth, setRightSidebarWidth] = useState<number>(180);
   const [isResizingLeft, setIsResizingLeft] = useState<boolean>(false);
   const [isResizingRight, setIsResizingRight] = useState<boolean>(false);
   const [selectedItemType, setSelectedItemType] = useState<'note' | 'chat'>('note');
   const [selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const [expandedSection, setExpandedSection] = useState<'notes' | 'chats' | null>('notes');
   const [showLeftSidebar, setShowLeftSidebar] = useState<boolean>(true);
   const [showRightSidebar, setShowRightSidebar] = useState<boolean>(true);
 
@@ -42,40 +41,23 @@ const NotesPage = () => {
   const resizeInitPositionRef = useRef<number>(0);
   const initialWidthRef = useRef<number>(0);
 
-  // Get chat history data
-  const chatHistory = useStorage(chatHistoryStorage);
+  // Get chat history data (Might be needed by CenterPanel indirectly via selectedChatId)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _chatHistory = useStorage(chatHistoryStorage);
   const editor = useCreateBlockNote();
 
   // Use the hooks to manage state and logic for notes
-  const {
+  const { notes, allTags, getChildrenOf, addNote, updateNote, deleteNote, getNote, moveNoteToFolder, moveFolder } =
+    useNotes();
+
+  const { activeTag, currentFolderId, folderPath, handleTagFilter, clearTagFilter, navigateToFolder } =
+    useFilterAndSort(notes);
+
+  const { selectedNote, setSelectedNote, handleSelectNote, handleCreateNewNote } = useNoteSelection(
     notes,
-    allTags,
-    scratchpad,
-    getChildrenOf,
-    addNote,
-    updateNote,
-    deleteNote,
     getNote,
-    clearScratchpad,
-    createFolder,
-    moveNoteToFolder,
-    moveFolder,
-    createFolderFromNotes,
-  } = useNotes();
-
-  const {
-    activeTag,
-    sortOption,
-    currentFolderId,
-    folderPath,
-    filteredAndSortedNotes,
-    handleTagFilter,
-    clearTagFilter,
-    navigateToFolder,
-    setSortOption,
-  } = useFilterAndSort(notes);
-
-  const { selectedNote, handleSelectNote, handleCreateNewNote } = useNoteSelection(notes, getNote, addNote);
+    addNote,
+  );
 
   const {
     editedTitle,
@@ -94,6 +76,9 @@ const NotesPage = () => {
     syncInitialContent,
   } = useNoteEditing(selectedNote, updateNote, editor);
 
+  // Extract sourceUrl state and setter
+  const { editedSourceUrl, setEditedSourceUrl } = useNoteEditing(selectedNote, updateNote, editor);
+
   // const { insertMarkdown, handleInsertLink, handleInsertImage } = useMarkdownTools(
   //   textareaRef as React.RefObject<HTMLTextAreaElement>,
   //   setEditedContent,
@@ -108,7 +93,7 @@ const NotesPage = () => {
     setShowRightSidebar(prev => !prev);
   }, []);
 
-  // Select note handler (switches to note view)
+  // Select note handler
   const handleSelectNoteItem = useCallback(
     (note: NoteEntry | null) => {
       if (isDirty && selectedNote && editor) {
@@ -122,11 +107,20 @@ const NotesPage = () => {
     [handleSelectNote, isDirty, selectedNote, editor, handleSaveChanges],
   );
 
-  // Select chat handler (switches to chat view)
-  const handleSelectChat = useCallback((chatId: string) => {
-    setSelectedChatId(chatId);
-    setSelectedItemType('chat');
-  }, []);
+  // Select chat handler (Kept for CenterPanel logic, but not triggered from NotesPage UI directly)
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const _handleSelectChat = useCallback(
+    (chatId: string) => {
+      if (isDirty && selectedNote && editor) {
+        console.log('Sauvegarde automatique avant changement de chat...');
+        handleSaveChanges();
+      }
+      setSelectedChatId(chatId);
+      setSelectedItemType('chat');
+      setSelectedNote(null);
+    },
+    [isDirty, selectedNote, editor, handleSaveChanges, setSelectedNote],
+  );
 
   // Handle deleting the selected note
   /*
@@ -140,39 +134,12 @@ const NotesPage = () => {
   }, [selectedNote, deleteNote]);
   */
 
-  // Handle sort option change
-  const handleSortChange = useCallback(
-    (e: React.ChangeEvent<HTMLSelectElement>) => {
-      setSortOption(e.target.value as ReturnType<typeof useFilterAndSort>['sortOption']);
-    },
-    [setSortOption],
-  );
-
-  // Toggle expanded section in left sidebar
-  const handleToggleSection = useCallback((section: 'notes' | 'chats') => {
-    setExpandedSection(prevSection => (prevSection === section ? null : section));
-  }, []);
-
-  // Créer un nouveau dossier
-  const handleCreateFolder = useCallback(
-    async (parentId: string | null, title: string) => {
-      try {
-        const folderId = await createFolder(parentId, title);
-        return folderId;
-      } catch (error) {
-        console.error('Erreur lors de la création du dossier', error);
-        return null;
-      }
-    },
-    [createFolder],
-  );
-
   // Handlers for resizing sidebars
   const handleMouseDownLeft = useCallback(
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsResizingLeft(true);
-      setIsResizingRight(false); // Ensure only one resize operation at a time
+      setIsResizingRight(false);
       resizeInitPositionRef.current = e.clientX;
       initialWidthRef.current = leftSidebarWidth;
     },
@@ -183,7 +150,7 @@ const NotesPage = () => {
     (e: React.MouseEvent) => {
       e.preventDefault();
       setIsResizingRight(true);
-      setIsResizingLeft(false); // Ensure only one resize operation at a time
+      setIsResizingLeft(false);
       resizeInitPositionRef.current = e.clientX;
       initialWidthRef.current = rightSidebarWidth;
     },
@@ -194,11 +161,11 @@ const NotesPage = () => {
     const handleMouseMove = (e: MouseEvent) => {
       if (isResizingLeft) {
         const delta = e.clientX - resizeInitPositionRef.current;
-        const newWidth = Math.max(150, Math.min(400, initialWidthRef.current + delta));
+        const newWidth = Math.max(180, Math.min(500, initialWidthRef.current + delta));
         setLeftSidebarWidth(newWidth);
       } else if (isResizingRight) {
         const delta = resizeInitPositionRef.current - e.clientX;
-        const newWidth = Math.max(150, Math.min(800, initialWidthRef.current + delta));
+        const newWidth = Math.max(150, Math.min(500, initialWidthRef.current + delta));
         setRightSidebarWidth(newWidth);
       }
     };
@@ -211,7 +178,6 @@ const NotesPage = () => {
     if (isResizingLeft || isResizingRight) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-      // Add a class to disable text selection during resize
       document.body.classList.add('resize-active');
     }
 
@@ -226,11 +192,8 @@ const NotesPage = () => {
   useEffect(() => {
     const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
       if (isDirty) {
-        event.preventDefault(); // Requis par certains navigateurs
-        event.returnValue = 'Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter ?'; // Message standard
-        // Tenter une sauvegarde synchrone ici est difficile et peu fiable.
-        // La meilleure approche est de sauvegarder fréquemment et/ou de laisser le navigateur gérer l'avertissement.
-        // Forcer une sauvegarde ici avant de quitter :
+        event.preventDefault();
+        event.returnValue = 'Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter ?';
         await handleSaveChanges();
       }
     };
@@ -266,6 +229,8 @@ const NotesPage = () => {
         handleRemoveTag={handleRemoveTag}
         handleSaveChanges={handleSaveChanges}
         handleCancelEdit={handleCancelEdit}
+        editedSourceUrl={editedSourceUrl}
+        setEditedSourceUrl={setEditedSourceUrl}
       />
 
       {/* Main Content - Using CSS Grid for responsive layout */}
@@ -273,40 +238,33 @@ const NotesPage = () => {
         ref={mainContainerRef}
         className="flex-1 grid overflow-hidden relative"
         style={{
-          gridTemplateColumns: `${showLeftSidebar ? leftSidebarWidth + 'px' : '0'} 1fr ${
+          gridTemplateColumns: `${showLeftSidebar ? leftSidebarWidth + 'px' : '0'} auto ${
             showRightSidebar ? rightSidebarWidth + 'px' : '0'
           }`,
         }}>
         {/* Left Sidebar with transition */}
         <div
           ref={leftSidebarRef}
-          className={`bg-slate-800 border-r border-slate-700/70 transition-all duration-300 ease-in-out overflow-hidden ${
-            !showLeftSidebar ? 'w-0 opacity-0' : 'opacity-100'
-          }`}>
-          <LeftSidebar
-            notes={filteredAndSortedNotes}
-            scratchpad={scratchpad || null}
-            chatHistory={chatHistory}
-            currentFolderId={currentFolderId}
-            selectedNoteId={selectedNote?.id || null}
-            selectedChatId={selectedChatId}
-            sortOption={sortOption}
-            expandedSection={expandedSection}
-            onToggleSection={handleToggleSection}
-            onSelectNote={handleSelectNoteItem}
-            onSelectChat={handleSelectChat}
-            onCreateNote={handleCreateNewNote}
-            onCreateFolder={handleCreateFolder}
-            onNavigateToFolder={navigateToFolder}
-            onClearScratchpad={clearScratchpad}
-            onMoveNoteToFolder={moveNoteToFolder}
-            onMoveFolder={moveFolder}
-            onCreateFolderFromNotes={createFolderFromNotes}
-            onSortChange={handleSortChange}
-            getChildrenOf={getChildrenOf}
-            activeTag={activeTag}
-            onDeleteItem={deleteNote}
-          />
+          className={`bg-slate-800 border-r border-slate-700/70 transition-width duration-300 ease-in-out overflow-hidden relative ${
+            !showLeftSidebar ? 'w-0 p-0 border-none' : ''
+          }`}
+          style={{ width: showLeftSidebar ? `${leftSidebarWidth}px` : '0' }}>
+          {showLeftSidebar && (
+            <LeftSidebar
+              notes={notes || []}
+              currentFolderId={currentFolderId}
+              selectedNoteId={selectedNote?.id || null}
+              activeTag={activeTag}
+              onSelectNote={handleSelectNoteItem}
+              onCreateNote={handleCreateNewNote}
+              onNavigateToFolder={navigateToFolder}
+              onMoveNoteToFolder={moveNoteToFolder}
+              onMoveFolder={moveFolder}
+              getChildrenOf={getChildrenOf}
+              onDeleteItem={deleteNote}
+              onUpdateNote={updateNote}
+            />
+          )}
         </div>
 
         {/* Left resize handle - positioned between sidebars */}
@@ -315,20 +273,17 @@ const NotesPage = () => {
             ref={leftResizeHandleRef}
             type="button"
             aria-label="Redimensionner la barre latérale gauche"
-            style={{ left: `${leftSidebarWidth}px` }}
-            className={`absolute top-0 h-full w-4 cursor-col-resize z-20 hover:z-50 bg-transparent border-0 p-0 m-0 resize-handle ${
-              isResizingLeft ? 'z-50' : ''
+            style={{ left: `${leftSidebarWidth - 8}px` }}
+            className={`absolute top-0 bottom-0 w-4 cursor-col-resize z-30 group flex items-center justify-center ${
+              isResizingLeft ? 'bg-blue-500/20' : ''
             }`}
             onMouseDown={handleMouseDownLeft}>
-            <div className="absolute left-0 top-0 h-full w-px bg-slate-700" />
-            <div className="absolute left-0 top-0 h-full w-4 bg-transparent hover:bg-blue-500/10 flex items-center justify-center group">
-              <div className="w-1 h-16 rounded-full opacity-0 group-hover:opacity-70 bg-blue-500 resize-handle-indicator"></div>
-            </div>
+            <div className="w-1 h-10 bg-slate-600 rounded-full group-hover:bg-blue-500 transition-colors duration-150"></div>
           </button>
         )}
 
         {/* Center Panel - Flexbox layout for the content */}
-        <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner relative">
+        <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner relative z-10">
           <CenterPanel
             editor={editor}
             selectedItemType={selectedItemType}
@@ -344,31 +299,31 @@ const NotesPage = () => {
             ref={rightResizeHandleRef}
             type="button"
             aria-label="Redimensionner la barre latérale droite"
-            style={{ right: `${rightSidebarWidth}px` }}
-            className={`absolute top-0 h-full w-4 cursor-col-resize z-20 hover:z-50 bg-transparent border-0 p-0 m-0 resize-handle ${
-              isResizingRight ? 'z-50' : ''
+            style={{ right: `${rightSidebarWidth - 8}px` }}
+            className={`absolute top-0 bottom-0 w-4 cursor-col-resize z-30 group flex items-center justify-center ${
+              isResizingRight ? 'bg-blue-500/20' : ''
             }`}
             onMouseDown={handleMouseDownRight}>
-            <div className="absolute right-0 top-0 h-full w-px bg-slate-700" />
-            <div className="absolute right-0 top-0 h-full w-4 bg-transparent hover:bg-blue-500/10 flex items-center justify-center group">
-              <div className="w-1 h-16 rounded-full opacity-0 group-hover:opacity-70 bg-blue-500 resize-handle-indicator"></div>
-            </div>
+            <div className="w-1 h-10 bg-slate-600 rounded-full group-hover:bg-blue-500 transition-colors duration-150"></div>
           </button>
         )}
 
         {/* Right Sidebar with transition */}
         <div
           ref={rightSidebarRef}
-          className={`bg-slate-800 border-l border-slate-700/70 transition-all duration-300 ease-in-out overflow-hidden ${
-            !showRightSidebar ? 'w-0 opacity-0' : 'opacity-100'
-          }`}>
-          <TagsPanel
-            notes={notes}
-            allTags={allTags}
-            activeTag={activeTag}
-            onTagSelect={handleTagFilter}
-            onClearFilter={clearTagFilter}
-          />
+          className={`bg-slate-800 border-l border-slate-700/70 transition-width duration-300 ease-in-out overflow-hidden ${
+            !showRightSidebar ? 'w-0 p-0 border-none' : ''
+          }`}
+          style={{ width: showRightSidebar ? `${rightSidebarWidth}px` : '0' }}>
+          {showRightSidebar && (
+            <TagsPanel
+              notes={notes || []}
+              allTags={allTags}
+              activeTag={activeTag}
+              onTagSelect={handleTagFilter}
+              onClearFilter={clearTagFilter}
+            />
+          )}
         </div>
       </main>
     </div>

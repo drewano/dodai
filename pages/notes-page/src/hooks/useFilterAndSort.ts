@@ -1,6 +1,5 @@
 import { useMemo, useState } from 'react';
 import type { NoteEntry } from '@extension/storage';
-import { SCRATCHPAD_ID } from './useNotes';
 
 export type SortOption =
   | 'updatedAt_desc'
@@ -70,11 +69,8 @@ export function useFilterAndSort(notes: NoteEntry[] | null) {
       filteredNotes = notes.filter(note => note.parentId === null);
     }
 
-    // Exclude the scratchpad from the regular notes list
-    const regularNotes = filteredNotes.filter(note => note.id !== SCRATCHPAD_ID);
-
     // Sort the notes according to the selected option
-    return [...regularNotes].sort((a, b) => {
+    return [...filteredNotes].sort((a, b) => {
       // Les dossiers d'abord, puis tri selon l'option sélectionnée
       if (a.type === 'folder' && b.type !== 'folder') return -1;
       if (a.type !== 'folder' && b.type === 'folder') return 1;

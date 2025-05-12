@@ -2,7 +2,7 @@ import { useStorage } from '@extension/shared';
 import { notesStorage, type NoteEntry } from '@extension/storage';
 import { useMemo } from 'react';
 
-export const SCRATCHPAD_ID = '@Scratchpad';
+// export const SCRATCHPAD_ID = '@Scratchpad'; // Removed
 
 export function useNotes() {
   const notes = useStorage(notesStorage);
@@ -19,17 +19,18 @@ export function useNotes() {
     return Array.from(tagSet).sort();
   }, [notes]);
 
-  // Find the scratchpad note
+  /* // Removed scratchpad memo
   const scratchpad = useMemo(() => {
     if (!notes) return null;
     return notes.find(note => note.id === SCRATCHPAD_ID);
   }, [notes]);
+  */
 
   // Récupère toutes les notes racine (sans parentId)
   const rootEntries = useMemo(() => {
     if (!notes) return [];
     return notes
-      .filter(note => note.id !== SCRATCHPAD_ID && note.parentId === null)
+      .filter(note => note.parentId === null)
       .sort((a, b) => {
         // Les dossiers d'abord, puis tri par orderIndex ou par date de mise à jour
         if (a.type === 'folder' && b.type !== 'folder') return -1;
@@ -99,6 +100,7 @@ export function useNotes() {
     await notesStorage.reorderNote(noteId, newOrderIndex);
   };
 
+  /* // Removed clearScratchpad function
   const clearScratchpad = async (): Promise<NoteEntry | null> => {
     if (scratchpad) {
       await notesStorage.updateNote(SCRATCHPAD_ID, {
@@ -111,6 +113,7 @@ export function useNotes() {
     }
     return null;
   };
+  */
 
   // Créer un nouveau dossier à partir de deux notes
   const createFolderFromNotes = async (noteAId: string, noteBId: string, folderTitle: string) => {
@@ -127,14 +130,14 @@ export function useNotes() {
   return {
     notes,
     allTags,
-    scratchpad,
+    // scratchpad removed
     rootEntries,
     getChildrenOf,
     addNote,
     updateNote,
     deleteNote,
     getNote,
-    clearScratchpad,
+    // clearScratchpad removed
     // Fonctions de gestion des dossiers
     createFolder,
     moveNoteToFolder,

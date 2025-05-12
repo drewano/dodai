@@ -3,29 +3,7 @@ import { forwardRef } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import { fr } from 'date-fns/locale';
 import type { NoteEntry } from '@extension/storage';
-import { useDraggable } from '@dnd-kit/core';
-
-interface StyledText {
-  type: 'text';
-  text: string;
-  styles: Record<string, string | boolean | number>; // Simplifié
-}
-
-interface Link {
-  type: 'link';
-  content: StyledText[];
-  href: string;
-}
-
-type InlineContent = StyledText | Link;
-
-interface PartialBlock {
-  id?: string;
-  type?: string;
-  props?: Record<string, unknown>;
-  content?: string | InlineContent[]; // Peut être une chaîne (Markdown) ou un tableau d'InlineContent
-  children?: PartialBlock[];
-}
+import { useDraggable, useDroppable } from '@dnd-kit/core';
 
 interface NoteCardProps {
   note: NoteEntry;
@@ -36,13 +14,32 @@ interface NoteCardProps {
 
 const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, onSelect, onContextMenu }) => {
   // Configuration du draggable
-  const { attributes, listeners, setNodeRef, transform, isDragging } = useDraggable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef: setDragNodeRef,
+    transform,
+    isDragging,
+  } = useDraggable({
     id: note.id,
     data: {
       type: 'note',
       note,
     },
   });
+
+  const { setNodeRef: setDropNodeRef, isOver } = useDroppable({
+    id: note.id, // Use note.id as the droppable ID
+    data: {
+      type: 'note', // Keep type as 'note' for over.data.current.note to work
+      note: note,
+    },
+  });
+
+  const setNodeRef = (element: HTMLDivElement | null) => {
+    setDragNodeRef(element);
+    setDropNodeRef(element); // Combine refs
+  };
 
   const style = transform
     ? {
@@ -53,69 +50,6 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
   // Format the date for display
   const formatDate = (timestamp: number) => {
     return formatDistanceToNow(new Date(timestamp), { addSuffix: true, locale: fr });
-  };
-
-  const extractTextFromBlockNoteContent = (contentJson: string): string => {
-    if (!contentJson) {
-      return 'Contenu vide';
-    }
-
-    try {
-      // Essayons d'abord de voir si c'est une chaîne simple qui n'est pas du JSON
-      if (
-        typeof contentJson === 'string' &&
-        contentJson.length < 200 && // Arbitraire, pour éviter de parser de grosses chaînes non JSON
-        !contentJson.trim().startsWith('[') &&
-        !contentJson.trim().startsWith('{')
-      ) {
-        // Si ce n'est pas du JSON (ne commence pas par [ ou {), retourner directement si c'est court
-        const preview = contentJson.substring(0, 150);
-        return preview.length === 150 ? preview + '...' : preview;
-      }
-
-      const blocks = JSON.parse(contentJson) as PartialBlock[];
-      if (!Array.isArray(blocks)) {
-        return 'Aperçu non disponible (format)';
-      }
-
-      let extractedText = '';
-      for (const block of blocks) {
-        if (block.content && Array.isArray(block.content)) {
-          for (const item of block.content) {
-            if (item.type === 'text') {
-              extractedText += item.text + ' ';
-            } else if (item.type === 'link' && item.content) {
-              for (const linkTextItem of item.content) {
-                if (linkTextItem.type === 'text') {
-                  extractedText += linkTextItem.text + ' ';
-                }
-              }
-            }
-          }
-        } else if (typeof block.content === 'string') {
-          extractedText += block.content + ' ';
-        }
-      }
-
-      if (!extractedText.trim()) {
-        return 'Note vide';
-      }
-
-      const preview = extractedText.trim().substring(0, 150);
-      return preview.length === 150 ? preview + '...' : preview;
-    } catch {
-      // console.warn('[NoteCard] Erreur parsing JSON du contenu:', error);
-      // Si le parsing échoue, et que la chaîne originale est courte et ne ressemble pas à du JSON, l'afficher
-      if (
-        typeof contentJson === 'string' &&
-        contentJson.length < 150 &&
-        !contentJson.trim().startsWith('[') &&
-        !contentJson.trim().startsWith('{')
-      ) {
-        return contentJson;
-      }
-      return 'Aperçu indisponible';
-    }
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -134,10 +68,9 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
           isSelected
             ? 'bg-slate-700 shadow-md shadow-slate-900/30 ring-1 ring-blue-500/20'
             : 'bg-slate-800/90 hover:bg-slate-700/80 hover:shadow-sm hover:shadow-slate-900/10'
-        } 
-        ${
-          isDragging ? 'opacity-70 border-dashed border-2 border-blue-400 bg-slate-700/60 shadow-lg scale-[1.01]' : ''
-        }`}
+        }
+        ${isDragging ? 'opacity-70 border-dashed border-2 border-blue-400 bg-slate-700/60 shadow-lg scale-[1.01]' : ''}
+        ${isOver ? 'ring-2 ring-green-500 bg-slate-700/70 shadow-lg' : ''}`}
       onClick={() => onSelect(note)}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -169,8 +102,6 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
           {note.title || 'Sans titre'}
         </h3>
       </div>
-
-      <p className="text-slate-400 text-sm mt-2 line-clamp-2 ml-7">{extractTextFromBlockNoteContent(note.content)}</p>
 
       {/* Footer avec métadonnées */}
       <div className="mt-3 ml-7 flex flex-wrap items-center gap-y-2">
@@ -232,6 +163,11 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
           )}
         </div>
       </div>
+      {isOver && (
+        <div
+          className="absolute inset-0 bg-green-500 opacity-20 rounded-md pointer-events-none"
+          aria-hidden="true"></div>
+      )}
     </div>
   );
 });

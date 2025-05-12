@@ -1,6 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { NoteEntry } from '@extension/storage';
-import { SCRATCHPAD_ID } from './useNotes';
 
 export function useNoteSelection(
   notes: NoteEntry[] | null,
@@ -9,89 +8,76 @@ export function useNoteSelection(
 ) {
   const [selectedNote, setSelectedNote] = useState<NoteEntry | null>(null);
 
-  // Handle selecting a note
+  // Effet pour sélectionner la première note au chargement ou après suppression,
+  // ou la note demandée via query param
+  useEffect(() => {
+    if (!notes) return;
+
+    const searchParams = new URLSearchParams(window.location.search);
+    const noteIdFromParam = searchParams.get('noteId');
+
+    let noteToSelect: NoteEntry | undefined | null = null;
+
+    if (noteIdFromParam) {
+      noteToSelect = notes.find(note => note.id === noteIdFromParam);
+    }
+
+    // If a specific note was found via params and it's not already selected, select it.
+    if (noteToSelect && (!selectedNote || selectedNote.id !== noteToSelect.id)) {
+      setSelectedNote(noteToSelect);
+    }
+    // If no note is selected yet, select the most recently updated non-folder note.
+    else if (!selectedNote && notes.length > 0) {
+      const mostRecentNote = [...notes]
+        .filter(note => note.type === 'note')
+        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
+
+      if (mostRecentNote) {
+        setSelectedNote(mostRecentNote);
+      } else {
+        // Fallback: If only folders exist, select the first item
+        setSelectedNote(notes[0]);
+      }
+    }
+    // If the currently selected note is no longer in the list (e.g., deleted)
+    else if (selectedNote && !notes.some(note => note.id === selectedNote.id)) {
+      // Select the most recent note remaining in the list as a fallback
+      const fallbackNote = [...notes].sort((a, b) => b.updatedAt - a.updatedAt)[0];
+      setSelectedNote(fallbackNote || null); // Select null if no notes remain
+    }
+  }, [notes, selectedNote]);
+
   const handleSelectNote = useCallback((note: NoteEntry | null) => {
     setSelectedNote(note);
   }, []);
 
-  // Create a new note
   const handleCreateNewNote = useCallback(
     async (parentId: string | null = null): Promise<NoteEntry | null> => {
-      const timestamp = new Date().toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
-      const newNoteTitle = `Nouvelle Note (${timestamp})`;
-      const newNoteContent = '';
-
-      // Generate a unique ID for the note
-      const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 5);
-
       try {
+        // Add a temporary ID to satisfy the type checker
+        const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
         const newNoteId = await addNote({
-          id: tempId,
-          title: newNoteTitle,
-          content: newNoteContent,
-          parentId,
+          id: tempId, // Provide the temporary ID
+          title: 'Nouvelle Note',
+          content: '# Nouvelle Note\n\nCommencez à écrire ici...',
           tags: [],
+          parentId: parentId,
         });
-
-        // Get the new note to select it
-        const newNote = await getNote(newNoteId);
+        const newNote = await getNote(newNoteId); // Fetch with the ID returned by addNote
         if (newNote) {
           setSelectedNote(newNote);
           return newNote;
+        } else {
+          console.error('Impossible de récupérer la nouvelle note créée');
+          return null;
         }
       } catch (error) {
         console.error('Erreur lors de la création de la note:', error);
+        return null;
       }
-
-      return null;
     },
     [addNote, getNote],
   );
-
-  // Check for URL parameters (for opening scratchpad directly)
-  useEffect(() => {
-    const searchParams = new URLSearchParams(window.location.search);
-    const openScratchpad = searchParams.get('scratchpad') === 'true';
-    const noteId = searchParams.get('note');
-    const folderId = searchParams.get('folder');
-
-    if (openScratchpad && notes) {
-      const scratchpad = notes.find(note => note.id === SCRATCHPAD_ID);
-      if (scratchpad && (!selectedNote || selectedNote.id !== SCRATCHPAD_ID)) {
-        setSelectedNote(scratchpad);
-      }
-    } else if (noteId && notes) {
-      const note = notes.find(note => note.id === noteId);
-      if (note) {
-        setSelectedNote(note);
-      }
-    } else if (folderId && notes) {
-      const folder = notes.find(note => note.id === folderId && note.type === 'folder');
-      if (folder) {
-        setSelectedNote(folder);
-      }
-    }
-  }, [notes, selectedNote]);
-
-  // Si la note sélectionnée est supprimée, sélectionner une autre note
-  useEffect(() => {
-    if (selectedNote && notes && !notes.find(note => note.id === selectedNote.id)) {
-      // La note sélectionnée n'existe plus
-      const noteInSameFolder = notes
-        .filter(note => note.parentId === selectedNote.parentId)
-        .sort((a, b) => b.updatedAt - a.updatedAt)[0];
-
-      if (noteInSameFolder) {
-        setSelectedNote(noteInSameFolder);
-      } else if (notes.length > 0) {
-        // Fallback: sélectionner la note la plus récente
-        const latestNote = [...notes].sort((a, b) => b.updatedAt - a.updatedAt)[0];
-        setSelectedNote(latestNote);
-      } else {
-        setSelectedNote(null);
-      }
-    }
-  }, [notes, selectedNote]);
 
   return {
     selectedNote,

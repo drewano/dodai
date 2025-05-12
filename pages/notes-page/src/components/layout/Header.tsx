@@ -2,6 +2,8 @@ import React, { useEffect, useRef, useState } from 'react';
 import FolderBreadcrumb from '../common/FolderBreadcrumb';
 import type { NoteEntry } from '@extension/storage';
 import type { SaveStatus } from '../../hooks/useNoteEditing';
+import * as Popover from '@radix-ui/react-popover';
+import { Globe, Link2, Edit3, Check, X, Copy, ExternalLink } from 'lucide-react';
 
 interface HeaderProps {
   showLeftSidebar: boolean;
@@ -27,6 +29,8 @@ interface HeaderProps {
   handleRemoveTag: (tagToRemove: string) => void;
   handleSaveChanges: () => Promise<void>;
   handleCancelEdit: () => void;
+  editedSourceUrl: string | undefined;
+  setEditedSourceUrl: (url: string | undefined) => void;
 }
 
 const Header: React.FC<HeaderProps> = ({
@@ -48,11 +52,18 @@ const Header: React.FC<HeaderProps> = ({
   lastError,
   handleAddTag,
   handleRemoveTag,
+  editedSourceUrl,
+  setEditedSourceUrl,
 }) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
   const [isAddingTag, setIsAddingTag] = useState(false);
   const tagInputRef = useRef<HTMLInputElement>(null);
+
+  const [isSourceUrlPopoverOpen, setIsSourceUrlPopoverOpen] = useState(false);
+  const [isEditingSourceUrl, setIsEditingSourceUrl] = useState(false);
+  const [localSourceUrlEdit, setLocalSourceUrlEdit] = useState('');
+  const sourceUrlInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     if (isEditingTitle && titleInputRef.current) {
@@ -66,6 +77,13 @@ const Header: React.FC<HeaderProps> = ({
       tagInputRef.current.focus();
     }
   }, [isAddingTag]);
+
+  useEffect(() => {
+    if (isEditingSourceUrl && sourceUrlInputRef.current) {
+      sourceUrlInputRef.current.focus();
+      sourceUrlInputRef.current.select();
+    }
+  }, [isEditingSourceUrl]);
 
   const handleTitleClick = () => {
     if (selectedItemType === 'note' && selectedNote) {
@@ -118,6 +136,44 @@ const Header: React.FC<HeaderProps> = ({
     } else if (e.key === 'Escape') {
       setTagInput('');
       setIsAddingTag(false);
+    }
+  };
+
+  const handleSourceUrlIconClick = () => {
+    if (selectedNote?.sourceUrl) {
+      window.open(selectedNote.sourceUrl, '_blank', 'noopener,noreferrer');
+    }
+  };
+
+  const handleEditSourceUrl = () => {
+    setLocalSourceUrlEdit(editedSourceUrl || '');
+    setIsEditingSourceUrl(true);
+  };
+
+  const handleSaveSourceUrl = () => {
+    setEditedSourceUrl(localSourceUrlEdit.trim() || undefined);
+    setIsEditingSourceUrl(false);
+  };
+
+  const handleCancelSourceUrlEdit = () => {
+    setIsEditingSourceUrl(false);
+    setLocalSourceUrlEdit(editedSourceUrl || '');
+  };
+
+  const handleCopySourceUrl = async () => {
+    if (editedSourceUrl) {
+      try {
+        await navigator.clipboard.writeText(editedSourceUrl);
+        console.log('Source URL copied to clipboard');
+      } catch (err) {
+        console.error('Failed to copy source URL: ', err);
+      }
+    }
+  };
+
+  const handleOpenSourceUrl = () => {
+    if (editedSourceUrl) {
+      window.open(editedSourceUrl, '_blank', 'noopener,noreferrer');
     }
   };
 
@@ -275,6 +331,103 @@ const Header: React.FC<HeaderProps> = ({
 
         {selectedItemType === 'note' && selectedNote ? (
           <React.Fragment>
+            {editedSourceUrl && (
+              <Popover.Root open={isSourceUrlPopoverOpen} onOpenChange={setIsSourceUrlPopoverOpen}>
+                <Popover.Trigger asChild>
+                  <button
+                    className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500/40 flex-shrink-0"
+                    title="View/Edit Source URL"
+                  >
+                    <Link2 size={16} />
+                  </button>
+                </Popover.Trigger>
+                <Popover.Portal>
+                  <Popover.Content
+                    side="bottom"
+                    align="start"
+                    sideOffset={5}
+                    className="bg-slate-700 border border-slate-600 rounded-md shadow-xl p-3 w-80 z-50 text-slate-100 text-sm"
+                    onCloseAutoFocus={(e) => e.preventDefault()}
+                  >
+                    {isEditingSourceUrl ? (
+                      <div className="space-y-2">
+                        <label htmlFor="sourceUrlInput" className="block text-xs font-medium text-slate-300">Edit Source URL</label>
+                        <input
+                          ref={sourceUrlInputRef}
+                          id="sourceUrlInput"
+                          type="url"
+                          value={localSourceUrlEdit}
+                          onChange={(e) => setLocalSourceUrlEdit(e.target.value)}
+                          placeholder="https://example.com"
+                          className="w-full bg-slate-800 border border-slate-600 rounded-md px-2 py-1.5 text-sm text-slate-100 focus:ring-1 focus:ring-blue-500 focus:border-blue-500 outline-none"
+                        />
+                        <div className="flex justify-end gap-2 mt-2">
+                          <button
+                            onClick={handleCancelSourceUrlEdit}
+                            className="px-3 py-1 text-xs rounded-md bg-slate-600 hover:bg-slate-500 text-slate-200 transition-colors"
+                          >
+                            <X size={14} className="inline mr-1"/> Cancel
+                          </button>
+                          <button
+                            onClick={handleSaveSourceUrl}
+                            className="px-3 py-1 text-xs rounded-md bg-blue-600 hover:bg-blue-500 text-white transition-colors"
+                          >
+                            <Check size={14} className="inline mr-1"/> Save
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                          <p className="font-medium text-slate-200">Source URL</p>
+                          <button
+                            onClick={handleEditSourceUrl}
+                            className="p-1 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-600/50 transition-colors"
+                            title="Edit Source URL"
+                          >
+                            <Edit3 size={14} />
+                          </button>
+                        </div>
+                        {editedSourceUrl ? (
+                          <div className="flex items-center gap-2 group">
+                            <Globe size={14} className="text-slate-400 flex-shrink-0" />
+                            <a
+                              href={editedSourceUrl}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="truncate text-blue-400 hover:text-blue-300 hover:underline flex-grow min-w-0"
+                              title={editedSourceUrl}
+                            >
+                              {editedSourceUrl}
+                            </a>
+                          </div>
+                        ) : (
+                          <p className="text-slate-400 italic">No URL provided.</p>
+                        )}
+                        <div className="flex gap-2 pt-2 border-t border-slate-600/70 mt-2">
+                           <button
+                            onClick={handleOpenSourceUrl}
+                            disabled={!editedSourceUrl}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-slate-600/80 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <ExternalLink size={14}/> Open Link
+                          </button>
+                          <button
+                            onClick={handleCopySourceUrl}
+                            disabled={!editedSourceUrl}
+                            className="flex-1 flex items-center justify-center gap-1.5 px-2.5 py-1.5 text-xs rounded-md bg-slate-600/80 hover:bg-slate-600 text-slate-200 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                          >
+                            <Copy size={14}/> Copy URL
+                          </button>
+                        </div>
+                      </div>
+                    )}
+                     <Popover.Arrow className="fill-current text-slate-700" />
+                  </Popover.Content>
+                </Popover.Portal>
+              </Popover.Root>
+            )}
+
             {isEditingTitle ? (
               <input
                 type="text"

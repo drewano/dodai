@@ -109,7 +109,7 @@ importers:
         version: 19.0.0(react@19.0.0)
       react-force-graph:
         specifier: ^1.47.6
-        version: 1.47.6(aframe@1.7.1)(react@19.0.0)(three@0.164.1)
+        version: 1.47.6(aframe@1.7.1)(react@19.0.0)(three@0.176.0)
       react-force-graph-2d:
         specifier: ^1.27.1
         version: 1.27.1(react@19.0.0)
@@ -913,6 +913,12 @@ importers:
       '@extension/ui':
         specifier: workspace:*
         version: link:../../packages/ui
+      '@radix-ui/react-popover':
+        specifier: ^1.1.13
+        version: 1.1.13(@types/react-dom@19.0.3(@types/react@19.0.8))(@types/react@19.0.8)(react-dom@19.0.0(react@19.0.0))(react@19.0.0)
+      lucide-react:
+        specifier: ^0.503.0
+        version: 0.503.0(react@19.0.0)
       react-markdown:
         specifier: ^10.1.0
         version: 10.1.0(@types/react@19.0.8)(react@19.0.0)
@@ -8249,20 +8255,20 @@ packages:
 
 snapshots:
 
-  3d-force-graph-ar@1.9.5(aframe@1.7.1)(three@0.164.1):
+  3d-force-graph-ar@1.9.5(aframe@1.7.1)(three@0.176.0):
     dependencies:
-      aframe-forcegraph-component: 3.2.3(aframe@1.7.1)(three@0.164.1)
+      aframe-forcegraph-component: 3.2.3(aframe@1.7.1)(three@0.176.0)
       kapsule: 1.16.3
     transitivePeerDependencies:
       - aframe
       - three
 
-  3d-force-graph-vr@3.0.3(aframe@1.7.1)(three@0.164.1):
+  3d-force-graph-vr@3.0.3(aframe@1.7.1)(three@0.176.0):
     dependencies:
       accessor-fn: 1.5.3
       aframe: 1.7.1
       aframe-extras: 7.5.4
-      aframe-forcegraph-component: 3.2.3(aframe@1.7.1)(three@0.164.1)
+      aframe-forcegraph-component: 3.2.3(aframe@1.7.1)(three@0.176.0)
       kapsule: 1.16.3
       polished: 4.3.1
     transitivePeerDependencies:
@@ -10592,10 +10598,10 @@ snapshots:
       three: 0.164.1
       three-pathfinding: 1.3.0(three@0.164.1)
 
-  aframe-forcegraph-component@3.2.3(aframe@1.7.1)(three@0.164.1):
+  aframe-forcegraph-component@3.2.3(aframe@1.7.1)(three@0.176.0):
     dependencies:
       aframe: 1.7.1
-      three-forcegraph: 1.42.13(three@0.164.1)
+      three-forcegraph: 1.42.13(three@0.176.0)
     transitivePeerDependencies:
       - three
 
@@ -14963,11 +14969,11 @@ snapshots:
       react: 19.0.0
       react-kapsule: 2.5.7(react@19.0.0)
 
-  react-force-graph@1.47.6(aframe@1.7.1)(react@19.0.0)(three@0.164.1):
+  react-force-graph@1.47.6(aframe@1.7.1)(react@19.0.0)(three@0.176.0):
     dependencies:
       3d-force-graph: 1.77.0
-      3d-force-graph-ar: 1.9.5(aframe@1.7.1)(three@0.164.1)
-      3d-force-graph-vr: 3.0.3(aframe@1.7.1)(three@0.164.1)
+      3d-force-graph-ar: 1.9.5(aframe@1.7.1)(three@0.176.0)
+      3d-force-graph-vr: 3.0.3(aframe@1.7.1)(three@0.176.0)
       force-graph: 1.49.5
       prop-types: 15.8.1
       react: 19.0.0
@@ -15849,20 +15855,6 @@ snapshots:
       layout-bmfont-text: 1.3.4
       nice-color-palettes: 3.0.0
       quad-indices: 2.0.1
-
-  three-forcegraph@1.42.13(three@0.164.1):
-    dependencies:
-      accessor-fn: 1.5.3
-      d3-array: 3.2.4
-      d3-force-3d: 3.0.6
-      d3-scale: 4.0.2
-      d3-scale-chromatic: 3.1.0
-      data-bind-mapper: 1.0.3
-      kapsule: 1.16.3
-      ngraph.forcelayout: 3.3.1
-      ngraph.graph: 20.0.1
-      three: 0.164.1
-      tinycolor2: 1.6.0
 
   three-forcegraph@1.42.13(three@0.176.0):
     dependencies:

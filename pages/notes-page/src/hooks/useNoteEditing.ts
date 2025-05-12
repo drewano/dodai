@@ -10,9 +10,11 @@ export interface UseNoteEditingReturn {
   tagInput: string;
   saveStatus: SaveStatus;
   lastError: string | null;
+  editedSourceUrl: string | undefined;
   setEditedTitle: (title: string) => void;
   setEditedTags: (tagsOrCallback: string[] | ((prevTags: string[]) => string[])) => void;
   setTagInput: (input: string) => void;
+  setEditedSourceUrl: (url: string | undefined) => void;
   handleSaveChanges: () => Promise<void>;
   handleCancelEdit: () => void;
   handleAddTag: () => void;
@@ -42,8 +44,9 @@ export function useNoteEditing(
   const [saveStatus, setSaveStatus] = useState<SaveStatus>('idle');
   const [lastError, setLastError] = useState<string | null>(null);
   const [isDirty, setIsDirty] = useState<boolean>(false);
+  const [editedSourceUrl, setEditedSourceUrlInternal] = useState<string | undefined>(undefined);
 
-  const initialNoteStateRef = useRef<{ title: string; tags: string[]; content: string } | null>(null);
+  const initialNoteStateRef = useRef<{ title: string; tags: string[]; content: string; sourceUrl: string | undefined } | null>(null);
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
   const isSavingRef = useRef<boolean>(false);
   const editorContentChangedSinceLastSaveRef = useRef<boolean>(false);
@@ -55,9 +58,10 @@ export function useNoteEditing(
     }
     const titleChanged = editedTitle !== initialNoteStateRef.current.title;
     const tagsChanged = !arraysEqual(editedTags, initialNoteStateRef.current.tags);
-    const dirty = titleChanged || tagsChanged || editorContentChangedSinceLastSaveRef.current;
+    const sourceUrlChanged = editedSourceUrl !== initialNoteStateRef.current.sourceUrl;
+    const dirty = titleChanged || tagsChanged || sourceUrlChanged || editorContentChangedSinceLastSaveRef.current;
     setIsDirty(dirty);
-  }, [editedTitle, editedTags, selectedNote]);
+  }, [editedTitle, editedTags, selectedNote, editedSourceUrl]);
 
   // Effet pour gérer les transitions de saveStatus en fonction de isDirty
   useEffect(() => {
@@ -85,12 +89,14 @@ export function useNoteEditing(
     if (selectedNote) {
       setEditedTitleInternal(selectedNote.title);
       setEditedTagsInternal(selectedNote.tags || []);
+      setEditedSourceUrlInternal(selectedNote.sourceUrl);
       // Content will be set by syncInitialContent after editor loads it.
       // For now, use selectedNote.content as a temporary baseline.
       initialNoteStateRef.current = {
         title: selectedNote.title,
         tags: selectedNote.tags || [],
         content: selectedNote.content || '', // This will be updated by syncInitialContent
+        sourceUrl: selectedNote.sourceUrl,
       };
       setSaveStatus('idle');
       setLastError(null);
@@ -104,6 +110,7 @@ export function useNoteEditing(
       setLastError(null);
       editorContentChangedSinceLastSaveRef.current = false;
       setIsDirty(false);
+      setEditedSourceUrlInternal(undefined);
     }
   }, [selectedNote]);
 
@@ -111,10 +118,11 @@ export function useNoteEditing(
   const syncInitialContent = useCallback(
     (contentJSON: string) => {
       if (selectedNote && initialNoteStateRef.current) {
-        // S'assurer de prendre les titre/tags de la note sélectionnée au moment de la synchro du contenu
+        // S'assurer de prendre les titre/tags/sourceUrl de la note sélectionnée au moment de la synchro du contenu
         initialNoteStateRef.current.title = selectedNote.title;
         initialNoteStateRef.current.tags = selectedNote.tags || [];
         initialNoteStateRef.current.content = contentJSON;
+        initialNoteStateRef.current.sourceUrl = selectedNote.sourceUrl;
         editorContentChangedSinceLastSaveRef.current = false;
         _updateIsDirty(); // Met à jour isDirty; le useEffect ci-dessus s'occupera de saveStatus.
       } else if (!selectedNote) {
@@ -126,7 +134,7 @@ export function useNoteEditing(
           initialNoteStateRef.current.content = emptyContent;
         } else {
           // Première initialisation, aucune note, mais l'éditeur existe (ou pas)
-          initialNoteStateRef.current = { title: '', tags: [], content: emptyContent };
+          initialNoteStateRef.current = { title: '', tags: [], content: emptyContent, sourceUrl: undefined };
         }
         editorContentChangedSinceLastSaveRef.current = false;
         _updateIsDirty();
@@ -154,7 +162,7 @@ export function useNoteEditing(
 
   useEffect(() => {
     _updateIsDirty();
-  }, [editedTitle, editedTags, _updateIsDirty]);
+  }, [editedTitle, editedTags, editedSourceUrl, _updateIsDirty]);
 
   // Debounced save logic
   const performSave = useCallback(async () => {
@@ -165,11 +173,12 @@ export function useNoteEditing(
     // Vérifier les changements réels avant de sauvegarder
     const titleChanged = editedTitle !== initialNoteStateRef.current.title;
     const tagsChanged = !arraysEqual(editedTags, initialNoteStateRef.current.tags);
+    const sourceUrlChanged = editedSourceUrl !== initialNoteStateRef.current.sourceUrl;
     // JSON.stringify seulement ici, juste avant la sauvegarde potentielle.
     const currentContentJSON = JSON.stringify(editor.document);
     const contentChanged = currentContentJSON !== initialNoteStateRef.current.content;
 
-    if (!titleChanged && !tagsChanged && !contentChanged) {
+    if (!titleChanged && !tagsChanged && !contentChanged && !sourceUrlChanged) {
       editorContentChangedSinceLastSaveRef.current = false; // Assurer que c'est false
       // Si isDirty était vrai uniquement à cause de changements non réels, _updateIsDirty le corrigera.
       // Appelons _updateIsDirty pour s'assurer que isDirty et saveStatus sont corrects.
@@ -183,18 +192,21 @@ export function useNoteEditing(
 
     const newTitle = editedTitle;
     const newTags = [...editedTags];
+    const newSourceUrl = editedSourceUrl;
 
     try {
       await updateNote(selectedNote.id, {
         title: newTitle,
         content: currentContentJSON,
         tags: newTags,
+        sourceUrl: newSourceUrl,
       });
 
       initialNoteStateRef.current = {
         title: newTitle,
         tags: newTags,
         content: currentContentJSON,
+        sourceUrl: newSourceUrl,
       };
       setSaveStatus('saved');
       editorContentChangedSinceLastSaveRef.current = false;
@@ -214,9 +226,9 @@ export function useNoteEditing(
     } finally {
       isSavingRef.current = false;
     }
-  }, [selectedNote, editor, editedTitle, editedTags, updateNote, _updateIsDirty]); // saveStatus enlevé
+  }, [selectedNote, editor, editedTitle, editedTags, editedSourceUrl, updateNote, _updateIsDirty]); // saveStatus enlevé
 
-  // useEffect for handling title, tags, and editor content changes for auto-save
+  // useEffect for handling title, tags, editor content, and source URL changes for auto-save
   useEffect(() => {
     if (!selectedNote || !editor) {
       // Plus besoin de initialNoteStateRef.current ici car _updateIsDirty le gère
@@ -258,17 +270,17 @@ export function useNoteEditing(
       // On vérifie si le changement vient bien du titre/tags pour éviter de rescheduler si seul le contenu a changé
       // (ce qui est déjà géré par handleEditorChange).
       if (initialNoteStateRef.current) {
-        const titleOrTagsHaveChangedRecently =
+        const titleOrTagsOrUrlHaveChangedRecently =
           editedTitle !== initialNoteStateRef.current.title ||
-          !arraysEqual(editedTags, initialNoteStateRef.current.tags);
-        if (titleOrTagsHaveChangedRecently && !editorContentChangedSinceLastSaveRef.current) {
-          // Si le titre/tag a changé mais PAS le contenu de l'éditeur depuis la dernière synchro/sauvegarde
-          // Alors on schedule. Si le contenu a aussi changé, handleEditorChange l'a déjà fait.
+          !arraysEqual(editedTags, initialNoteStateRef.current.tags) ||
+          editedSourceUrl !== initialNoteStateRef.current.sourceUrl;
+        if (titleOrTagsOrUrlHaveChangedRecently && !editorContentChangedSinceLastSaveRef.current) {
+          // Si le titre/tag/url a changé mais PAS le contenu de l'éditeur depuis la dernière synchro/sauvegarde
           scheduleSave();
-        } else if (titleOrTagsHaveChangedRecently && editorContentChangedSinceLastSaveRef.current) {
+        } else if (titleOrTagsOrUrlHaveChangedRecently && editorContentChangedSinceLastSaveRef.current) {
           // Si tout a changé, handleEditorChange a déjà schedulé, pas besoin de le refaire.
           // scheduleSave() a déjà une garde contre les appels multiples.
-        } else if (titleOrTagsHaveChangedRecently) {
+        } else if (titleOrTagsOrUrlHaveChangedRecently) {
           scheduleSave(); // Au cas où editorContentChangedSinceLastSaveRef est faussement false
         }
       } else {
@@ -285,7 +297,7 @@ export function useNoteEditing(
         unsubscribeEditorOnChange();
       }
     };
-  }, [editor, selectedNote, editedTitle, editedTags, performSave, _updateIsDirty, saveStatus, isDirty]);
+  }, [editor, selectedNote, editedTitle, editedTags, editedSourceUrl, performSave, _updateIsDirty, saveStatus, isDirty]);
   // saveStatus et isDirty sont toujours là car ils peuvent influencer si on schedule ou si performSave s'exécute.
 
   // Force save (e.g., when changing note or closing)
@@ -305,6 +317,7 @@ export function useNoteEditing(
     if (selectedNote && initialNoteStateRef.current && editor) {
       setEditedTitleInternal(initialNoteStateRef.current.title);
       setEditedTagsInternal(initialNoteStateRef.current.tags);
+      setEditedSourceUrlInternal(initialNoteStateRef.current.sourceUrl);
 
       // Reset editor content
       try {
@@ -349,15 +362,26 @@ export function useNoteEditing(
     });
   }, []);
 
+  // Add setter for source URL
+  const setEditedSourceUrl = useCallback(
+    (url: string | undefined) => {
+      setEditedSourceUrlInternal(url);
+      // _updateIsDirty will be called by useEffect on editedSourceUrl
+    },
+    [] // No direct dependency on _updateIsDirty here, it happens in useEffect
+  );
+
   return {
     editedTitle,
     editedTags,
     tagInput,
     saveStatus,
     lastError,
+    editedSourceUrl,
     setEditedTitle,
     setEditedTags,
     setTagInput,
+    setEditedSourceUrl,
     handleSaveChanges,
     handleCancelEdit,
     handleAddTag,

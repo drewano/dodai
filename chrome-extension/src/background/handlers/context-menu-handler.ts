@@ -5,10 +5,7 @@ import { messageHandler } from './message-handler';
 export class ContextMenuHandler {
   // Identifiants des éléments de menu
   private readonly MENU_ADD_SELECTION_NEW_NOTE = 'dodai-add-selection-new-note';
-  private readonly MENU_ADD_SELECTION_SCRATCHPAD = 'dodai-add-selection-scratchpad';
   private readonly MENU_ADD_URL_NEW_NOTE = 'dodai-add-url-new-note';
-  private readonly MENU_ADD_URL_SCRATCHPAD = 'dodai-add-url-scratchpad';
-  private readonly SCRATCHPAD_ID = '@Scratchpad';
 
   /**
    * Initialise les menus contextuels de l'extension
@@ -17,7 +14,6 @@ export class ContextMenuHandler {
     logger.info('Initialisation des menus contextuels');
     this.createContextMenus();
     this.setupEventListeners();
-    this.ensureScratchpadExists();
   }
 
   /**
@@ -40,13 +36,6 @@ export class ContextMenuHandler {
         contexts: ['selection'],
       });
 
-      chrome.contextMenus.create({
-        id: this.MENU_ADD_SELECTION_SCRATCHPAD,
-        parentId: 'dodai-selection-parent',
-        title: 'Ajouter au Scratchpad',
-        contexts: ['selection'],
-      });
-
       // Menu pour l'URL
       chrome.contextMenus.create({
         id: 'dodai-url-parent',
@@ -58,13 +47,6 @@ export class ContextMenuHandler {
         id: this.MENU_ADD_URL_NEW_NOTE,
         parentId: 'dodai-url-parent',
         title: 'Nouvelle note',
-        contexts: ['page', 'link'],
-      });
-
-      chrome.contextMenus.create({
-        id: this.MENU_ADD_URL_SCRATCHPAD,
-        parentId: 'dodai-url-parent',
-        title: 'Ajouter au Scratchpad',
         contexts: ['page', 'link'],
       });
     });
@@ -83,44 +65,14 @@ export class ContextMenuHandler {
           case this.MENU_ADD_SELECTION_NEW_NOTE:
             await this.addSelectionToNewNote(info.selectionText || '', pageUrl, pageTitle);
             break;
-          case this.MENU_ADD_SELECTION_SCRATCHPAD:
-            await this.addSelectionToScratchpad(info.selectionText || '', pageUrl, pageTitle);
-            break;
           case this.MENU_ADD_URL_NEW_NOTE:
             await this.addUrlToNewNote(pageUrl, pageTitle);
-            break;
-          case this.MENU_ADD_URL_SCRATCHPAD:
-            await this.addUrlToScratchpad(pageUrl, pageTitle);
             break;
         }
       } catch (error) {
         logger.error('Erreur lors du traitement du menu contextuel:', error);
       }
     });
-  }
-
-  /**
-   * S'assure que la note Scratchpad existe
-   */
-  private async ensureScratchpadExists() {
-    try {
-      const allNotes = await notesStorage.getAllNotes();
-      const scratchpad = allNotes.find(note => note.id === this.SCRATCHPAD_ID);
-
-      if (!scratchpad) {
-        logger.info('Création de la note Scratchpad');
-        await notesStorage.addNote({
-          id: this.SCRATCHPAD_ID,
-          title: '📥 Scratchpad',
-          content:
-            '# 📥 Scratchpad\n\nUtilisez cette note comme collecteur rapide pour vos idées et captures web.\n\n---\n\n',
-          tags: ['system', 'scratchpad'],
-          parentId: null,
-        });
-      }
-    } catch (error) {
-      logger.error('Erreur lors de la vérification du Scratchpad:', error);
-    }
   }
 
   /**
@@ -161,36 +113,6 @@ export class ContextMenuHandler {
   }
 
   /**
-   * Ajoute un texte sélectionné au Scratchpad
-   */
-  private async addSelectionToScratchpad(selection: string, sourceUrl: string, pageTitle: string) {
-    if (!selection) return;
-
-    try {
-      await this.ensureScratchpadExists();
-
-      // Récupérer le scratchpad
-      const scratchpad = await notesStorage.getNote(this.SCRATCHPAD_ID);
-      if (!scratchpad) throw new Error('Scratchpad introuvable');
-
-      // Préparer le nouveau contenu
-      const timestamp = new Date().toLocaleString('fr-FR');
-      const newContent = `## Sélection de ${pageTitle || 'Page web'} - ${timestamp}\n\n${selection}\n\nSource: [${pageTitle || 'Page web'}](${sourceUrl})\n\n---\n\n${scratchpad.content}`;
-
-      // Mettre à jour le scratchpad
-      await notesStorage.updateNote(this.SCRATCHPAD_ID, {
-        content: newContent,
-      });
-
-      // Notifier l'utilisateur
-      this.showNotification('Scratchpad mis à jour', 'La sélection a été ajoutée au Scratchpad.');
-    } catch (error) {
-      logger.error("Erreur lors de l'ajout de la sélection au Scratchpad:", error);
-      this.showNotification('Erreur', "Impossible d'ajouter la sélection au Scratchpad.");
-    }
-  }
-
-  /**
    * Ajoute une URL à une nouvelle note
    */
   private async addUrlToNewNote(url: string, pageTitle: string) {
@@ -221,36 +143,6 @@ export class ContextMenuHandler {
     } catch (error) {
       logger.error("Erreur lors de l'ajout de l'URL à une nouvelle note:", error);
       this.showNotification('Erreur', "Impossible de sauvegarder l'URL dans une nouvelle note.");
-    }
-  }
-
-  /**
-   * Ajoute une URL au Scratchpad
-   */
-  private async addUrlToScratchpad(url: string, pageTitle: string) {
-    if (!url) return;
-
-    try {
-      await this.ensureScratchpadExists();
-
-      // Récupérer le scratchpad
-      const scratchpad = await notesStorage.getNote(this.SCRATCHPAD_ID);
-      if (!scratchpad) throw new Error('Scratchpad introuvable');
-
-      // Préparer le nouveau contenu
-      const timestamp = new Date().toLocaleString('fr-FR');
-      const newContent = `## Lien sauvegardé - ${timestamp}\n\n[${pageTitle || url}](${url})\n\n---\n\n${scratchpad.content}`;
-
-      // Mettre à jour le scratchpad
-      await notesStorage.updateNote(this.SCRATCHPAD_ID, {
-        content: newContent,
-      });
-
-      // Notifier l'utilisateur
-      this.showNotification('Scratchpad mis à jour', "L'URL a été ajoutée au Scratchpad.");
-    } catch (error) {
-      logger.error("Erreur lors de l'ajout de l'URL au Scratchpad:", error);
-      this.showNotification('Erreur', "Impossible d'ajouter l'URL au Scratchpad.");
     }
   }
 
