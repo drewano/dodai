@@ -3,6 +3,7 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './componen
 // import { useDodai } from './contexts/DodaiContext'; // Supprimé car non utilisé pour l'instant
 import { DodaiProvider } from './contexts/DodaiContext';
 import ChatPanel from './components/ChatPanel';
+import ArtifactPanel from './components/ArtifactPanel';
 
 const DodaiCanvasContent = () => {
   const [chatCollapsed, setChatCollapsed] = useState(false);
@@ -86,9 +87,7 @@ const DodaiCanvasContent = () => {
           <ResizablePanel
             defaultSize={chatCollapsed ? 100 : 70}
             className="transition-all duration-300 bg-slate-800/30 p-4">
-            <div className="h-full w-full flex items-center justify-center text-slate-500">
-              <p>Panneau d'Artefact</p>
-            </div>
+            <ArtifactPanel />
           </ResizablePanel>
         </ResizablePanelGroup>
       </main>
