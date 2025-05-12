@@ -1,6 +1,7 @@
 import { withErrorBoundary, withSuspense, useStorage } from '@extension/shared';
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { chatHistoryStorage } from '@extension/storage';
+import { useCreateBlockNote } from '@blocknote/react';
 
 // Hooks
 import { useNotes } from './hooks/useNotes';
@@ -43,6 +44,7 @@ const NotesPage = () => {
 
   // Get chat history data
   const chatHistory = useStorage(chatHistoryStorage);
+  const editor = useCreateBlockNote();
 
   // Use the hooks to manage state and logic for notes
   const {
@@ -79,14 +81,19 @@ const NotesPage = () => {
     editedTitle,
     editedTags,
     tagInput,
+    saveStatus,
+    lastError,
+    isDirty,
     setEditedTitle,
+    setEditedTags,
     setTagInput,
     handleSaveChanges,
     handleCancelEdit,
     handleAddTag,
     handleRemoveTag,
     handleTagInputKeyDown,
-  } = useNoteEditing(selectedNote, updateNote);
+    syncInitialContent,
+  } = useNoteEditing(selectedNote, updateNote, editor);
 
   // const { insertMarkdown, handleInsertLink, handleInsertImage } = useMarkdownTools(
   //   textareaRef as React.RefObject<HTMLTextAreaElement>,
@@ -104,12 +111,16 @@ const NotesPage = () => {
 
   // Select note handler (switches to note view)
   const handleSelectNoteItem = useCallback(
-    (note: NoteEntry) => {
+    (note: NoteEntry | null) => {
+      if (isDirty && selectedNote && editor) {
+        console.log('Sauvegarde automatique avant changement de note...');
+        handleSaveChanges();
+      }
       handleSelectNote(note);
       setSelectedItemType('note');
       setSelectedChatId(null);
     },
-    [handleSelectNote],
+    [handleSelectNote, isDirty, selectedNote, editor, handleSaveChanges],
   );
 
   // Select chat handler (switches to chat view)
@@ -119,11 +130,16 @@ const NotesPage = () => {
   }, []);
 
   // Handle deleting the selected note
+  /*
   const handleDeleteNote = useCallback(async () => {
     if (selectedNote && window.confirm('Êtes-vous sûr de vouloir supprimer cette note ?')) {
       await deleteNote(selectedNote.id);
+      // La désélection est maintenant gérée dans LeftSidebar après suppression via le menu contextuel
+      // Si la note supprimée était celle en cours d'édition, il faut nettoyer les états d'édition.
+      // useNoteSelection devrait idéalement désélectionner la note, ce qui déclencherait le useEffect dans useNoteEditing.
     }
   }, [selectedNote, deleteNote]);
+  */
 
   // Handle sort option change
   const handleSortChange = useCallback(
@@ -207,6 +223,25 @@ const NotesPage = () => {
     };
   }, [isResizingLeft, isResizingRight]);
 
+  // Gestion du beforeunload pour sauvegarder les modifications en attente
+  useEffect(() => {
+    const handleBeforeUnload = async (event: BeforeUnloadEvent) => {
+      if (isDirty) {
+        event.preventDefault(); // Requis par certains navigateurs
+        event.returnValue = 'Vous avez des modifications non enregistrées. Voulez-vous vraiment quitter ?'; // Message standard
+        // Tenter une sauvegarde synchrone ici est difficile et peu fiable.
+        // La meilleure approche est de sauvegarder fréquemment et/ou de laisser le navigateur gérer l'avertissement.
+        // Forcer une sauvegarde ici avant de quitter :
+        await handleSaveChanges();
+      }
+    };
+
+    window.addEventListener('beforeunload', handleBeforeUnload);
+    return () => {
+      window.removeEventListener('beforeunload', handleBeforeUnload);
+    };
+  }, [isDirty, handleSaveChanges]);
+
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
       <Header
@@ -283,16 +318,20 @@ const NotesPage = () => {
         {/* Center Panel - Flexbox layout for the content */}
         <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner relative">
           <CenterPanel
+            editor={editor}
             selectedItemType={selectedItemType}
             selectedNote={selectedNote}
             selectedChatId={selectedChatId}
             editedTitle={editedTitle}
             editedTags={editedTags}
             tagInput={tagInput}
+            saveStatus={saveStatus}
+            lastError={lastError}
             onTitleChange={(e: React.ChangeEvent<HTMLInputElement>) => setEditedTitle(e.target.value)}
+            onSetEditedTags={setEditedTags}
             onSaveChanges={handleSaveChanges}
             onCancelEdit={handleCancelEdit}
-            onDeleteNote={handleDeleteNote}
+            onSyncInitialContent={syncInitialContent}
             onTagInputChange={(e: React.ChangeEvent<HTMLInputElement>) => setTagInput(e.target.value)}
             onTagInputKeyDown={handleTagInputKeyDown}
             onAddTag={handleAddTag}

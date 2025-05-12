@@ -10,7 +10,7 @@ export function useNoteSelection(
   const [selectedNote, setSelectedNote] = useState<NoteEntry | null>(null);
 
   // Handle selecting a note
-  const handleSelectNote = useCallback((note: NoteEntry) => {
+  const handleSelectNote = useCallback((note: NoteEntry | null) => {
     setSelectedNote(note);
   }, []);
 

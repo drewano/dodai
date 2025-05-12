@@ -41,6 +41,7 @@ interface NoteListProps {
   onCreateFolderFromNotes: (noteAId: string, noteBId: string, folderTitle: string) => Promise<string | null>;
   onSortChange: (e: React.ChangeEvent<HTMLSelectElement>) => void;
   getChildrenOf: (folderId: string) => NoteEntry[];
+  onContextMenu: (event: React.MouseEvent, item: NoteEntry) => void;
 }
 
 const NoteList: React.FC<NoteListProps> = ({
@@ -60,6 +61,7 @@ const NoteList: React.FC<NoteListProps> = ({
   onCreateFolderFromNotes,
   onSortChange,
   getChildrenOf,
+  onContextMenu,
 }) => {
   const [folderNameInput, setFolderNameInput] = useState('');
   const [showNewFolderInput, setShowNewFolderInput] = useState(false);
@@ -229,6 +231,7 @@ const NoteList: React.FC<NoteListProps> = ({
           isSelected={selectedNoteId === scratchpad.id}
           onSelect={onSelectNote}
           onClear={() => onClearScratchpad()}
+          onContextMenu={e => onContextMenu(e, scratchpad)}
         />
       )}
 
@@ -258,11 +261,18 @@ const NoteList: React.FC<NoteListProps> = ({
                     onSelect={onSelectNote}
                     onOpen={handleOpenFolder}
                     notesCount={children.length}
+                    onContextMenu={e => onContextMenu(e, item)}
                   />
                 );
               } else {
                 return (
-                  <NoteCard key={item.id} note={item} isSelected={selectedNoteId === item.id} onSelect={onSelectNote} />
+                  <NoteCard
+                    key={item.id}
+                    note={item}
+                    isSelected={selectedNoteId === item.id}
+                    onSelect={onSelectNote}
+                    onContextMenu={e => onContextMenu(e, item)}
+                  />
                 );
               }
             })}

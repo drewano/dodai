@@ -1,14 +1,14 @@
 import type React from 'react';
 import { useEffect } from 'react';
 import TagEditor from '../tag/TagEditor';
-import { useCreateBlockNote } from '@blocknote/react';
-import { type PartialBlock } from '@blocknote/core';
+import { type PartialBlock, type BlockNoteEditor } from '@blocknote/core';
 import { BlockNoteView } from '@blocknote/mantine';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import type { NoteEntry } from '@extension/storage';
 
 interface NoteEditorProps {
+  editor: BlockNoteEditor;
   editedTitle: string;
   editedTags: string[];
   tagInput: string;
@@ -18,13 +18,11 @@ interface NoteEditorProps {
   onTagInputKeyDown: (e: React.KeyboardEvent) => void;
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
-  onSave: (newContentJSON: string) => void;
-  onCancel: () => void;
-  onExport: () => void;
-  onDelete: () => void;
+  onSyncInitialContent: (contentJSON: string) => void;
 }
 
 const NoteEditor: React.FC<NoteEditorProps> = ({
+  editor,
   editedTitle,
   editedTags,
   tagInput,
@@ -34,13 +32,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
   onTagInputKeyDown,
   onAddTag,
   onRemoveTag,
-  onSave,
-  onCancel,
-  onExport,
-  onDelete,
+  onSyncInitialContent,
 }) => {
-  const editor = useCreateBlockNote({});
-
   useEffect(() => {
     if (!editor) return;
 
@@ -96,6 +89,7 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
             ]);
           }
         }
+        onSyncInitialContent(JSON.stringify(editor.document));
       };
       loadContentIntoEditor();
     } else {
@@ -113,25 +107,12 @@ const NoteEditor: React.FC<NoteEditorProps> = ({
       if (!isEmptyDefault) {
         editor.replaceBlocks(editor.document, [{ type: 'paragraph', content: '' }]);
       }
+      onSyncInitialContent(JSON.stringify(editor.document));
     }
-  }, [editor, selectedNote]);
-
-  const handleSaveClick = async () => {
-    if (!editor) return;
-
-    const currentBlocks = editor.document;
-    const contentToSave = JSON.stringify(currentBlocks);
-    onSave(contentToSave);
-  };
+  }, [editor, selectedNote, onSyncInitialContent]);
 
   return (
     <div className="flex-1 flex flex-col h-full">
-      {selectedNote && (
-        <div className="flex items-center justify-end gap-2 pb-4 border-b border-gray-700 mb-5">
-          {/* Les boutons Sauvegarder, Annuler, Exporter, Supprimer étaient ici et ont été enlevés */}
-        </div>
-      )}
-
       {selectedNote && (
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="mb-5">

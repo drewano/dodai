@@ -1,86 +1,51 @@
 import type React from 'react';
-import { exportNoteToMarkdown, useStorage } from '@extension/shared';
+import { useStorage } from '@extension/shared';
+import type { BlockNoteEditor } from '@blocknote/core';
 
 import type { NoteEntry } from '@extension/storage';
 import { chatHistoryStorage } from '@extension/storage';
 import { ChatMessage } from '../common/ChatMessage';
 import NoteEditor from '../note/NoteEditor';
+import type { SaveStatus } from '../../hooks/useNoteEditing';
 
 interface CenterPanelProps {
+  editor: BlockNoteEditor;
   selectedItemType: 'note' | 'chat';
   selectedNote: NoteEntry | null;
   selectedChatId: string | null;
   editedTitle: string;
   editedTags: string[];
   tagInput: string;
-  onSaveChanges: (newContentJSON: string) => Promise<void>;
-  onCancelEdit: () => void;
-  onDeleteNote: () => Promise<void>;
+  saveStatus: SaveStatus;
+  lastError: string | null;
   onTagInputChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onTagInputKeyDown: (e: React.KeyboardEvent) => void;
   onAddTag: () => void;
   onRemoveTag: (tag: string) => void;
   onTitleChange: (e: React.ChangeEvent<HTMLInputElement>) => void;
+  onSetEditedTags: (tagsOrCallback: string[] | ((prevTags: string[]) => string[])) => void;
+  onSaveChanges: () => Promise<void>;
+  onCancelEdit: () => void;
+  onSyncInitialContent: (contentJSON: string) => void;
 }
 
 const CenterPanel: React.FC<CenterPanelProps> = ({
+  editor,
   selectedItemType,
   selectedNote,
   selectedChatId,
   editedTitle,
   editedTags,
   tagInput,
-  onSaveChanges,
-  onCancelEdit,
-  onDeleteNote,
+  saveStatus,
+  lastError,
   onTagInputChange,
   onTagInputKeyDown,
   onAddTag,
   onRemoveTag,
   onTitleChange,
+  onSyncInitialContent,
 }) => {
-  // Auto-save timer for notes (entièrement commenté)
-  /*
-  const [saveStatus, setSaveStatus] = useState<'saved' | 'saving' | 'error' | null>(null);
-  const autoSaveTimerRef = useRef<NodeJS.Timeout | null>(null);
-
-  useEffect(() => {
-    if (isEditing && (selectedNote?.title !== editedTitle || selectedNote?.content !== editedContent)) {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-
-      setSaveStatus('saving');
-      autoSaveTimerRef.current = setTimeout(async () => {
-        try {
-          console.warn("Auto-save désactivé car il nécessite une refonte pour BlockNote.");
-          setSaveStatus(null);
-        } catch {
-          setSaveStatus('error');
-        }
-      }, 2000);
-    }
-
-    return () => {
-      if (autoSaveTimerRef.current) {
-        clearTimeout(autoSaveTimerRef.current);
-      }
-    };
-  }, [editedTitle, editedContent, isEditing, selectedNote, onSaveChanges]);
-  */
-
-  // Handle note export
-  const handleExportNote = async () => {
-    if (selectedNote) {
-      try {
-        await exportNoteToMarkdown(selectedNote);
-      } catch (error) {
-        console.error("Erreur lors de l'export de la note:", error);
-        alert("Erreur lors de l'export de la note en Markdown.");
-      }
-    }
-  };
-
   const selectedChat = useChatConversation(selectedChatId);
 
   if (selectedItemType === 'note') {
@@ -96,22 +61,117 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
       return renderEmptyState();
     }
 
+    const SaveStatusIndicator: React.FC = () => {
+      if (
+        !selectedNote ||
+        (saveStatus === 'idle' && !editedTitle && editedTags.length === 0 && !editor.document[0]?.content?.toString())
+      ) {
+        if (
+          saveStatus === 'idle' &&
+          selectedNote &&
+          editor.document.length === 1 &&
+          editor.document[0]?.type === 'paragraph' &&
+          !editor.document[0]?.content
+        ) {
+          return null;
+        }
+        if (!selectedNote) return null;
+        if (saveStatus === 'idle') return null;
+      }
+
+      let statusText = '';
+      let textColor = 'text-gray-400';
+      let icon = null;
+
+      switch (saveStatus) {
+        case 'modified':
+          statusText = 'Modifications non enregistrées';
+          textColor = 'text-yellow-400';
+          icon = (
+            <svg className="w-3 h-3 mr-1.5 animate-pulse" fill="currentColor" viewBox="0 0 20 20">
+              <path d="M17.414 2.586a2 2 0 00-2.828 0L7 10.172V13h2.828l7.586-7.586a2 2 0 000-2.828z" />
+              <path
+                fillRule="evenodd"
+                d="M2 6a2 2 0 012-2h4a1 1 0 010 2H4v10h10v-4a1 1 0 112 0v4a2 2 0 01-2 2H4a2 2 0 01-2-2V6z"
+                clipRule="evenodd"
+              />
+            </svg>
+          );
+          break;
+        case 'saving':
+          statusText = 'Sauvegarde en cours...';
+          textColor = 'text-blue-400';
+          icon = (
+            <svg
+              className="animate-spin h-3 w-3 mr-1.5 text-blue-400"
+              xmlns="http://www.w3.org/2000/svg"
+              fill="none"
+              viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+              <path
+                className="opacity-75"
+                fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+            </svg>
+          );
+          break;
+        case 'saved':
+          statusText = 'Enregistré';
+          textColor = 'text-green-400';
+          icon = (
+            <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z"
+                clipRule="evenodd"
+              />
+            </svg>
+          );
+          break;
+        case 'error':
+          statusText = `Erreur: ${lastError || 'Inconnue'}`;
+          textColor = 'text-red-400';
+          icon = (
+            <svg className="w-3 h-3 mr-1.5" fill="currentColor" viewBox="0 0 20 20">
+              <path
+                fillRule="evenodd"
+                d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z"
+                clipRule="evenodd"
+              />
+            </svg>
+          );
+          break;
+        case 'idle':
+        default:
+          return null;
+      }
+
+      return (
+        <div
+          className={`fixed bottom-3 right-3 text-xs px-2.5 py-1.5 rounded-md shadow-lg bg-gray-800 border border-gray-700 ${textColor} flex items-center transition-opacity duration-300 opacity-90 hover:opacity-100 z-50`}>
+          {icon}
+          {statusText}
+        </div>
+      );
+    };
+
     return (
-      <NoteEditor
-        selectedNote={selectedNote}
-        editedTitle={editedTitle}
-        editedTags={editedTags}
-        tagInput={tagInput}
-        onTitleChange={onTitleChange}
-        onTagInputChange={onTagInputChange}
-        onTagInputKeyDown={onTagInputKeyDown}
-        onAddTag={onAddTag}
-        onRemoveTag={onRemoveTag}
-        onSave={onSaveChanges}
-        onCancel={onCancelEdit}
-        onExport={handleExportNote}
-        onDelete={onDeleteNote}
-      />
+      <>
+        <NoteEditor
+          editor={editor}
+          selectedNote={selectedNote}
+          editedTitle={editedTitle}
+          editedTags={editedTags}
+          tagInput={tagInput}
+          onTitleChange={onTitleChange}
+          onTagInputChange={onTagInputChange}
+          onTagInputKeyDown={onTagInputKeyDown}
+          onAddTag={onAddTag}
+          onRemoveTag={onRemoveTag}
+          onSyncInitialContent={onSyncInitialContent}
+        />
+        <SaveStatusIndicator />
+      </>
     );
   }
 
@@ -240,7 +300,6 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   }
 };
 
-// Hook personnalisé pour récupérer une conversation spécifique
 function useChatConversation(chatId: string | null) {
   const chatHistory = useStorage(chatHistoryStorage);
 

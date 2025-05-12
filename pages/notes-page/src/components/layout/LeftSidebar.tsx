@@ -36,7 +36,7 @@ interface LeftSidebarProps {
   expandedSection: 'notes' | 'chats' | null;
   activeTag: string | null;
   onToggleSection: (section: 'notes' | 'chats') => void;
-  onSelectNote: (note: NoteEntry) => void;
+  onSelectNote: (note: NoteEntry | null) => void;
   onSelectChat: (chatId: string) => void;
   onCreateNote: () => Promise<NoteEntry | null>;
   onCreateFolder: (parentId: string | null, title: string) => Promise<string | null>;
@@ -269,8 +269,9 @@ const LeftSidebar: React.FC<LeftSidebarProps> = ({
             await onDeleteItem(itemToDelete.id);
 
             // Si l'élément supprimé était sélectionné, le désélectionner
-            if (selectedNoteId === itemToDelete.id || selectedChatId === itemToDelete.id) {
-              onSelectNote(null as any); // Ceci devrait idéalement être une action plus propre comme clearSelection
+            if (selectedNoteId === itemToDelete.id /*|| selectedChatId === itemToDelete.id */) {
+              // selectedChatId condition commentée pour l'instant
+              onSelectNote(null); // Modifié : plus de 'as any'
               // Si c'était un chat, il faudrait aussi gérer la désélection du chat.
               // Pour l'instant, on se concentre sur les notes/dossiers.
             }

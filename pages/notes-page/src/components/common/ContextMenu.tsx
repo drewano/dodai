@@ -29,10 +29,12 @@ const ContextMenu: React.FC<ContextMenuProps> = ({ isVisible, x, y, onClose, onE
 
   return (
     <div
+      role="menu"
+      tabIndex={-1}
       className="fixed z-50 py-2 bg-slate-700 shadow-xl rounded-md border border-slate-600"
       style={{ top: y, left: x }}
-      onClick={e => e.stopPropagation()} // Empêche la fermeture si on clique dans le menu
-    >
+      onClick={e => e.stopPropagation()}
+      onKeyDown={e => e.stopPropagation()}>
       {!isFolder && onExport && (
         <button
           onClick={handleExportClick}
