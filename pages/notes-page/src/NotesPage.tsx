@@ -74,6 +74,7 @@ const NotesPage = () => {
     handleAddTag,
     handleRemoveTag,
     syncInitialContent,
+    handleContentModification,
   } = useNoteEditing(selectedNote, updateNote, editor);
 
   // Extract sourceUrl state and setter
@@ -290,6 +291,7 @@ const NotesPage = () => {
             selectedNote={selectedNote}
             selectedChatId={selectedChatId}
             onSyncInitialContent={syncInitialContent}
+            onNoteTextModified={handleContentModification}
           />
         </div>
 

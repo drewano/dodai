@@ -1,11 +1,14 @@
 import type React from 'react';
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { type PartialBlock, type BlockNoteEditor } from '@blocknote/core';
 import { BlockNoteView } from '@blocknote/mantine';
 import type { Theme } from '@blocknote/mantine';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import type { NoteEntry } from '@extension/storage';
+import FloatingTextAction from '../../../../../packages/ui/lib/components/FloatingTextAction';
+import { MessageType } from '../../../../../chrome-extension/src/background/types';
+import type { ModifySelectedTextResponse } from '../../../../../chrome-extension/src/background/types';
 
 // Define the custom dark theme for BlockNote
 const dodaiDarkTheme: Theme = {
@@ -58,9 +61,16 @@ interface NoteEditorProps {
   editor: BlockNoteEditor;
   selectedNote: NoteEntry | null;
   onSyncInitialContent: (contentJSON: string) => void;
+  onTextModified?: () => void;
 }
 
-const NoteEditor: React.FC<NoteEditorProps> = ({ editor, selectedNote, onSyncInitialContent }) => {
+const NoteEditor: React.FC<NoteEditorProps> = ({ editor, selectedNote, onSyncInitialContent, onTextModified }) => {
+  const [isFloatingActionVisible, setIsFloatingActionVisible] = useState(false);
+  const [floatingActionPosition, setFloatingActionPosition] = useState<{ top: number; left: number } | null>(null);
+  const [selectedTextContent, setSelectedTextContent] = useState('');
+  const [isModifyingSelectedText, setIsModifyingSelectedText] = useState(false);
+  const noteEditorRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!editor) return;
 
@@ -138,8 +148,120 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ editor, selectedNote, onSyncIni
     }
   }, [editor, selectedNote, onSyncInitialContent]);
 
+  useEffect(() => {
+    if (!editor) {
+      setIsFloatingActionVisible(false);
+      return;
+    }
+
+    const handleSelectionChange = () => {
+      if (!editor) {
+        setIsFloatingActionVisible(false);
+        return;
+      }
+      const selection = editor.getSelection();
+      const currentSelectedText = editor.getSelectedText();
+
+      if (selection && currentSelectedText.trim() !== '') {
+        setSelectedTextContent(currentSelectedText);
+        const editorViewElement = noteEditorRef.current?.querySelector('.bn-editor');
+        if (editorViewElement) {
+          const domSelection = window.getSelection();
+          if (domSelection && domSelection.rangeCount > 0) {
+            const range = domSelection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const editorRect = editorViewElement.getBoundingClientRect();
+
+            const topPosition = rect.top - editorRect.top - 40;
+            const leftPosition = rect.left - editorRect.left + rect.width / 2;
+
+            setFloatingActionPosition({ top: Math.max(0, topPosition), left: Math.max(0, leftPosition) });
+            setIsFloatingActionVisible(true);
+          } else {
+            setIsFloatingActionVisible(false);
+          }
+        } else {
+          const fallbackRect = noteEditorRef.current?.getBoundingClientRect();
+          const domSelectionForFallback = window.getSelection();
+          if (fallbackRect && domSelectionForFallback && domSelectionForFallback.rangeCount > 0) {
+            const range = domSelectionForFallback.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const topPosition = rect.top - fallbackRect.top - 40;
+            const leftPosition = rect.left - fallbackRect.left + rect.width / 2;
+            setFloatingActionPosition({ top: Math.max(0, topPosition), left: Math.max(0, leftPosition) });
+            setIsFloatingActionVisible(true);
+          } else {
+            setIsFloatingActionVisible(false);
+          }
+        }
+      } else {
+        setIsFloatingActionVisible(false);
+        setSelectedTextContent('');
+      }
+    };
+
+    const unsubscribe = editor.onSelectionChange(handleSelectionChange);
+    return () => {
+      if (unsubscribe) unsubscribe();
+    };
+  }, [editor]);
+
+  const handleFloatingActionSubmit = async (instructions: string) => {
+    if (!editor || !selectedTextContent.trim() || isModifyingSelectedText) return;
+
+    setIsModifyingSelectedText(true);
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: MessageType.MODIFY_SELECTED_TEXT_REQUEST,
+          payload: {
+            selectedText: selectedTextContent,
+            userInstructions: instructions,
+            documentTitle: selectedNote?.title || 'Note',
+          },
+        },
+        (response: ModifySelectedTextResponse) => {
+          setIsModifyingSelectedText(false);
+          if (chrome.runtime.lastError) {
+            console.error('Error modifying selected text in NoteEditor:', chrome.runtime.lastError.message);
+            setIsFloatingActionVisible(false);
+            return;
+          }
+          if (response && response.success && response.modifiedText) {
+            editor.insertInlineContent(response.modifiedText);
+            setIsFloatingActionVisible(false);
+            onTextModified?.();
+          } else {
+            console.error('Failed to modify selected text in NoteEditor:', response?.error);
+            setIsFloatingActionVisible(false);
+          }
+        },
+      );
+    } catch (error) {
+      console.error('Exception sending MODIFY_SELECTED_TEXT_REQUEST from NoteEditor:', error);
+      setIsModifyingSelectedText(false);
+      setIsFloatingActionVisible(false);
+    }
+  };
+
+  const handleFloatingActionCancel = () => {
+    setIsFloatingActionVisible(false);
+    setSelectedTextContent('');
+  };
+
   return (
-    <div className="flex-1 flex flex-col h-full">
+    <div ref={noteEditorRef} className="flex-1 flex flex-col h-full relative">
+      {selectedNote && floatingActionPosition && (
+        <FloatingTextAction
+          isVisible={isFloatingActionVisible}
+          top={floatingActionPosition.top}
+          left={floatingActionPosition.left}
+          onSubmit={handleFloatingActionSubmit}
+          onCancel={handleFloatingActionCancel}
+          isLoading={isModifyingSelectedText}
+          zIndex={1050}
+        />
+      )}
       {selectedNote && (
         <div className="flex-1 flex flex-col overflow-hidden">
           <div className="flex-1 w-full bg-slate-850 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed editor-container">

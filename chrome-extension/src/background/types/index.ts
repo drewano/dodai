@@ -109,6 +109,9 @@ export enum MessageType {
 
   // Nouveau type pour la génération d'artefacts en streaming dans Dodai Canvas
   GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST = 'GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST',
+
+  // Added new message type
+  MODIFY_SELECTED_TEXT_REQUEST = 'MODIFY_SELECTED_TEXT_REQUEST',
 }
 
 /**
@@ -391,4 +394,23 @@ export interface GenerateDodaiCanvasArtifactStreamResponse {
   success?: boolean; // For STREAM_END
   error?: string; // For STREAM_ERROR
   model?: string; // Nom du modèle qui a généré la réponse (envoyé avec STREAM_START et STREAM_END)
+}
+
+// Added new interfaces for selected text modification
+export interface ModifySelectedTextRequestMessage extends BaseRuntimeMessage {
+  type: MessageType.MODIFY_SELECTED_TEXT_REQUEST;
+  payload: {
+    selectedText: string;
+    userInstructions: string;
+    // Optional context, can be added if needed by the background task
+    pageUrl?: string; // Kept pageUrl as optional, adding documentTitle
+    documentTitle?: string; // Added documentTitle
+  };
+}
+
+export interface ModifySelectedTextResponse {
+  success: boolean;
+  modifiedText?: string;
+  error?: string;
+  model?: string; // Optional: if the background uses a model and wants to report it
 }

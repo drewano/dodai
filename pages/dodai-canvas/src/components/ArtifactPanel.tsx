@@ -1,9 +1,12 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDodai } from '../contexts/DodaiContext';
 import type { ArtifactMarkdownV3, ArtifactCodeV3, ArtifactContentV3 } from '../types';
 import { notesStorage } from '@extension/storage';
 import { debounce } from 'lodash';
 import MarkdownToolbar from './MarkdownToolbar';
+import FloatingTextAction from '../../../../packages/ui/lib/components/FloatingTextAction';
+import { MessageType } from '../../../../chrome-extension/src/background/types';
+import type { ModifySelectedTextResponse } from '../../../../chrome-extension/src/background/types';
 
 // BlockNote Imports
 import { useCreateBlockNote } from '@blocknote/react';
@@ -15,6 +18,14 @@ const ArtifactPanel = () => {
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+
+  // State for FloatingTextAction
+  const [isFloatingActionVisible, setIsFloatingActionVisible] = useState(false);
+  const [floatingActionPosition, setFloatingActionPosition] = useState<{ top: number; left: number } | null>(null);
+  const [selectedTextContent, setSelectedTextContent] = useState('');
+  const [isModifyingSelectedText, setIsModifyingSelectedText] = useState(false);
+  const artifactPanelRef = useRef<HTMLDivElement>(null);
+
   const {
     currentArtifact,
     isLoading, // General loading from context (e.g., for initial generation, modification)
@@ -52,7 +63,60 @@ const ArtifactPanel = () => {
     }
     // This effect should run whenever the markdown content itself changes,
     // or when the editor/artifact instance changes.
-  }, [editor, currentContent, currentArtifact, isMarkdown]); // Added currentArtifact dependency
+
+    // Setup selection change listener
+    const handleSelectionChange = () => {
+      if (!editor || isLoading || isStreamingArtifact || !isMarkdown) {
+        setIsFloatingActionVisible(false);
+        return;
+      }
+
+      const selection = editor.getSelection();
+      const selectedText = editor.getSelectedText();
+
+      if (selection && selectedText.trim() !== '') {
+        setSelectedTextContent(selectedText);
+        // Get editor view element for relative positioning
+        const editorViewElement = artifactPanelRef.current?.querySelector('.bn-editor'); // Adjust selector if needed
+        if (editorViewElement) {
+          const domSelection = window.getSelection();
+          if (domSelection && domSelection.rangeCount > 0) {
+            const range = domSelection.getRangeAt(0);
+            const rect = range.getBoundingClientRect();
+            const editorRect = editorViewElement.getBoundingClientRect();
+
+            // Adjust position to be relative to the editor view, not the viewport
+            // And position it slightly above the selection
+            const topPosition = rect.top - editorRect.top - 40; // 40px offset for the button height + margin
+            const leftPosition = rect.left - editorRect.left + rect.width / 2;
+
+            setFloatingActionPosition({ top: Math.max(0, topPosition), left: Math.max(0, leftPosition) });
+            setIsFloatingActionVisible(true);
+          } else {
+            setIsFloatingActionVisible(false);
+          }
+        } else {
+          setIsFloatingActionVisible(false);
+        }
+      } else {
+        setIsFloatingActionVisible(false);
+        setSelectedTextContent('');
+      }
+    };
+
+    if (editor && isMarkdown) {
+      // Only for markdown, and when editor is available
+      const unsubscribe = editor.onSelectionChange(handleSelectionChange);
+      return () => {
+        if (unsubscribe) {
+          unsubscribe();
+        }
+      };
+    } else {
+      // Ensure floating action is hidden if not markdown or no editor
+      setIsFloatingActionVisible(false);
+    }
+  }, [editor, currentContent, currentArtifact, isMarkdown, isLoading, isStreamingArtifact]); // Added isLoading and isStreamingArtifact
 
   // Debounce for the manual update of the content from the editor to the context
   const debouncedUpdate = useCallback(
@@ -171,8 +235,69 @@ const ArtifactPanel = () => {
     }
   };
 
+  // Handlers for FloatingTextAction
+  const handleFloatingActionSubmit = async (instructions: string) => {
+    if (!editor || !selectedTextContent.trim() || isModifyingSelectedText) return;
+
+    setIsModifyingSelectedText(true);
+    try {
+      chrome.runtime.sendMessage(
+        {
+          type: MessageType.MODIFY_SELECTED_TEXT_REQUEST,
+          payload: {
+            selectedText: selectedTextContent,
+            userInstructions: instructions,
+            documentTitle: currentContent?.title || 'Dodai Canvas Artifact',
+          },
+        },
+        (response: ModifySelectedTextResponse) => {
+          setIsModifyingSelectedText(false);
+          if (chrome.runtime.lastError) {
+            console.error('Error modifying selected text:', chrome.runtime.lastError.message);
+            // Optionally show error to user
+            setIsFloatingActionVisible(false); // Hide on error
+            return;
+          }
+          if (response && response.success && response.modifiedText) {
+            // Replace selected text in BlockNote
+            // editor.deleteSelection(); // Not directly available
+            // editor.insertBlocks([{type: 'paragraph', content: response.modifiedText}], editor.getTextCursorPosition().block, "after" ) // This is for blocks
+            editor.insertInlineContent(response.modifiedText);
+            setIsFloatingActionVisible(false); // Hide on success
+          } else {
+            console.error('Failed to modify selected text:', response?.error);
+            // Optionally show error to user
+            setIsFloatingActionVisible(false); // Hide on failure
+          }
+        },
+      );
+    } catch (error) {
+      console.error('Exception sending MODIFY_SELECTED_TEXT_REQUEST:', error);
+      setIsModifyingSelectedText(false);
+      setIsFloatingActionVisible(false); // Hide on exception
+    }
+  };
+
+  const handleFloatingActionCancel = () => {
+    setIsFloatingActionVisible(false);
+    setSelectedTextContent(''); // Clear selected text
+  };
+
   return (
-    <div className="flex flex-col h-full bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
+    <div
+      ref={artifactPanelRef}
+      className="flex flex-col h-full bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 relative">
+      {isMarkdown && floatingActionPosition && (
+        <FloatingTextAction
+          isVisible={isFloatingActionVisible}
+          top={floatingActionPosition.top}
+          left={floatingActionPosition.left}
+          onSubmit={handleFloatingActionSubmit}
+          onCancel={handleFloatingActionCancel}
+          isLoading={isModifyingSelectedText}
+          zIndex={1050} // Ensure it's above other elements
+        />
+      )}
       <div className="p-2 border-b border-slate-300 dark:border-slate-700 flex justify-between items-center bg-slate-200 dark:bg-slate-800 shadow-sm">
         <div className="flex items-center">
           <div className="text-lg font-medium mr-2">

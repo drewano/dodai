@@ -525,6 +525,67 @@ Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. 
       }
     }
   }
+
+  // New method for modifying selected text
+  async modifyTextWithInstructions(
+    selectedText: string,
+    userInstructions: string,
+    documentContextTitle?: string, // Optional context from the document
+  ): Promise<{ modifiedText?: string; model?: string; error?: string }> {
+    logger.debug('[AgentService] Demande de modification de texte', {
+      selectedTextLength: selectedText.length,
+      userInstructionsLength: userInstructions.length,
+      documentContextTitle,
+    });
+
+    if (!selectedText.trim() || !userInstructions.trim()) {
+      return { error: 'Selected text and user instructions cannot be empty.' };
+    }
+
+    try {
+      const isReady = await this.isAgentReady();
+      if (!isReady) {
+        return { error: "L'agent IA n'est pas prêt. Vérifiez les paramètres." };
+      }
+
+      const settings = await aiAgentStorage.get();
+      const modelName = settings.selectedModel;
+      const llm = await this.createLLMInstance(modelName);
+
+      const systemPrompt = `You are an AI assistant that modifies text based on user instructions. \nONLY output the modified text. Do not add any extra explanations, introductions, or pleasantries. \nDo not wrap the output in markdown code blocks unless the instruction explicitly asks for code and the original text is also code.`;
+
+      let userPromptContent = `Original text:\\n\`\`\`\\n${selectedText}\\n\`\`\`\\n\\nInstructions:\\n${userInstructions}\\n\\nModified text:`;
+      if (documentContextTitle) {
+        userPromptContent = `Document Title (for context): ${documentContextTitle}\\n\\n${userPromptContent}`;
+      }
+
+      // For this task, we don't need chat history, just the direct instruction on the text.
+      const response = await llm.invoke([
+        { type: 'system', content: systemPrompt },
+        { type: 'human', content: userPromptContent },
+      ]);
+
+      const modifiedText = typeof response.content === 'string' ? response.content.trim() : '';
+
+      if (!modifiedText) {
+        logger.warn('[AgentService] La modification de texte a retourné une chaîne vide.');
+        // It might be desirable to return the original text or a specific error here.
+        // For now, returning an error that no modification was made.
+        return { error: 'The model did not return any modified text.', model: modelName };
+      }
+
+      logger.debug('[AgentService] Texte modifié avec succès', {
+        modifiedTextLength: modifiedText.length,
+        model: modelName,
+      });
+      return { modifiedText, model: modelName };
+    } catch (error) {
+      logger.error('[AgentService] Erreur lors de la modification du texte:', error);
+      return {
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la modification du texte.',
+      };
+    }
+  }
 }
 
 // Export d'une instance singleton

@@ -13,6 +13,7 @@ interface CenterPanelProps {
   selectedNote: NoteEntry | null;
   selectedChatId: string | null;
   onSyncInitialContent: (contentJSON: string) => void;
+  onNoteTextModified?: () => void;
 }
 
 const CenterPanel: React.FC<CenterPanelProps> = ({
@@ -21,6 +22,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
   selectedNote,
   selectedChatId,
   onSyncInitialContent,
+  onNoteTextModified,
 }) => {
   const selectedChat = useChatConversation(selectedChatId);
 
@@ -39,7 +41,12 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
 
     return (
       <>
-        <NoteEditor editor={editor} selectedNote={selectedNote} onSyncInitialContent={onSyncInitialContent} />
+        <NoteEditor
+          editor={editor}
+          selectedNote={selectedNote}
+          onSyncInitialContent={onSyncInitialContent}
+          onTextModified={onNoteTextModified}
+        />
       </>
     );
   }

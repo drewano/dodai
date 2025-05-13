@@ -21,6 +21,7 @@ export interface UseNoteEditingReturn {
   handleRemoveTag: (tagToRemove: string) => void;
   syncInitialContent: (contentJSON: string) => void;
   isDirty: boolean;
+  handleContentModification: () => void;
 }
 
 // Utility to compare arrays (ensure it handles undefined correctly if needed)
@@ -386,6 +387,16 @@ export function useNoteEditing(
     [], // No direct dependency on _updateIsDirty here, it happens in useEffect
   );
 
+  // New handler for external content modification
+  const handleContentModification = useCallback(() => {
+    if (!editor || !selectedNote) return; // Only act if an editor and note are active
+    editorContentChangedSinceLastSaveRef.current = true;
+    _updateIsDirty();
+    // Optionally, if you want to trigger an immediate save or a faster debounce:
+    // if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    // performSave(); // or scheduleSave() with a shorter delay
+  }, [editor, selectedNote, _updateIsDirty]);
+
   return {
     editedTitle,
     editedTags,
@@ -403,5 +414,6 @@ export function useNoteEditing(
     handleRemoveTag,
     syncInitialContent,
     isDirty,
+    handleContentModification, // Expose the new handler
   };
 }

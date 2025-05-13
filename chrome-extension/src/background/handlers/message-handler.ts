@@ -26,6 +26,8 @@ import type {
   ModifyDodaiCanvasArtifactRequest,
   ModifyDodaiCanvasArtifactResponse,
   GenerateDodaiCanvasArtifactStreamRequestMessage,
+  ModifySelectedTextRequestMessage,
+  ModifySelectedTextResponse,
 } from '../types';
 import { convertChatHistory, MessageType, StreamEventType } from '../types';
 import { stateService } from '../services/state-service';
@@ -80,6 +82,8 @@ export class MessageHandler {
       this.handleModifyDodaiCanvasArtifact(message as ModifyDodaiCanvasArtifactRequest, sender),
     [MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST]: (message: BaseRuntimeMessage, sender) =>
       this.handleGenerateDodaiCanvasArtifactStream(message as GenerateDodaiCanvasArtifactStreamRequestMessage, sender),
+    [MessageType.MODIFY_SELECTED_TEXT_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleModifySelectedText(message as ModifySelectedTextRequestMessage),
   };
 
   /**
@@ -1106,6 +1110,36 @@ Instruction de modification: ${prompt}`;
         error:
           error instanceof Error ? error.message : "Erreur inconnue lors de la préparation du streaming d'artefact",
         streaming: true,
+      };
+    }
+  }
+
+  private async handleModifySelectedText(
+    message: ModifySelectedTextRequestMessage,
+  ): Promise<ModifySelectedTextResponse> {
+    const { selectedText, userInstructions, documentTitle } = message.payload;
+    logger.debug('[MessageHandler] Traitement de MODIFY_SELECTED_TEXT_REQUEST', {
+      selectedTextLength: selectedText.length,
+      userInstructionsLength: userInstructions.length,
+      documentTitle,
+    });
+
+    try {
+      const result = await agentService.modifyTextWithInstructions(
+        selectedText,
+        userInstructions,
+        documentTitle, // Pass documentTitle as context
+      );
+
+      if (result.error) {
+        return { success: false, error: result.error, model: result.model };
+      }
+      return { success: true, modifiedText: result.modifiedText, model: result.model };
+    } catch (error) {
+      logger.error('[MessageHandler] Erreur lors de la modification du texte sélectionné:', error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la modification du texte.',
       };
     }
   }
