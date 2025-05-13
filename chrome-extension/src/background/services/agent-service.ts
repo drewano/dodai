@@ -483,15 +483,15 @@ Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. 
     try {
       const llm = await this.createLLMInstance(modelName);
 
-      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré.\\nTa réponse DOIT être uniquement le contenu Markdown brut et directement utilisable.\\nN'inclus AUCUNE introduction, phrase de politesse, conclusion, explication, commentaire, ni aucun type d'encapsulation de code (comme \\\`\\\`\\\`markdown ... \\\`\\\`\\\` ou des backticks simples autour de la réponse entière).\\nLa sortie doit commencer directement par le contenu Markdown (par exemple, un titre comme '# Mon Titre', une liste, ou du texte simple).\\n\\nSi la demande est explicitement de générer du CODE SOURCE (par exemple Python, JavaScript, etc.), alors seulement tu généreras uniquement le code demandé. Dans ce cas de figure, tu peux utiliser des backticks pour délimiter des blocs de code si cela fait partie de la syntaxe standard du langage demandé ou si c'est pour imbriquer un bloc de code dans un autre format. Mais pour une demande de document MARKDOWN, la sortie doit être le Markdown pur.\\n\\nDemande utilisateur: ${prompt}`;
+      const systemPromptArtifact = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré.\\nTa réponse DOIT être uniquement le contenu Markdown brut et directement utilisable.\\nN'inclus AUCUNE introduction, phrase de politesse, conclusion, explication, commentaire, ni aucun type d'encapsulation de code (comme \\\`\\\`\\\`markdown ... \\\`\\\`\\\` ou des backticks simples autour de la réponse entière).\\nLa sortie doit commencer directement par le contenu Markdown (par exemple, un titre comme '# Mon Titre', une liste, ou du texte simple).\\n\\nSi la demande est explicitement de générer du CODE SOURCE (par exemple Python, JavaScript, etc.), alors seulement tu généreras uniquement le code demandé. Dans ce cas de figure, tu peux utiliser des backticks pour délimiter des blocs de code si cela fait partie de la syntaxe standard du langage demandé ou si c'est pour imbriquer un bloc de code dans un autre format. Mais pour une demande de document MARKDOWN, la sortie doit être le Markdown pur.\\n\\nDemande utilisateur: ${prompt}`;
 
       const streamIterator = await llm.stream([
         ...history,
-        { type: 'system', content: systemPrompt },
-        { type: 'human', content: prompt }, // Répéter le prompt ici est souvent une bonne pratique
+        { type: 'system', content: systemPromptArtifact },
+        { type: 'human', content: prompt },
       ]);
 
-      let fullArtifactForLog = ''; // Pour le log uniquement
+      let fullArtifactForLog = '';
 
       for await (const chunk of streamIterator) {
         if (typeof chunk.content === 'string' && chunk.content.length > 0) {
@@ -507,6 +507,37 @@ Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. 
         "[AgentService/DodaiCanvasStream] Streaming d'artefact terminé. Longueur totale pour log:",
         fullArtifactForLog.length,
       );
+
+      // Génération de la réponse conversationnelle après la génération de l'artefact
+      if (fullArtifactForLog.trim()) {
+        const systemPromptChat = `L'utilisateur a fait la demande suivante : "${prompt}".\nEn réponse, tu as généré l'artefact suivant :\n---\n${fullArtifactForLog.substring(0, 2000)}${fullArtifactForLog.length > 2000 ? '...' : ''}\n---\nFournis une réponse conversationnelle courte et pertinente à l'utilisateur, en accusant réception de sa demande et en mentionnant brièvement l'artefact généré. Ne répète pas le contenu de l'artefact. Sois concis.`;
+
+        try {
+          const chatResponseContent = await llm.invoke([
+            // On pourrait inclure l'historique ici aussi si pertinent pour la réponse chat
+            { type: 'system', content: systemPromptChat },
+            { type: 'human', content: `J'ai bien reçu l'artefact. Que devrais-je dire à l'utilisateur ?` }, // Prompt simple pour déclencher la réponse
+          ]);
+
+          if (typeof chatResponseContent.content === 'string' && chatResponseContent.content.trim()) {
+            port.postMessage({
+              type: StreamEventType.ARTIFACT_CHAT_RESPONSE,
+              chatResponse: chatResponseContent.content.trim(),
+              model: modelName, // On peut aussi inclure le modèle ici
+            });
+            logger.debug('[AgentService/DodaiCanvasStream] Réponse conversationnelle générée et envoyée.');
+          } else {
+            logger.warn('[AgentService/DodaiCanvasStream] La réponse conversationnelle générée est vide.');
+          }
+        } catch (chatError) {
+          logger.error(
+            '[AgentService/DodaiCanvasStream] Erreur lors de la génération de la réponse conversationnelle:',
+            chatError,
+          );
+          // Ne pas bloquer la fin du stream principal pour ça, mais logger l'erreur.
+        }
+      }
+
       port.postMessage({ type: StreamEventType.STREAM_END, success: true, model: modelName });
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : "Erreur inconnue pendant le streaming d'artefact";

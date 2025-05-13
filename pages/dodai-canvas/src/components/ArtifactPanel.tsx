@@ -1,12 +1,14 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useDodai } from '../contexts/DodaiContext';
 import type { ArtifactMarkdownV3, ArtifactCodeV3, ArtifactContentV3 } from '../types';
-import { notesStorage } from '@extension/storage';
 import { debounce } from 'lodash';
 import MarkdownToolbar from './MarkdownToolbar';
 import FloatingTextAction from '../../../../packages/ui/lib/components/FloatingTextAction';
 import { MessageType } from '../../../../chrome-extension/src/background/types';
-import type { ModifySelectedTextResponse } from '../../../../chrome-extension/src/background/types';
+import type {
+  ModifySelectedTextResponse,
+  SaveArtifactAsNoteResponseMessage,
+} from '../../../../chrome-extension/src/background/types';
 
 // BlockNote Imports
 import { useCreateBlockNote } from '@blocknote/react';
@@ -154,56 +156,77 @@ const ArtifactPanel = () => {
   const saveToNotes = async () => {
     if (!currentArtifact || !currentContent || isStreamingArtifact) return; // Do not save while streaming
 
-    try {
-      setIsSaving(true);
-      setSaveError(null);
+    setIsSaving(true);
+    setSaveSuccess(null); // Réinitialiser le succès
+    setSaveError(null);
 
-      const content = isMarkdown
+    try {
+      const artifactContentForSaving = isMarkdown
         ? (currentContent as ArtifactMarkdownV3).fullMarkdown
         : (currentContent as ArtifactCodeV3).code;
       const titleFromContent = currentContent.title;
 
-      if (!content.trim()) {
+      if (!artifactContentForSaving.trim()) {
         setSaveError('Impossible de sauvegarder un artefact vide');
         setIsSaving(false);
         return;
       }
 
-      let title = titleFromContent || 'Artefact Dodai Canvas';
+      let finalTitle = titleFromContent || 'Artefact Dodai Canvas';
       if (
-        title === 'Artefact généré' ||
-        title === 'Bienvenue sur Dodai Canvas' ||
-        title === 'Nouvel artefact' ||
-        title.startsWith('En cours:')
+        finalTitle === 'Artefact généré' ||
+        finalTitle === 'Bienvenue sur Dodai Canvas' ||
+        finalTitle === 'Nouvel artefact' ||
+        finalTitle.startsWith('En cours:')
       ) {
-        const firstLine = content.split('\n')[0];
+        const firstLine = artifactContentForSaving.split('\n')[0];
         const rawTitle = firstLine.replace(/^#+ /, '');
-        title = rawTitle.length > 50 ? `${rawTitle.substring(0, 47)}...` : rawTitle || 'Artefact sauvegardé';
+        finalTitle = rawTitle.length > 50 ? `${rawTitle.substring(0, 47)}...` : rawTitle || 'Artefact sauvegardé';
       }
 
-      let noteContent = '';
+      // Le contenu à sauvegarder peut avoir besoin d'être formaté si c'est du code
+      let noteContentForBackground = '';
       if (isMarkdown) {
-        noteContent = content;
+        noteContentForBackground = artifactContentForSaving;
       } else if (isCode) {
         const language = (currentContent as ArtifactCodeV3).language || '';
-        noteContent = `# ${title}\n\n\`\`\`${language}\n${content}\n\`\`\``;
+        // Le script d'arrière-plan s'attend à du Markdown pour générer les tags, donc on formate le code en Markdown.
+        noteContentForBackground = `# ${finalTitle}\n\n\`\`\`${language}\n${artifactContentForSaving}\n\`\`\``;
       }
 
-      const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
-      await notesStorage.addNote({
-        id: tempId,
-        title: title,
-        content: noteContent,
-        tags: ['dodai-canvas'],
-        parentId: null,
-      });
+      // Envoyer le message au script d'arrière-plan
+      chrome.runtime.sendMessage(
+        {
+          type: MessageType.SAVE_ARTIFACT_AS_NOTE_REQUEST, // Utiliser le nouveau MessageType
+          payload: {
+            title: finalTitle,
+            content: noteContentForBackground, // Envoyer le contenu formaté (Markdown pur ou code en Markdown)
+            sourceUrl: undefined, // Les artefacts n'ont pas d'URL source typiquement
+          },
+        },
+        (response: SaveArtifactAsNoteResponseMessage) => {
+          if (chrome.runtime.lastError) {
+            console.error("Erreur lors de l'envoi du message de sauvegarde d'artefact:", chrome.runtime.lastError);
+            setSaveError(chrome.runtime.lastError.message || "Erreur de communication avec le script d'arrière-plan.");
+            setSaveSuccess(false);
+            setIsSaving(false);
+            return;
+          }
 
-      setSaveSuccess(true);
+          if (response && response.success) {
+            setSaveSuccess(true);
+            // optionnellement, on pourrait utiliser response.noteId ou response.model si nécessaire
+          } else {
+            setSaveError(response?.error || "Une erreur s'est produite lors de la sauvegarde de l'artefact.");
+            setSaveSuccess(false);
+          }
+          setIsSaving(false);
+        },
+      );
     } catch (error) {
-      console.error("Erreur lors de la sauvegarde de l'artefact:", error);
-      setSaveError(error instanceof Error ? error.message : "Une erreur s'est produite");
+      console.error("Erreur inattendue lors de la préparation de la sauvegarde de l'artefact:", error);
+      setSaveError(error instanceof Error ? error.message : "Une erreur locale s'est produite");
       setSaveSuccess(false);
-    } finally {
       setIsSaving(false);
     }
   };

@@ -199,21 +199,13 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
         case StreamEventType.STREAM_END:
           console.log("[DodaiCanvas] Fin du streaming d'artefact, succès:", message.success);
           if (message.success) {
-            setMessages(prev =>
-              prev.map(msg =>
-                msg.id === assistantPlaceholderId
-                  ? {
-                      ...msg,
-                      content: `Artefact généré avec succès ! (Modèle: ${message.model || 'inconnu'})\nVous pouvez le consulter dans le panneau de droite.`,
-                    }
-                  : msg,
-              ),
-            );
-            // Finaliser l'artefact dans l'historique
-            // La version finale de currentArtifact est déjà là grâce aux chunks
+            // Le message de succès est maintenant géré par ARTIFACT_CHAT_RESPONSE
+            // ou affiché s'il n'y a pas de réponse chat.
+            // On garde une trace de l'artefact ici.
             if (currentArtifact) {
               setArtifactHistory(prev => [...prev, currentArtifact]);
             }
+            // Ne pas appeler cleanupStreamingConnection() ici si on attend ARTIFACT_CHAT_RESPONSE
           } else {
             setMessages(prev =>
               prev.map(msg =>
@@ -225,7 +217,6 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
                   : msg,
               ),
             );
-            // Peut-être réinitialiser currentArtifact ou le marquer comme erroné
             setCurrentArtifact(prev =>
               prev
                 ? {
@@ -234,7 +225,38 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
                   }
                 : null,
             );
+            cleanupStreamingConnection(); // Nettoyer en cas d'erreur de STREAM_END
           }
+          break;
+
+        case StreamEventType.ARTIFACT_CHAT_RESPONSE:
+          console.log('[DodaiCanvas] Réponse chat reçue:', message.chatResponse);
+          if (message.chatResponse) {
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? {
+                      ...msg,
+                      content: `${message.chatResponse} (Modèle: ${message.model || 'inconnu'})`,
+                    }
+                  : msg,
+              ),
+            );
+          } else {
+            // Fallback si ARTIFACT_CHAT_RESPONSE est vide mais STREAM_END était success
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? {
+                      ...msg,
+                      content: `Artefact généré avec succès ! (Modèle: ${message.model || 'inconnu'})
+Vous pouvez le consulter dans le panneau de droite.`,
+                    }
+                  : msg,
+              ),
+            );
+          }
+          // C'est le vrai signal de fin de la séquence complète.
           cleanupStreamingConnection();
           break;
 

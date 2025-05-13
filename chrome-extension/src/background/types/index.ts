@@ -112,6 +112,9 @@ export enum MessageType {
 
   // Added new message type
   MODIFY_SELECTED_TEXT_REQUEST = 'MODIFY_SELECTED_TEXT_REQUEST',
+
+  // Nouveau type pour sauvegarder un artefact avec des tags générés par IA
+  SAVE_ARTIFACT_AS_NOTE_REQUEST = 'SAVE_ARTIFACT_AS_NOTE_REQUEST',
 }
 
 /**
@@ -123,6 +126,7 @@ export enum StreamEventType {
   STREAM_END = 'STREAM_END',
   STREAM_ERROR = 'STREAM_ERROR',
   CANCEL_STREAMING = 'CANCEL_STREAMING',
+  ARTIFACT_CHAT_RESPONSE = 'ARTIFACT_CHAT_RESPONSE',
 }
 
 /**
@@ -389,8 +393,9 @@ export interface GenerateDodaiCanvasArtifactStreamRequestMessage extends BaseRun
 }
 
 export interface GenerateDodaiCanvasArtifactStreamResponse {
-  type: StreamEventType; // STREAM_START, STREAM_CHUNK, STREAM_END, STREAM_ERROR
-  chunk?: string; // For STREAM_CHUNK
+  type: StreamEventType; // STREAM_START, STREAM_CHUNK, STREAM_END, STREAM_ERROR, ARTIFACT_CHAT_RESPONSE
+  chunk?: string; // For STREAM_CHUNK (artifact content)
+  chatResponse?: string; // For ARTIFACT_CHAT_RESPONSE
   success?: boolean; // For STREAM_END
   error?: string; // For STREAM_ERROR
   model?: string; // Nom du modèle qui a généré la réponse (envoyé avec STREAM_START et STREAM_END)
@@ -413,4 +418,21 @@ export interface ModifySelectedTextResponse {
   modifiedText?: string;
   error?: string;
   model?: string; // Optional: if the background uses a model and wants to report it
+}
+
+// Interfaces pour la sauvegarde d'artefact avec tags IA
+export interface SaveArtifactAsNoteRequestMessage extends BaseRuntimeMessage {
+  type: MessageType.SAVE_ARTIFACT_AS_NOTE_REQUEST;
+  payload: {
+    title: string;
+    content: string;
+    sourceUrl?: string; // Les artefacts n'ont généralement pas d'URL source, mais on garde l'option
+  };
+}
+
+export interface SaveArtifactAsNoteResponseMessage {
+  success: boolean;
+  noteId?: string;
+  error?: string;
+  model?: string; // Optionnel: si on veut remonter le modèle utilisé pour les tags
 }

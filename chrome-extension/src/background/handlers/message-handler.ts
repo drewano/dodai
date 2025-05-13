@@ -28,6 +28,8 @@ import type {
   GenerateDodaiCanvasArtifactStreamRequestMessage,
   ModifySelectedTextRequestMessage,
   ModifySelectedTextResponse,
+  SaveArtifactAsNoteRequestMessage,
+  SaveArtifactAsNoteResponseMessage,
 } from '../types';
 import { convertChatHistory, MessageType, StreamEventType } from '../types';
 import { stateService } from '../services/state-service';
@@ -84,6 +86,8 @@ export class MessageHandler {
       this.handleGenerateDodaiCanvasArtifactStream(message as GenerateDodaiCanvasArtifactStreamRequestMessage, sender),
     [MessageType.MODIFY_SELECTED_TEXT_REQUEST]: (message: BaseRuntimeMessage) =>
       this.handleModifySelectedText(message as ModifySelectedTextRequestMessage),
+    [MessageType.SAVE_ARTIFACT_AS_NOTE_REQUEST]: (message: BaseRuntimeMessage) =>
+      this.handleSaveArtifactAsNoteRequest(message as SaveArtifactAsNoteRequestMessage),
   };
 
   /**
@@ -96,8 +100,16 @@ export class MessageHandler {
   ): boolean {
     const { type } = message;
 
+    // Logs de débogage ajoutés
+    logger.debug('[MessageHandler] Attempting to handle message.');
+    logger.debug('[MessageHandler] Received message object:', JSON.stringify(message, null, 2));
+    logger.debug('[MessageHandler] Received message type:', type);
+    logger.debug('[MessageHandler] Available handler keys:', Object.keys(this.messageHandlers));
+    logger.debug('[MessageHandler] Looking for handler for type:', type, 'Exists:', !!this.messageHandlers[type]);
+
     if (!type || !this.messageHandlers[type]) {
-      logger.debug('Message non géré reçu:', message);
+      logger.warn('[MessageHandler] Unhandled message. Type was:', type, '. Full message:', message);
+      // logger.debug('Message non géré reçu:', message); // Ancien log, remplacé par un plus détaillé
       return false; // Indique que nous n'envoyons pas de réponse asynchrone
     }
 
@@ -1140,6 +1152,62 @@ Instruction de modification: ${prompt}`;
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erreur inconnue lors de la modification du texte.',
+      };
+    }
+  }
+
+  /**
+   * Gestionnaire pour sauvegarder un artefact Dodai Canvas comme note avec des tags générés par IA.
+   */
+  private async handleSaveArtifactAsNoteRequest(
+    message: SaveArtifactAsNoteRequestMessage,
+  ): Promise<SaveArtifactAsNoteResponseMessage> {
+    const { title, content, sourceUrl } = message.payload;
+    logger.debug('[MessageHandler] Traitement de SAVE_ARTIFACT_AS_NOTE_REQUEST', {
+      titleLength: title.length,
+      contentLength: content.length,
+      sourceUrl,
+    });
+
+    if (!title.trim() || !content.trim()) {
+      return {
+        success: false,
+        error: "Le titre et le contenu de l'artefact ne peuvent pas être vides.",
+      };
+    }
+
+    try {
+      const settings = await aiAgentStorage.get();
+      const modelName = settings.selectedModel; // Pour potentiellement retourner quel modèle a généré les tags
+
+      // 1. Générer les tags avec l'IA
+      const tags = await this.generateTagsWithAI(content, title, sourceUrl);
+      logger.debug("[MessageHandler] Tags générés pour l'artefact:", tags);
+
+      // 2. Sauvegarder la note avec les tags
+      // notesStorage.addNote s'attend à ce que l'ID soit fourni dans noteData, ou il le génère si absent.
+      // Pour être cohérent avec l'ancienne logique de saveToNotes, on génère un ID ici.
+      const noteId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
+
+      await notesStorage.addNote({
+        id: noteId,
+        title: title, // Le titre est déjà préparé par le frontend
+        content: content, // Le contenu est déjà formaté (Markdown ou bloc de code en Markdown)
+        tags: tags,
+        parentId: null, // Sauvegarder à la racine par défaut
+        sourceUrl: sourceUrl, // Optionnel
+      });
+
+      return {
+        success: true,
+        noteId: noteId,
+        model: modelName, // Informer quel modèle a été utilisé pour les tags
+      };
+    } catch (error) {
+      logger.error("[MessageHandler] Erreur lors de la sauvegarde de l'artefact comme note:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : "Erreur inconnue lors de la sauvegarde de l'artefact.",
       };
     }
   }
