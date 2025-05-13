@@ -872,7 +872,12 @@ export class MessageHandler {
       const settings = await aiAgentStorage.get();
       const modelName = settings.selectedModel;
 
-      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré. Ta réponse DOIT être uniquement le contenu Markdown, sans introduction ni conclusion supplémentaire, sans explications ni commentaires. Si la demande semble être du code, génère uniquement le code sans explication ni backticks autour.
+      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré.
+Ta réponse DOIT être uniquement le contenu Markdown brut et directement utilisable.
+N'inclus AUCUNE introduction, phrase de politesse, conclusion, explication, commentaire, ni aucun type d'encapsulation de code (comme \`\`\`markdown ... \`\`\` ou des backticks simples autour de la réponse entière).
+La sortie doit commencer directement par le contenu Markdown (par exemple, un titre comme '# Mon Titre', une liste, ou du texte simple).
+
+Si la demande est explicitement de générer du CODE SOURCE (par exemple Python, JavaScript, etc.), alors seulement tu généreras uniquement le code demandé. Dans ce cas de figure, tu peux utiliser des backticks pour délimiter des blocs de code si cela fait partie de la syntaxe standard du langage demandé ou si c'est pour imbriquer un bloc de code dans un autre format. Mais pour une demande de document MARKDOWN, la sortie doit être le Markdown pur.
 
 Demande utilisateur: ${prompt}`;
 
@@ -955,7 +960,10 @@ Demande utilisateur: ${prompt}`;
       const modelName = settings.selectedModel;
 
       // Prompt système spécifique pour la modification
-      const systemPrompt = `Tu es un assistant d'édition expert. Modifie le texte suivant en suivant précisément l'instruction donnée. Ta réponse DOIT être uniquement le texte modifié intégralement, sans aucune introduction, explication, commentaire ou formatage supplémentaire (comme les backticks markdown si ce n'est pas explicitement demandé par l'instruction).
+      const systemPrompt = `Tu es un assistant d'édition expert. Modifie le texte Markdown suivant en suivant précisément l'instruction donnée.
+Ta réponse DOIT être uniquement le texte Markdown modifié intégralement et brut.
+N'inclus AUCUNE introduction, phrase de politesse, conclusion, explication, commentaire, ni aucun type d'encapsulation de code (par exemple, ne pas envelopper la réponse dans des backticks \`\`\`markdown ... \`\`\` ou des backticks simples autour de la réponse entière).
+La sortie doit être directement le contenu Markdown modifié.
 
 Texte original à modifier:
 ---
@@ -966,7 +974,6 @@ Instruction de modification: ${prompt}`;
 
       const llm = await agentService.createLLMInstance();
       // On n'utilise pas l'historique du chat pour la modification, seulement le prompt système et l'instruction.
-      // L'instruction est déjà incluse dans le systemPrompt.
       const stream = await llm.stream([
         { type: 'system', content: systemPrompt },
         // Optionnel: On pourrait ajouter un message 'human' vide ou répétitif si l'API l'exige,
