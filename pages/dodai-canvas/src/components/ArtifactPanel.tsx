@@ -27,8 +27,7 @@ const ArtifactPanel = () => {
   const editor = useCreateBlockNote();
 
   // Obtenir le contenu actuel basé sur currentIndex
-  const currentContent: ArtifactContentV3 | undefined =
-    currentArtifact?.contents[currentArtifact.currentIndex];
+  const currentContent: ArtifactContentV3 | undefined = currentArtifact?.contents[currentArtifact.currentIndex];
 
   const isMarkdown = currentContent?.type === 'text';
   const isCode = currentContent?.type === 'code';
@@ -70,7 +69,7 @@ const ArtifactPanel = () => {
   // Gérer les changements dans l'éditeur BlockNote (par l'utilisateur)
   const handleEditorContentChange = async () => {
     // Do not process changes if streaming, general loading, or not markdown.
-    if (!editor || isLoading || isStreamingArtifact) return; 
+    if (!editor || isLoading || isStreamingArtifact) return;
 
     const markdown = await editor.blocksToMarkdownLossy(editor.document);
     debouncedUpdate(markdown);
@@ -107,7 +106,12 @@ const ArtifactPanel = () => {
       }
 
       let title = titleFromContent || 'Artefact Dodai Canvas';
-      if (title === 'Artefact généré' || title === 'Bienvenue sur Dodai Canvas' || title === 'Nouvel artefact' || title.startsWith('En cours:')) {
+      if (
+        title === 'Artefact généré' ||
+        title === 'Bienvenue sur Dodai Canvas' ||
+        title === 'Nouvel artefact' ||
+        title.startsWith('En cours:')
+      ) {
         const firstLine = content.split('\n')[0];
         const rawTitle = firstLine.replace(/^#+ /, '');
         title = rawTitle.length > 50 ? `${rawTitle.substring(0, 47)}...` : rawTitle || 'Artefact sauvegardé';
@@ -171,7 +175,9 @@ const ArtifactPanel = () => {
     <div className="flex flex-col h-full bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       <div className="p-2 border-b border-slate-300 dark:border-slate-700 flex justify-between items-center bg-slate-200 dark:bg-slate-800 shadow-sm">
         <div className="flex items-center">
-          <div className="text-lg font-medium mr-2">{currentContent?.title || (isStreamingArtifact ? 'Génération...' : 'Nouvel Artefact')}</div>
+          <div className="text-lg font-medium mr-2">
+            {currentContent?.title || (isStreamingArtifact ? 'Génération...' : 'Nouvel Artefact')}
+          </div>
           <div className="text-xs px-2 py-0.5 rounded bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
             {currentContent?.type === 'text'
               ? 'Markdown'
