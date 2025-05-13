@@ -5,6 +5,7 @@ import { ChatPromptTemplate } from '@langchain/core/prompts';
 import { aiAgentStorage } from '@extension/storage';
 import loggerImport from '../logger';
 import { stateService } from './state-service';
+import { StreamEventType } from '../types'; // For DodaiCanvas streaming
 
 // Use renamed import
 const logger = loggerImport;
@@ -460,6 +461,67 @@ Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. 
           toolUsed: false,
           error: error instanceof Error ? error.message : String(error),
         };
+      }
+    }
+  }
+
+  /**
+   * Génère un artefact (Markdown/Code) en mode streaming pour Dodai Canvas.
+   * Envoie les chunks via le port fourni.
+   */
+  async streamArtifactGeneration(
+    prompt: string,
+    history: BaseMessage[],
+    port: chrome.runtime.Port,
+    modelName: string,
+  ): Promise<void> {
+    logger.debug("[AgentService/DodaiCanvasStream] Démarrage de la génération d'artefact en streaming", {
+      promptLength: prompt.length,
+      historyLength: history.length,
+    });
+
+    try {
+      const llm = await this.createLLMInstance(modelName);
+
+      const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré.\\nTa réponse DOIT être uniquement le contenu Markdown brut et directement utilisable.\\nN'inclus AUCUNE introduction, phrase de politesse, conclusion, explication, commentaire, ni aucun type d'encapsulation de code (comme \\\`\\\`\\\`markdown ... \\\`\\\`\\\` ou des backticks simples autour de la réponse entière).\\nLa sortie doit commencer directement par le contenu Markdown (par exemple, un titre comme '# Mon Titre', une liste, ou du texte simple).\\n\\nSi la demande est explicitement de générer du CODE SOURCE (par exemple Python, JavaScript, etc.), alors seulement tu généreras uniquement le code demandé. Dans ce cas de figure, tu peux utiliser des backticks pour délimiter des blocs de code si cela fait partie de la syntaxe standard du langage demandé ou si c'est pour imbriquer un bloc de code dans un autre format. Mais pour une demande de document MARKDOWN, la sortie doit être le Markdown pur.\\n\\nDemande utilisateur: ${prompt}`;
+
+      const streamIterator = await llm.stream([
+        ...history,
+        { type: 'system', content: systemPrompt },
+        { type: 'human', content: prompt }, // Répéter le prompt ici est souvent une bonne pratique
+      ]);
+
+      let fullArtifactForLog = ''; // Pour le log uniquement
+
+      for await (const chunk of streamIterator) {
+        if (typeof chunk.content === 'string' && chunk.content.length > 0) {
+          port.postMessage({
+            type: StreamEventType.STREAM_CHUNK,
+            chunk: chunk.content,
+          });
+          fullArtifactForLog += chunk.content;
+        }
+      }
+
+      logger.debug(
+        "[AgentService/DodaiCanvasStream] Streaming d'artefact terminé. Longueur totale pour log:",
+        fullArtifactForLog.length,
+      );
+      port.postMessage({ type: StreamEventType.STREAM_END, success: true, model: modelName });
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : "Erreur inconnue pendant le streaming d'artefact";
+      logger.error("[AgentService/DodaiCanvasStream] Erreur pendant le streaming d'artefact:", error);
+      try {
+        port.postMessage({
+          type: StreamEventType.STREAM_ERROR,
+          error: errorMessage,
+        });
+        port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: modelName });
+      } catch (portError) {
+        logger.warn(
+          "[AgentService/DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après échec interne:",
+          portError,
+        );
       }
     }
   }

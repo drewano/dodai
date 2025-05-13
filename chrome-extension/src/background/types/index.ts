@@ -106,6 +106,9 @@ export enum MessageType {
 
   // Nouveau type pour modifier un artefact existant
   MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST = 'MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST',
+
+  // Nouveau type pour la génération d'artefacts en streaming dans Dodai Canvas
+  GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST = 'GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST',
 }
 
 /**
@@ -370,4 +373,22 @@ export interface ModifyDodaiCanvasArtifactResponse {
   artifact?: string;
   error?: string;
   model?: string;
+}
+
+// --- Dodai Canvas Streaming Types ---
+export interface GenerateDodaiCanvasArtifactStreamRequestMessage extends BaseRuntimeMessage {
+  type: MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST;
+  payload: {
+    prompt: string;
+    history?: ChatHistoryMessage[];
+    portId: string; // Important pour identifier le port de streaming
+  };
+}
+
+export interface GenerateDodaiCanvasArtifactStreamResponse {
+  type: StreamEventType; // STREAM_START, STREAM_CHUNK, STREAM_END, STREAM_ERROR
+  chunk?: string; // For STREAM_CHUNK
+  success?: boolean; // For STREAM_END
+  error?: string; // For STREAM_ERROR
+  model?: string; // Nom du modèle qui a généré la réponse (envoyé avec STREAM_START et STREAM_END)
 }

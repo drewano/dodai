@@ -15,50 +15,64 @@ const ArtifactPanel = () => {
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { currentArtifact, isLoading, updateCurrentArtifactContent, modifyCurrentArtifact } = useDodai();
+  const {
+    currentArtifact,
+    isLoading, // General loading from context (e.g., for initial generation, modification)
+    updateCurrentArtifactContent,
+    modifyCurrentArtifact,
+    isStreamingArtifact, // New state from context to know if artifact is streaming
+  } = useDodai();
 
   // BlockNote Editor
   const editor = useCreateBlockNote();
 
   // Obtenir le contenu actuel basé sur currentIndex
-  const currentContent: ArtifactContentV3 | undefined = currentArtifact?.contents[currentArtifact.currentIndex];
+  const currentContent: ArtifactContentV3 | undefined =
+    currentArtifact?.contents[currentArtifact.currentIndex];
 
   const isMarkdown = currentContent?.type === 'text';
   const isCode = currentContent?.type === 'code';
 
-  // Charger le contenu dans BlockNote
+  // Effect to load/update editor content when currentArtifact changes, including during streaming
   useEffect(() => {
-    // Vérifier si on est en mode chargement, si l'éditeur est défini et si le contenu est du markdown
-    if (editor && !isLoading && currentArtifact && currentContent && isMarkdown) {
+    if (editor && currentArtifact && currentContent && isMarkdown) {
       const markdown = (currentContent as ArtifactMarkdownV3).fullMarkdown;
-      // Convertir le markdown en blocks et mettre à jour l'éditeur
-      editor.tryParseMarkdownToBlocks(markdown).then(blocks => {
-        editor.replaceBlocks(editor.document, blocks);
+      // Check if the editor content is already the same as the markdown from context
+      // This is a simple check; more sophisticated diffing might be needed for complex scenarios
+      // to avoid unnecessary re-renders or cursor jumps if the user is also editing (though editing is disabled during stream).
+      const currentEditorMarkdownPromise = editor.blocksToMarkdownLossy(editor.document);
+      currentEditorMarkdownPromise.then(currentEditorMarkdown => {
+        if (currentEditorMarkdown !== markdown) {
+          editor.tryParseMarkdownToBlocks(markdown).then(blocks => {
+            // It is important to replace blocks only when content has actually changed
+            // to avoid disrupting user cursor or selection if they were somehow able to edit.
+            editor.replaceBlocks(editor.document, blocks);
+          });
+        }
       });
     }
-    // Dépendances : l'éditeur, l'état de chargement, l'artefact et son contenu actuel
-  }, [editor, isLoading, currentArtifact, currentContent, isMarkdown]);
+    // This effect should run whenever the markdown content itself changes,
+    // or when the editor/artifact instance changes.
+  }, [editor, currentContent, currentArtifact, isMarkdown]); // Added currentArtifact dependency
 
-  // Debounce pour la sauvegarde du contenu de l'éditeur
+  // Debounce for the manual update of the content from the editor to the context
   const debouncedUpdate = useCallback(
     debounce((markdown: string) => {
-      // Ne pas mettre à jour si on est en train de charger depuis le contexte
-      // La vérification isLoading dans useEffect devrait déjà empêcher ça, mais double sécurité
-      if (!isLoading && currentArtifact && currentArtifact.contents[currentArtifact.currentIndex]?.type === 'text') {
-        updateCurrentArtifactContent(markdown);
+      // Do not update if streaming, or general loading, or not a text artifact
+      if (isLoading || isStreamingArtifact || !currentArtifact || currentContent?.type !== 'text') {
+        return;
       }
+      updateCurrentArtifactContent(markdown);
     }, 1000), // Délai de 1 seconde
-    [updateCurrentArtifactContent, isLoading, currentArtifact], // Dépendances pour recréer la fonction debounce si nécessaire
+    [updateCurrentArtifactContent, isLoading, isStreamingArtifact, currentArtifact, currentContent], // Include all relevant dependencies
   );
 
-  // Gérer les changements dans l'éditeur BlockNote
+  // Gérer les changements dans l'éditeur BlockNote (par l'utilisateur)
   const handleEditorContentChange = async () => {
-    if (!editor || !isMarkdown) return; // Ne rien faire si pas markdown
+    // Do not process changes if streaming, general loading, or not markdown.
+    if (!editor || isLoading || isStreamingArtifact) return; 
 
-    // Obtenir le contenu actuel en markdown
     const markdown = await editor.blocksToMarkdownLossy(editor.document);
-
-    // Appeler la fonction debounced
     debouncedUpdate(markdown);
   };
 
@@ -75,50 +89,39 @@ const ArtifactPanel = () => {
 
   // Sauvegarder l'artefact actuel dans les notes
   const saveToNotes = async () => {
-    if (!currentArtifact || !currentContent) return; // Vérifier si l'artefact existe
+    if (!currentArtifact || !currentContent || isStreamingArtifact) return; // Do not save while streaming
 
     try {
       setIsSaving(true);
       setSaveError(null);
 
-      // Récupérer le contenu de l'artefact
       const content = isMarkdown
         ? (currentContent as ArtifactMarkdownV3).fullMarkdown
         : (currentContent as ArtifactCodeV3).code;
-      const titleFromContent = currentContent.title; // Utiliser le titre du contenu actuel
+      const titleFromContent = currentContent.title;
 
-      // Vérifier que le contenu n'est pas vide
       if (!content.trim()) {
         setSaveError('Impossible de sauvegarder un artefact vide');
         setIsSaving(false);
         return;
       }
 
-      // Générer un titre à partir des premiers mots
       let title = titleFromContent || 'Artefact Dodai Canvas';
-
-      // Si le titre est générique, essayer de générer un meilleur titre à partir du contenu
-      if (title === 'Artefact généré' || title === 'Bienvenue sur Dodai Canvas' || title === 'Nouvel artefact') {
-        // Extraire les premiers mots (50 caractères max) pour le titre
+      if (title === 'Artefact généré' || title === 'Bienvenue sur Dodai Canvas' || title === 'Nouvel artefact' || title.startsWith('En cours:')) {
         const firstLine = content.split('\n')[0];
-        const rawTitle = firstLine.replace(/^#+ /, ''); // Enlever les # du Markdown
-        title = rawTitle.length > 50 ? `${rawTitle.substring(0, 47)}...` : rawTitle;
+        const rawTitle = firstLine.replace(/^#+ /, '');
+        title = rawTitle.length > 50 ? `${rawTitle.substring(0, 47)}...` : rawTitle || 'Artefact sauvegardé';
       }
 
-      // Préparer le contenu selon le type d'artefact
       let noteContent = '';
       if (isMarkdown) {
         noteContent = content;
       } else if (isCode) {
-        // Pour le code, l'encapsuler dans un bloc de code
         const language = (currentContent as ArtifactCodeV3).language || '';
         noteContent = `# ${title}\n\n\`\`\`${language}\n${content}\n\`\`\``;
       }
 
-      // Générer un ID temporaire
       const tempId = Date.now().toString(36) + Math.random().toString(36).substring(2, 9);
-
-      // Sauvegarder dans notesStorage
       await notesStorage.addNote({
         id: tempId,
         title: title,
@@ -127,7 +130,6 @@ const ArtifactPanel = () => {
         parentId: null,
       });
 
-      // Afficher une notification de succès
       setSaveSuccess(true);
     } catch (error) {
       console.error("Erreur lors de la sauvegarde de l'artefact:", error);
@@ -138,9 +140,8 @@ const ArtifactPanel = () => {
     }
   };
 
-  // Fonctions pour la barre d'outils de modification
   const handleMakeConcise = async () => {
-    if (!editor || !isMarkdown || !currentArtifact) return;
+    if (!editor || !isMarkdown || !currentArtifact || isLoading || isStreamingArtifact) return;
     const currentMarkdown = await editor.blocksToMarkdownLossy(editor.document);
     if (currentMarkdown.trim()) {
       modifyCurrentArtifact('Rends ce texte plus concis et direct.', currentMarkdown);
@@ -148,7 +149,7 @@ const ArtifactPanel = () => {
   };
 
   const handleProfessionalTone = async () => {
-    if (!editor || !isMarkdown || !currentArtifact) return;
+    if (!editor || !isMarkdown || !currentArtifact || isLoading || isStreamingArtifact) return;
     const currentMarkdown = await editor.blocksToMarkdownLossy(editor.document);
     if (currentMarkdown.trim()) {
       modifyCurrentArtifact('Adapte ce texte pour un ton plus professionnel.', currentMarkdown);
@@ -156,7 +157,7 @@ const ArtifactPanel = () => {
   };
 
   const handleExplainSimply = async () => {
-    if (!editor || !isMarkdown || !currentArtifact) return;
+    if (!editor || !isMarkdown || !currentArtifact || isLoading || isStreamingArtifact) return;
     const currentMarkdown = await editor.blocksToMarkdownLossy(editor.document);
     if (currentMarkdown.trim()) {
       modifyCurrentArtifact(
@@ -168,10 +169,9 @@ const ArtifactPanel = () => {
 
   return (
     <div className="flex flex-col h-full bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
-      {/* En-tête */}
       <div className="p-2 border-b border-slate-300 dark:border-slate-700 flex justify-between items-center bg-slate-200 dark:bg-slate-800 shadow-sm">
         <div className="flex items-center">
-          <div className="text-lg font-medium mr-2">{currentContent?.title}</div>
+          <div className="text-lg font-medium mr-2">{currentContent?.title || (isStreamingArtifact ? 'Génération...' : 'Nouvel Artefact')}</div>
           <div className="text-xs px-2 py-0.5 rounded bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
             {currentContent?.type === 'text'
               ? 'Markdown'
@@ -187,7 +187,7 @@ const ArtifactPanel = () => {
             focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-500/50
             disabled:opacity-50 disabled:cursor-not-allowed"
             onClick={saveToNotes}
-            disabled={isSaving || isLoading || !currentArtifact}>
+            disabled={isSaving || isLoading || isStreamingArtifact || !currentArtifact}>
             {isSaving ? (
               <div className="flex items-center">
                 <svg
@@ -210,8 +210,7 @@ const ArtifactPanel = () => {
         </div>
       </div>
 
-      {/* Barre d'outils de modification - Affichée seulement si c'est du markdown et pas en chargement */}
-      {isMarkdown && !isLoading && (
+      {isMarkdown && !isLoading && !isStreamingArtifact && (
         <MarkdownToolbar
           onConcise={handleMakeConcise}
           onProfessionalTone={handleProfessionalTone}
@@ -219,7 +218,6 @@ const ArtifactPanel = () => {
         />
       )}
 
-      {/* Notification de succès/échec */}
       {saveSuccess !== null && (
         <div
           className={`p-2 text-center text-sm font-medium ${
@@ -233,8 +231,7 @@ const ArtifactPanel = () => {
         </div>
       )}
 
-      {/* État de chargement */}
-      {isLoading && (
+      {(isLoading || isStreamingArtifact) && !isSaving && (
         <div className="p-2 text-center text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 animate-pulse">
           <div className="flex items-center justify-center">
             <svg
@@ -248,32 +245,28 @@ const ArtifactPanel = () => {
                 fill="currentColor"
                 d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            Mise à jour de l'artefact en cours...
+            {isStreamingArtifact ? "Réception de l'artefact en cours..." : "Mise à jour de l'artefact en cours..."}
           </div>
         </div>
       )}
 
-      {/* Contenu */}
       <div className="flex-1 overflow-auto">
-        {isLoading ? (
-          <div className="flex items-center justify-center h-full">
-            <svg
-              className="animate-spin h-8 w-8 text-blue-500"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-          </div>
+        {(isLoading || isStreamingArtifact) && isMarkdown ? (
+          // Show a simplified view or placeholder when BlockNote is loading/streaming markdown to avoid aggressive re-renders of the full editor.
+          // Or, allow BlockNoteView to render but ensure it's truly read-only and doesn't steal focus or cause jumps.
+          // For now, we let BlockNoteView handle its rendering, but it is set to editable=false.
+          <BlockNoteView
+            editor={editor}
+            editable={false} // Strictly non-editable during streaming/loading
+            theme="light"
+            // onChange should not fire if editable is false, but good to be defensive.
+            // onChange={handleEditorContentChange} // Potentially remove if editable=false guarantees no change events
+          />
         ) : isMarkdown ? (
           <div className="h-full p-0">
             <BlockNoteView
               editor={editor}
-              editable={!isLoading && isMarkdown}
+              editable={!isLoading && !isStreamingArtifact && isMarkdown} // Editable only when not loading/streaming
               theme="light"
               onChange={handleEditorContentChange}
             />

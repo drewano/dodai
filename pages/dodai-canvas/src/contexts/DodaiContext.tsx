@@ -1,11 +1,11 @@
 import type { ReactNode } from 'react';
 import type React from 'react';
-import { createContext, useContext, useState } from 'react';
+import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid'; // Besoin pour les IDs de messages
 import type { Message, ArtifactV3, ArtifactMarkdownV3 } from '../types'; // ArtifactContentV3 supprimé
-import { MessageType } from '../../../../chrome-extension/src/background/types'; // Importer MessageType
+import { MessageType, StreamEventType } from '../../../../chrome-extension/src/background/types'; // Importer MessageType and StreamEventType
 import type {
-  GenerateDodaiCanvasArtifactResponse,
+  GenerateDodaiCanvasArtifactStreamResponse, // For handling stream responses
   ChatHistoryMessage,
   ModifyDodaiCanvasArtifactResponse, // Ajouter le type de réponse pour la modification
 } from '../../../../chrome-extension/src/background/types'; // Formatage import
@@ -21,9 +21,11 @@ interface DodaiContextType {
   setArtifactHistory: React.Dispatch<React.SetStateAction<ArtifactV3[]>>;
   isLoading: boolean;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
+  isStreamingArtifact: boolean; // Added for artifact streaming state
   sendPromptAndGenerateArtifact: (prompt: string) => Promise<void>;
   updateCurrentArtifactContent: (newMarkdown: string) => void;
   modifyCurrentArtifact: (promptSuffix: string, currentMarkdown: string) => Promise<void>; // Nouvelle fonction
+  cancelCurrentStreaming: () => void; // New function to cancel streaming
 }
 
 const defaultContext: DodaiContextType = {
@@ -37,9 +39,11 @@ const defaultContext: DodaiContextType = {
   setArtifactHistory: () => {},
   isLoading: false,
   setIsLoading: () => {},
+  isStreamingArtifact: false, // Added default value
   sendPromptAndGenerateArtifact: async () => {},
   updateCurrentArtifactContent: () => {},
   modifyCurrentArtifact: async () => {}, // Valeur par défaut
+  cancelCurrentStreaming: () => {}, // Default for cancel
 };
 
 const DodaiContext = createContext<DodaiContextType>(defaultContext);
@@ -56,6 +60,11 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
   const [currentArtifact, setCurrentArtifact] = useState<ArtifactV3 | null>(null);
   const [artifactHistory, setArtifactHistory] = useState<ArtifactV3[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [isStreamingArtifact, setIsStreamingArtifact] = useState(false); // Specific state for artifact streaming
+
+  const streamingPort = useRef<chrome.runtime.Port | null>(null);
+  const streamingPortId = useRef<string | null>(null);
+  const currentStreamingPrompt = useRef<string | null>(null); // To store the prompt that initiated streaming
 
   // Fonction utilitaire pour générer un titre simple
   const generateTitleFromMarkdown = (markdown: string): string => {
@@ -65,9 +74,53 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
     return rawTitle.length > 50 ? `${rawTitle.substring(0, 47)}...` : rawTitle || 'Artefact édité';
   };
 
+  const cleanupStreamingConnection = useCallback(() => {
+    if (streamingPort.current) {
+      try {
+        streamingPort.current.disconnect();
+      } catch (e) {
+        console.warn('[DodaiCanvas] Erreur lors de la déconnexion du port:', e);
+      }
+      streamingPort.current = null;
+      streamingPortId.current = null;
+    }
+    setIsLoading(false); // General loading
+    setIsStreamingArtifact(false); // Specific artifact streaming loading
+    currentStreamingPrompt.current = null;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      cleanupStreamingConnection();
+    };
+  }, [cleanupStreamingConnection]);
+
+  const cancelCurrentStreaming = useCallback(() => {
+    if (streamingPort.current && streamingPortId.current) {
+      console.log('[DodaiCanvas] Annulation du streaming demandée pour le port:', streamingPortId.current);
+      // Notify background to cancel if it supports it (not implemented in this iteration)
+      // For now, just disconnect locally
+      cleanupStreamingConnection();
+      // Update messages to reflect cancellation
+      setMessages(prev =>
+        prev.map(msg =>
+          msg.role === 'assistant' && msg.content.includes('...') // A simple way to find the placeholder
+            ? { ...msg, content: "Génération d'artefact annulée par l'utilisateur." }
+            : msg,
+        ),
+      );
+    }
+  }, [cleanupStreamingConnection]);
+
   // Fonction pour envoyer le prompt et générer/modifier l'artefact
   const sendPromptAndGenerateArtifact = async (prompt: string) => {
     if (!prompt.trim()) return;
+    if (isLoading || isStreamingArtifact) {
+      console.warn("[DodaiCanvas] Tentative d'envoi de prompt pendant une opération en cours.");
+      return;
+    }
+
+    currentStreamingPrompt.current = prompt;
 
     const userMessage: Message = {
       id: uuidv4(),
@@ -76,98 +129,225 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
       timestamp: Date.now(),
     };
 
-    // Ajouter le message user et un message placeholder pour l'assistant
     const assistantPlaceholderId = uuidv4();
     const assistantPlaceholderMessage: Message = {
       id: assistantPlaceholderId,
       role: 'assistant',
-      content: '...', // Placeholder pendant la génération
-      timestamp: Date.now() + 1, // Légèrement après le message user
+      content: "Génération de l'artefact en cours...", // Placeholder pendant la génération
+      timestamp: Date.now() + 1,
     };
 
     setMessages(prev => [...prev, userMessage, assistantPlaceholderMessage]);
-    setChatInput(''); // Vider l'input après envoi
+    setChatInput('');
     setIsLoading(true);
+    setIsStreamingArtifact(true);
 
-    try {
-      // Préparer l'historique pour le backend
-      const historyToSend: ChatHistoryMessage[] = messages.map(msg => ({
-        role: msg.role === 'user' ? 'user' : 'assistant', // Simplification role
-        content: msg.content,
-      }));
+    // 1. Initialiser la connexion de streaming
+    const uniquePortId = `dodai_canvas_artifact_stream_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+    streamingPortId.current = uniquePortId;
+    const port = chrome.runtime.connect({ name: uniquePortId });
+    streamingPort.current = port;
 
-      // Envoyer la requête au background script
-      // Pour l'instant, on appelle toujours GENERATE, la modification viendra plus tard
-      const response: GenerateDodaiCanvasArtifactResponse = await chrome.runtime.sendMessage({
-        type: MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_REQUEST,
-        payload: {
-          prompt: prompt,
-          history: historyToSend,
-        },
-      });
+    // 2. Configurer les écouteurs de port
+    port.onMessage.addListener((message: GenerateDodaiCanvasArtifactStreamResponse) => {
+      switch (message.type) {
+        case StreamEventType.STREAM_START:
+          console.log("[DodaiCanvas] Début du streaming d'artefact", message.model);
+          // Initialiser l'artefact placeholder
+          setCurrentArtifact({
+            currentIndex: 0,
+            contents: [
+              {
+                type: 'text', // Default to text
+                title: `En cours: ${generateTitleFromMarkdown(currentStreamingPrompt.current || prompt)}`,
+                fullMarkdown: '',
+              },
+            ],
+          });
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === assistantPlaceholderId
+                ? {
+                    ...msg,
+                    content: `Génération avec ${message.model || 'le modèle par défaut'} commencée...`,
+                  }
+                : msg,
+            ),
+          );
+          break;
 
-      if (response.success && response.artifact) {
-        // Créer le nouvel artefact
-        const artifactContent: ArtifactMarkdownV3 = {
-          type: 'text', // TODO: Détecter le type (code/text) plus tard
-          title: generateTitleFromMarkdown(response.artifact), // Utiliser la fonction utilitaire
-          fullMarkdown: response.artifact,
-          // language: 'plaintext', // Pourrait être ajouté si type 'code'
-        };
+        case StreamEventType.STREAM_CHUNK:
+          if (message.chunk) {
+            setCurrentArtifact(prevArtifact => {
+              if (!prevArtifact) return null; // Should not happen if STREAM_START was handled
+              const currentContent = prevArtifact.contents[0] as ArtifactMarkdownV3;
+              const newMarkdown = currentContent.fullMarkdown + message.chunk;
+              return {
+                ...prevArtifact,
+                contents: [
+                  {
+                    ...currentContent,
+                    fullMarkdown: newMarkdown,
+                    title: generateTitleFromMarkdown(newMarkdown), // Update title as content grows
+                  },
+                ],
+              };
+            });
+          }
+          break;
 
-        const newArtifact: ArtifactV3 = {
-          currentIndex: 0, // Le nouveau contenu est à l'index 0
-          contents: [artifactContent], // Commence avec un seul contenu
-        };
+        case StreamEventType.STREAM_END:
+          console.log("[DodaiCanvas] Fin du streaming d'artefact, succès:", message.success);
+          if (message.success) {
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? {
+                      ...msg,
+                      content: `Artefact généré avec succès ! (Modèle: ${message.model || 'inconnu'})\nVous pouvez le consulter dans le panneau de droite.`,
+                    }
+                  : msg,
+              ),
+            );
+            // Finaliser l'artefact dans l'historique
+            // La version finale de currentArtifact est déjà là grâce aux chunks
+            if (currentArtifact) {
+              setArtifactHistory(prev => [...prev, currentArtifact]);
+            }
+          } else {
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? {
+                      ...msg,
+                      content: `Erreur lors de la génération : ${message.error || 'Erreur inconnue'}`,
+                    }
+                  : msg,
+              ),
+            );
+            // Peut-être réinitialiser currentArtifact ou le marquer comme erroné
+            setCurrentArtifact(prev =>
+              prev
+                ? {
+                    ...prev,
+                    contents: [{ ...(prev.contents[0] as ArtifactMarkdownV3), title: 'Erreur de génération' }],
+                  }
+                : null,
+            );
+          }
+          cleanupStreamingConnection();
+          break;
 
-        // Mettre à jour les états
-        setCurrentArtifact(newArtifact);
-        setArtifactHistory(prev => [...prev, newArtifact]);
+        case StreamEventType.STREAM_ERROR:
+          console.error("[DodaiCanvas] Erreur de streaming d'artefact:", message.error);
+          setMessages(prev =>
+            prev.map(msg =>
+              msg.id === assistantPlaceholderId
+                ? {
+                    ...msg,
+                    content: `Erreur de streaming : ${message.error || 'Erreur inconnue'}`,
+                  }
+                : msg,
+            ),
+          );
+          cleanupStreamingConnection();
+          break;
 
-        // Mettre à jour le message de l'assistant avec une confirmation
+        default:
+          console.warn("[DodaiCanvas] Message de streaming d'artefact inconnu:", message);
+      }
+    });
+
+    port.onDisconnect.addListener(() => {
+      console.log("[DodaiCanvas] Port de streaming d'artefact déconnecté");
+      // Only consider it an error if it was not a clean STREAM_END
+      if (isLoading && isStreamingArtifact) {
         setMessages(prev =>
           prev.map(msg =>
-            msg.id === assistantPlaceholderId
+            msg.id === assistantPlaceholderId && msg.content.includes('...')
               ? {
                   ...msg,
-                  content: `Artefact généré avec succès ! (Modèle: ${response.model || 'inconnu'})\n\nVous pouvez le consulter dans le panneau de droite.`,
-                }
-              : msg,
-          ),
-        );
-      } else {
-        // Gérer l'erreur
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantPlaceholderId
-              ? {
-                  ...msg,
-                  content: `Désolé, une erreur est survenue: ${response.error || 'Erreur inconnue'}`,
+                  content: "Connexion perdue pendant la génération de l'artefact.",
                 }
               : msg,
           ),
         );
       }
+      cleanupStreamingConnection(); // Ensure cleanup happens
+    });
+
+    // 3. Envoyer la requête au background
+    try {
+      const historyToSend: ChatHistoryMessage[] = messages
+        .filter(msg => msg.id !== assistantPlaceholderId) // Exclude current placeholder
+        .map(msg => ({
+          role: msg.role === 'user' ? 'user' : 'assistant',
+          content: msg.content,
+        }));
+
+      chrome.runtime.sendMessage(
+        {
+          type: MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST,
+          payload: {
+            prompt: prompt,
+            history: historyToSend,
+            portId: uniquePortId,
+          },
+        },
+        response => {
+          if (chrome.runtime.lastError) {
+            console.error("[DodaiCanvas] Erreur lors de l'envoi du message de streaming:", chrome.runtime.lastError);
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? {
+                      ...msg,
+                      content: `Erreur de communication (envoi): ${chrome.runtime.lastError?.message || 'Inconnue'}`,
+                    }
+                  : msg,
+              ),
+            );
+            cleanupStreamingConnection();
+            return;
+          }
+          // The initial response from sendMessage is just an ack or immediate error, not the stream itself.
+          if (response && !response.success) {
+            console.error('[DodaiCanvas] Le background a refusé la requête de streaming:', response.error);
+            setMessages(prev =>
+              prev.map(msg =>
+                msg.id === assistantPlaceholderId
+                  ? {
+                      ...msg,
+                      content: `Erreur (refus background): ${response.error || 'Inconnue'}`,
+                    }
+                  : msg,
+              ),
+            );
+            cleanupStreamingConnection();
+          }
+          // else: Streaming setup was successful on background side, waiting for port messages.
+        },
+      );
     } catch (error) {
-      console.error("Erreur lors de l'envoi du message au background:", error);
-      // Gérer l'erreur de communication
+      console.error("[DodaiCanvas] Erreur lors de la préparation de l'envoi du message de streaming:", error);
       setMessages(prev =>
         prev.map(msg =>
           msg.id === assistantPlaceholderId
             ? {
                 ...msg,
-                content: `Erreur de communication avec l'extension: ${error instanceof Error ? error.message : String(error)}`,
+                content: `Erreur (préparation): ${error instanceof Error ? error.message : String(error)}`,
               }
             : msg,
         ),
       );
-    } finally {
-      setIsLoading(false);
+      cleanupStreamingConnection();
     }
   };
 
   // Fonction pour mettre à jour le contenu de l'artefact actuel via BlockNote
   const updateCurrentArtifactContent = (newMarkdown: string) => {
+    if (isStreamingArtifact) return; // Ne pas permettre l'édition manuelle pendant le streaming
+
     setCurrentArtifact(prevArtifact => {
       if (!prevArtifact) return null; // Ne rien faire si pas d'artefact
 
@@ -325,9 +505,11 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
     setArtifactHistory,
     isLoading,
     setIsLoading,
+    isStreamingArtifact,
     sendPromptAndGenerateArtifact,
     updateCurrentArtifactContent,
     modifyCurrentArtifact,
+    cancelCurrentStreaming,
   };
 
   return <DodaiContext.Provider value={value}>{children}</DodaiContext.Provider>;

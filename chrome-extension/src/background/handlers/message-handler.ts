@@ -25,8 +25,9 @@ import type {
   GenerateDodaiCanvasArtifactResponse,
   ModifyDodaiCanvasArtifactRequest,
   ModifyDodaiCanvasArtifactResponse,
+  GenerateDodaiCanvasArtifactStreamRequestMessage,
 } from '../types';
-import { convertChatHistory, MessageType } from '../types';
+import { convertChatHistory, MessageType, StreamEventType } from '../types';
 import { stateService } from '../services/state-service';
 import { agentService } from '../services/agent-service';
 import { mcpService } from '../services/mcp-service';
@@ -77,6 +78,8 @@ export class MessageHandler {
       this.handleGenerateDodaiCanvasArtifact(message as GenerateDodaiCanvasArtifactRequest, sender),
     [MessageType.MODIFY_DODAI_CANVAS_ARTIFACT_REQUEST]: (message: BaseRuntimeMessage, sender) =>
       this.handleModifyDodaiCanvasArtifact(message as ModifyDodaiCanvasArtifactRequest, sender),
+    [MessageType.GENERATE_DODAI_CANVAS_ARTIFACT_STREAM_REQUEST]: (message: BaseRuntimeMessage, sender) =>
+      this.handleGenerateDodaiCanvasArtifactStream(message as GenerateDodaiCanvasArtifactStreamRequestMessage, sender),
   };
 
   /**
@@ -1019,6 +1022,90 @@ Instruction de modification: ${prompt}`;
       return {
         success: false,
         error: error instanceof Error ? error.message : 'Erreur inconnue lors de la modification.',
+      };
+    }
+  }
+
+  /**
+   * Gestionnaire pour la génération d'artefacts en streaming pour Dodai Canvas.
+   */
+  private async handleGenerateDodaiCanvasArtifactStream(
+    message: GenerateDodaiCanvasArtifactStreamRequestMessage,
+    _sender: chrome.runtime.MessageSender,
+  ): Promise<{ success: boolean; streaming?: boolean; error?: string }> {
+    const { prompt, history: chatHistoryPayload, portId } = message.payload;
+    logger.debug('[DodaiCanvasStream] Traitement de la requête de génération en streaming', {
+      promptLength: prompt.length,
+      historyLength: chatHistoryPayload?.length || 0,
+      portId: portId,
+    });
+
+    const streamingPortInfo = stateService.getStreamingPort(portId);
+
+    if (!streamingPortInfo || !streamingPortInfo.port) {
+      logger.error(`[DodaiCanvasStream] Port de streaming non trouvé pour portId: ${portId}`);
+      return {
+        success: false,
+        error: `Port de streaming ${portId} non trouvé ou invalide.`,
+      };
+    }
+    const { port } = streamingPortInfo;
+
+    try {
+      const isReady = await agentService.isAgentReady();
+      if (!isReady) {
+        port.postMessage({
+          type: StreamEventType.STREAM_ERROR,
+          error: "L'agent IA n'est pas prêt. Vérifiez les paramètres.",
+        });
+        port.postMessage({ type: StreamEventType.STREAM_END, success: false });
+        return { success: false, error: 'Agent not ready', streaming: true };
+      }
+
+      const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
+      const settings = await aiAgentStorage.get();
+      const modelName = settings.selectedModel;
+
+      port.postMessage({ type: StreamEventType.STREAM_START, model: modelName });
+
+      agentService
+        .streamArtifactGeneration(prompt, history, port, modelName)
+        .then(() => {
+          logger.debug('[DodaiCanvasStream] Streaming terminé avec succès par agentService pour le port', portId);
+        })
+        .catch(error => {
+          logger.error("[DodaiCanvasStream] Erreur lors du streaming d'artefact via agentService:", error);
+          try {
+            port.postMessage({
+              type: StreamEventType.STREAM_ERROR,
+              error: error instanceof Error ? error.message : "Erreur inconnue durant le streaming d'artefact",
+            });
+            port.postMessage({ type: StreamEventType.STREAM_END, success: false });
+          } catch (portError) {
+            logger.warn(
+              "[DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après échec agentService:",
+              portError,
+            );
+          }
+        });
+
+      return { success: true, streaming: true };
+    } catch (error) {
+      logger.error("[DodaiCanvasStream] Erreur majeure avant le lancement du streaming d'artefact:", error);
+      try {
+        port.postMessage({
+          type: StreamEventType.STREAM_ERROR,
+          error: error instanceof Error ? error.message : "Erreur inconnue avant le lancement du streaming d'artefact",
+        });
+        port.postMessage({ type: StreamEventType.STREAM_END, success: false });
+      } catch (portError) {
+        logger.warn("[DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après erreur majeure:", portError);
+      }
+      return {
+        success: false,
+        error:
+          error instanceof Error ? error.message : "Erreur inconnue lors de la préparation du streaming d'artefact",
+        streaming: true,
       };
     }
   }
