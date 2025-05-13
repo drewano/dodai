@@ -1,7 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useDodai } from '../contexts/DodaiContext';
 import type { ArtifactMarkdownV3, ArtifactCodeV3, ArtifactContentV3 } from '../types';
 import { notesStorage } from '@extension/storage';
+import { debounce } from 'lodash';
+import MarkdownToolbar from './MarkdownToolbar';
 
 // BlockNote Imports
 import { useCreateBlockNote } from '@blocknote/react';
@@ -13,7 +15,7 @@ const ArtifactPanel = () => {
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
-  const { currentArtifact, isLoading } = useDodai();
+  const { currentArtifact, isLoading, updateCurrentArtifactContent, modifyCurrentArtifact } = useDodai();
 
   // BlockNote Editor
   const editor = useCreateBlockNote();
@@ -36,6 +38,29 @@ const ArtifactPanel = () => {
     }
     // Dépendances : l'éditeur, l'état de chargement, l'artefact et son contenu actuel
   }, [editor, isLoading, currentArtifact, currentContent, isMarkdown]);
+
+  // Debounce pour la sauvegarde du contenu de l'éditeur
+  const debouncedUpdate = useCallback(
+    debounce((markdown: string) => {
+      // Ne pas mettre à jour si on est en train de charger depuis le contexte
+      // La vérification isLoading dans useEffect devrait déjà empêcher ça, mais double sécurité
+      if (!isLoading && currentArtifact && currentArtifact.contents[currentArtifact.currentIndex]?.type === 'text') {
+        updateCurrentArtifactContent(markdown);
+      }
+    }, 1000), // Délai de 1 seconde
+    [updateCurrentArtifactContent, isLoading, currentArtifact], // Dépendances pour recréer la fonction debounce si nécessaire
+  );
+
+  // Gérer les changements dans l'éditeur BlockNote
+  const handleEditorContentChange = async () => {
+    if (!editor || !isMarkdown) return; // Ne rien faire si pas markdown
+
+    // Obtenir le contenu actuel en markdown
+    const markdown = await editor.blocksToMarkdownLossy(editor.document);
+
+    // Appeler la fonction debounced
+    debouncedUpdate(markdown);
+  };
 
   // Masquer la notification de succès/échec après 3 secondes
   useEffect(() => {
@@ -113,6 +138,34 @@ const ArtifactPanel = () => {
     }
   };
 
+  // Fonctions pour la barre d'outils de modification
+  const handleMakeConcise = async () => {
+    if (!editor || !isMarkdown || !currentArtifact) return;
+    const currentMarkdown = await editor.blocksToMarkdownLossy(editor.document);
+    if (currentMarkdown.trim()) {
+      modifyCurrentArtifact('Rends ce texte plus concis et direct.', currentMarkdown);
+    }
+  };
+
+  const handleProfessionalTone = async () => {
+    if (!editor || !isMarkdown || !currentArtifact) return;
+    const currentMarkdown = await editor.blocksToMarkdownLossy(editor.document);
+    if (currentMarkdown.trim()) {
+      modifyCurrentArtifact('Adapte ce texte pour un ton plus professionnel.', currentMarkdown);
+    }
+  };
+
+  const handleExplainSimply = async () => {
+    if (!editor || !isMarkdown || !currentArtifact) return;
+    const currentMarkdown = await editor.blocksToMarkdownLossy(editor.document);
+    if (currentMarkdown.trim()) {
+      modifyCurrentArtifact(
+        'Explique ce texte de manière simple, comme si tu parlais à un enfant de 10 ans.',
+        currentMarkdown,
+      );
+    }
+  };
+
   return (
     <div className="flex flex-col h-full bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100">
       {/* En-tête */}
@@ -156,6 +209,15 @@ const ArtifactPanel = () => {
           </button>
         </div>
       </div>
+
+      {/* Barre d'outils de modification - Affichée seulement si c'est du markdown et pas en chargement */}
+      {isMarkdown && !isLoading && (
+        <MarkdownToolbar
+          onConcise={handleMakeConcise}
+          onProfessionalTone={handleProfessionalTone}
+          onExplainSimply={handleExplainSimply}
+        />
+      )}
 
       {/* Notification de succès/échec */}
       {saveSuccess !== null && (
@@ -209,7 +271,12 @@ const ArtifactPanel = () => {
           </div>
         ) : isMarkdown ? (
           <div className="h-full p-0">
-            <BlockNoteView editor={editor} editable={true} theme="light" />
+            <BlockNoteView
+              editor={editor}
+              editable={!isLoading && isMarkdown}
+              theme="light"
+              onChange={handleEditorContentChange}
+            />
           </div>
         ) : isCode ? (
           <div className="p-4 h-full">

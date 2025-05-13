@@ -919,20 +919,101 @@ Demande utilisateur: ${prompt}`;
 
   /**
    * Gestionnaire pour la modification d'artefacts pour Dodai Canvas.
-   * Placeholder pour l'instant.
    */
   private async handleModifyDodaiCanvasArtifact(
     message: ModifyDodaiCanvasArtifactRequest,
     sender: chrome.runtime.MessageSender,
   ): Promise<ModifyDodaiCanvasArtifactResponse> {
-    logger.debug("[DodaiCanvas] Traitement de la requête de modification d'artefact", message.payload);
-    // TODO: Implémenter la logique de modification similaire à handleGenerateDodaiCanvasArtifact
-    // en utilisant message.payload.currentArtifact et message.payload.artifactType
-    // Pour l'instant, on retourne une erreur ou un succès vide.
-    return {
-      success: false,
-      error: "La modification d'artifact n'est pas encore implémentée.",
-    };
+    const { prompt, currentArtifact, artifactType, history: chatHistoryPayload } = message.payload;
+    logger.debug("[DodaiCanvas] Traitement de la requête de modification d'artefact", {
+      promptLength: prompt.length,
+      currentArtifactLength: currentArtifact.length,
+      artifactType,
+      historyLength: chatHistoryPayload?.length || 0,
+    });
+
+    // Pour l'instant, on ne gère que la modification de texte
+    if (artifactType !== 'text') {
+      logger.warn("[DodaiCanvas] Type d'artefact non supporté pour la modification:", artifactType);
+      return {
+        success: false,
+        error: `Modification non supportée pour le type d'artefact: ${artifactType}`,
+      };
+    }
+
+    try {
+      const isReady = await agentService.isAgentReady();
+      if (!isReady) {
+        return {
+          success: false,
+          error: "L'agent IA n'est pas prêt. Vérifiez les paramètres.",
+        };
+      }
+
+      const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
+      const settings = await aiAgentStorage.get();
+      const modelName = settings.selectedModel;
+
+      // Prompt système spécifique pour la modification
+      const systemPrompt = `Tu es un assistant d'édition expert. Modifie le texte suivant en suivant précisément l'instruction donnée. Ta réponse DOIT être uniquement le texte modifié intégralement, sans aucune introduction, explication, commentaire ou formatage supplémentaire (comme les backticks markdown si ce n'est pas explicitement demandé par l'instruction).
+
+Texte original à modifier:
+---
+${currentArtifact}
+---
+
+Instruction de modification: ${prompt}`;
+
+      const llm = await agentService.createLLMInstance();
+      // On n'utilise pas l'historique du chat pour la modification, seulement le prompt système et l'instruction.
+      // L'instruction est déjà incluse dans le systemPrompt.
+      const stream = await llm.stream([
+        { type: 'system', content: systemPrompt },
+        // Optionnel: On pourrait ajouter un message 'human' vide ou répétitif si l'API l'exige,
+        // mais idéalement, le system prompt suffit.
+        // { type: 'human', content: "Modifie le texte selon l'instruction ci-dessus." }
+      ]);
+
+      let modifiedArtifact = '';
+      for await (const chunk of stream) {
+        if (typeof chunk.content === 'string') {
+          modifiedArtifact += chunk.content;
+        }
+      }
+
+      if (!modifiedArtifact.trim()) {
+        // Si le modèle ne renvoie rien, on renvoie l'original pour éviter de perdre le contenu
+        logger.warn("[DodaiCanvas] Modification a retourné une chaîne vide. Retour de l'original.");
+        return {
+          success: true, // Considéré comme succès car on ne perd pas de données
+          artifact: currentArtifact, // Renvoyer l'original
+          model: modelName,
+        };
+        // Alternative: retourner une erreur
+        // return {
+        //   success: false,
+        //   error: 'Aucun contenu modifié généré par le modèle.',
+        //   model: modelName,
+        // };
+      }
+
+      logger.debug('[DodaiCanvas] Artefact modifié avec succès', {
+        modifiedArtifactLength: modifiedArtifact.length,
+        model: modelName,
+      });
+
+      return {
+        success: true,
+        artifact: modifiedArtifact,
+        model: modelName,
+      };
+    } catch (error) {
+      logger.error("[DodaiCanvas] Erreur lors de la modification d'artefact:", error);
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Erreur inconnue lors de la modification.',
+      };
+    }
   }
 }
 
