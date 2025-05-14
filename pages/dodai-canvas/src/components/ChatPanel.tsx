@@ -3,6 +3,7 @@ import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { useDodai } from '../contexts/DodaiContext';
 import { History, Send, PlusCircle } from 'lucide-react';
+import { DodaiModelSelector } from './DodaiModelSelector';
 
 // Re-defined suggestion prompts (simplified for this example)
 const suggestionPrompts = [
@@ -27,7 +28,15 @@ const suggestionPrompts = [
 ];
 
 const ChatPanel = () => {
-  const { messages, chatInput, setChatInput, isLoading, sendPromptAndGenerateArtifact } = useDodai();
+  const {
+    messages,
+    chatInput,
+    setChatInput,
+    isLoading,
+    sendPromptAndGenerateArtifact,
+    currentArtifact,
+    isStreamingArtifact,
+  } = useDodai();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [initialHubPrompt, setInitialHubPrompt] = useState(''); // For the dedicated input in hub empty state
 
@@ -54,6 +63,13 @@ const ChatPanel = () => {
 
   const renderInitialHubView = () => (
     <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-850 text-slate-200">
+      {/* Model Selector - Rendered conditionally at the top of the hub view */}
+      {messages.length === 0 && !currentArtifact && !isLoading && !isStreamingArtifact && (
+        <div className="w-full max-w-xl lg:max-w-2xl mb-6 sm:mb-8 flex justify-start">
+          <DodaiModelSelector />
+        </div>
+      )}
+
       <h2 className="text-2xl sm:text-3xl font-semibold text-slate-100 mb-6 sm:mb-8 text-center">
         Comment puis-je vous aider aujourd'hui ?
       </h2>

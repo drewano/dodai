@@ -22,6 +22,8 @@ interface DodaiContextType {
   isLoading: boolean;
   setIsLoading: React.Dispatch<React.SetStateAction<boolean>>;
   isStreamingArtifact: boolean; // Added for artifact streaming state
+  selectedDodaiModel: string | null; // Added for Dodai Canvas specific model
+  setSelectedDodaiModel: (model: string | null) => void; // Added setter
   sendPromptAndGenerateArtifact: (prompt: string) => Promise<void>;
   updateCurrentArtifactContent: (newMarkdown: string) => void;
   modifyCurrentArtifact: (promptSuffix: string, currentMarkdown: string) => Promise<void>; // Nouvelle fonction
@@ -41,6 +43,8 @@ const defaultContext: DodaiContextType = {
   isLoading: false,
   setIsLoading: () => {},
   isStreamingArtifact: false, // Added default value
+  selectedDodaiModel: null, // Initial state
+  setSelectedDodaiModel: () => {}, // Default setter
   sendPromptAndGenerateArtifact: async () => {},
   updateCurrentArtifactContent: () => {},
   modifyCurrentArtifact: async () => {}, // Valeur par défaut
@@ -63,6 +67,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
   const [artifactHistory, setArtifactHistory] = useState<ArtifactV3[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [isStreamingArtifact, setIsStreamingArtifact] = useState(false); // Specific state for artifact streaming
+  const [selectedDodaiModel, setSelectedDodaiModel] = useState<string | null>(null); // State for selected model
 
   const streamingPort = useRef<chrome.runtime.Port | null>(null);
   const streamingPortId = useRef<string | null>(null);
@@ -316,6 +321,7 @@ Vous pouvez le consulter dans le panneau de droite.`,
             prompt: prompt,
             history: historyToSend,
             portId: uniquePortId,
+            modelName: selectedDodaiModel, // Pass selected model
           },
         },
         response => {
@@ -451,6 +457,7 @@ Vous pouvez le consulter dans le panneau de droite.`,
           currentArtifact: currentMarkdown,
           artifactType: 'text',
           history: historyToSend,
+          modelName: selectedDodaiModel, // Pass selected model
         },
       });
 
@@ -522,9 +529,9 @@ Vous pouvez le consulter dans le panneau de droite.`,
   const resetChatAndArtifact = useCallback(() => {
     setMessages([]);
     setCurrentArtifact(null);
+    // setSelectedDodaiModel(null); // Reset model selection if needed, or retain user preference
     setChatInput('');
     // Potentially clear artifactHistory as well if a full reset is desired
-    // setArtifactHistory([]);
     setIsLoading(false);
     setIsStreamingArtifact(false);
     // If a stream was active, ensure it is cleaned up
@@ -546,6 +553,8 @@ Vous pouvez le consulter dans le panneau de droite.`,
     isLoading,
     setIsLoading,
     isStreamingArtifact,
+    selectedDodaiModel, // Expose selected model
+    setSelectedDodaiModel, // Expose setter
     sendPromptAndGenerateArtifact,
     updateCurrentArtifactContent,
     modifyCurrentArtifact,

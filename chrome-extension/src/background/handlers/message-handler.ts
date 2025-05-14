@@ -872,10 +872,11 @@ export class MessageHandler {
     message: GenerateDodaiCanvasArtifactRequest,
     sender: chrome.runtime.MessageSender,
   ): Promise<GenerateDodaiCanvasArtifactResponse> {
-    const { prompt, history: chatHistoryPayload } = message.payload;
+    const { prompt, history: chatHistoryPayload, modelName: modelNameFromPayload } = message.payload;
     logger.debug("[DodaiCanvas] Traitement de la requête de génération d'artefact", {
       promptLength: prompt.length,
       historyLength: chatHistoryPayload?.length || 0,
+      modelNameFromPayload,
     });
 
     try {
@@ -889,7 +890,7 @@ export class MessageHandler {
 
       const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
       const settings = await aiAgentStorage.get();
-      const modelName = settings.selectedModel;
+      const modelToUse = modelNameFromPayload || settings.selectedModel;
 
       const systemPrompt = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré.
 Ta réponse DOIT être uniquement le contenu Markdown brut et directement utilisable.
@@ -900,7 +901,7 @@ Si la demande est explicitement de générer du CODE SOURCE (par exemple Python,
 
 Demande utilisateur: ${prompt}`;
 
-      const llm = await agentService.createLLMInstance();
+      const llm = await agentService.createLLMInstance(modelToUse);
       const stream = await llm.stream([
         ...history,
         { type: 'system', content: systemPrompt },
@@ -918,19 +919,19 @@ Demande utilisateur: ${prompt}`;
         return {
           success: false,
           error: 'Aucun contenu généré par le modèle.',
-          model: modelName,
+          model: modelToUse,
         };
       }
 
       logger.debug('[DodaiCanvas] Artefact généré avec succès', {
         artifactLength: fullArtifact.length,
-        model: modelName,
+        model: modelToUse,
       });
 
       return {
         success: true,
         artifact: fullArtifact,
-        model: modelName,
+        model: modelToUse,
       };
     } catch (error) {
       logger.error("[DodaiCanvas] Erreur lors de la génération d'artefact:", error);
@@ -948,12 +949,13 @@ Demande utilisateur: ${prompt}`;
     message: ModifyDodaiCanvasArtifactRequest,
     sender: chrome.runtime.MessageSender,
   ): Promise<ModifyDodaiCanvasArtifactResponse> {
-    const { prompt, currentArtifact, artifactType, history: chatHistoryPayload } = message.payload;
+    const { prompt, currentArtifact, artifactType, history: chatHistoryPayload, modelName: modelNameFromPayload } = message.payload;
     logger.debug("[DodaiCanvas] Traitement de la requête de modification d'artefact", {
       promptLength: prompt.length,
       currentArtifactLength: currentArtifact.length,
       artifactType,
       historyLength: chatHistoryPayload?.length || 0,
+      modelNameFromPayload,
     });
 
     // Pour l'instant, on ne gère que la modification de texte
@@ -976,7 +978,7 @@ Demande utilisateur: ${prompt}`;
 
       const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
       const settings = await aiAgentStorage.get();
-      const modelName = settings.selectedModel;
+      const modelToUse = modelNameFromPayload || settings.selectedModel;
 
       // Prompt système spécifique pour la modification
       const systemPrompt = `Tu es un assistant d'édition expert. Modifie le texte Markdown suivant en suivant précisément l'instruction donnée.
@@ -991,7 +993,7 @@ ${currentArtifact}
 
 Instruction de modification: ${prompt}`;
 
-      const llm = await agentService.createLLMInstance();
+      const llm = await agentService.createLLMInstance(modelToUse);
       // On n'utilise pas l'historique du chat pour la modification, seulement le prompt système et l'instruction.
       const stream = await llm.stream([
         { type: 'system', content: systemPrompt },
@@ -1013,25 +1015,25 @@ Instruction de modification: ${prompt}`;
         return {
           success: true, // Considéré comme succès car on ne perd pas de données
           artifact: currentArtifact, // Renvoyer l'original
-          model: modelName,
+          model: modelToUse,
         };
         // Alternative: retourner une erreur
         // return {
         //   success: false,
         //   error: 'Aucun contenu modifié généré par le modèle.',
-        //   model: modelName,
+        //   model: modelToUse,
         // };
       }
 
       logger.debug('[DodaiCanvas] Artefact modifié avec succès', {
         modifiedArtifactLength: modifiedArtifact.length,
-        model: modelName,
+        model: modelToUse,
       });
 
       return {
         success: true,
         artifact: modifiedArtifact,
-        model: modelName,
+        model: modelToUse,
       };
     } catch (error) {
       logger.error("[DodaiCanvas] Erreur lors de la modification d'artefact:", error);
@@ -1049,11 +1051,12 @@ Instruction de modification: ${prompt}`;
     message: GenerateDodaiCanvasArtifactStreamRequestMessage,
     _sender: chrome.runtime.MessageSender,
   ): Promise<{ success: boolean; streaming?: boolean; error?: string }> {
-    const { prompt, history: chatHistoryPayload, portId } = message.payload;
+    const { prompt, history: chatHistoryPayload, portId, modelName: modelNameFromPayload } = message.payload;
     logger.debug('[DodaiCanvasStream] Traitement de la requête de génération en streaming', {
       promptLength: prompt.length,
       historyLength: chatHistoryPayload?.length || 0,
       portId: portId,
+      modelNameFromPayload,
     });
 
     const streamingPortInfo = stateService.getStreamingPort(portId);
@@ -1080,12 +1083,12 @@ Instruction de modification: ${prompt}`;
 
       const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
       const settings = await aiAgentStorage.get();
-      const modelName = settings.selectedModel;
+      const modelToUse = modelNameFromPayload || settings.selectedModel;
 
-      port.postMessage({ type: StreamEventType.STREAM_START, model: modelName });
+      port.postMessage({ type: StreamEventType.STREAM_START, model: modelToUse });
 
       agentService
-        .streamArtifactGeneration(prompt, history, port, modelName)
+        .streamArtifactGeneration(prompt, history, port, modelToUse)
         .then(() => {
           logger.debug('[DodaiCanvasStream] Streaming terminé avec succès par agentService pour le port', portId);
         })
@@ -1096,7 +1099,7 @@ Instruction de modification: ${prompt}`;
               type: StreamEventType.STREAM_ERROR,
               error: error instanceof Error ? error.message : "Erreur inconnue durant le streaming d'artefact",
             });
-            port.postMessage({ type: StreamEventType.STREAM_END, success: false });
+            port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: modelToUse });
           } catch (portError) {
             logger.warn(
               "[DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après échec agentService:",
@@ -1113,7 +1116,7 @@ Instruction de modification: ${prompt}`;
           type: StreamEventType.STREAM_ERROR,
           error: error instanceof Error ? error.message : "Erreur inconnue avant le lancement du streaming d'artefact",
         });
-        port.postMessage({ type: StreamEventType.STREAM_END, success: false });
+        port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: modelToUse });
       } catch (portError) {
         logger.warn("[DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après erreur majeure:", portError);
       }

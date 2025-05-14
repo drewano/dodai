@@ -353,6 +353,7 @@ export interface GenerateDodaiCanvasArtifactRequest extends BaseRuntimeMessage {
   payload: {
     prompt: string;
     history?: ChatHistoryMessage[];
+    modelName?: string;
   };
 }
 
@@ -371,6 +372,7 @@ export interface ModifyDodaiCanvasArtifactRequest extends BaseRuntimeMessage {
     currentArtifact: string;
     artifactType: 'text' | 'code';
     history?: ChatHistoryMessage[];
+    modelName?: string;
   };
 }
 
@@ -389,6 +391,7 @@ export interface GenerateDodaiCanvasArtifactStreamRequestMessage extends BaseRun
     prompt: string;
     history?: ChatHistoryMessage[];
     portId: string; // Important pour identifier le port de streaming
+    modelName?: string;
   };
 }
 
