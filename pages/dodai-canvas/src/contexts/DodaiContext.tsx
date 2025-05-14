@@ -26,6 +26,7 @@ interface DodaiContextType {
   updateCurrentArtifactContent: (newMarkdown: string) => void;
   modifyCurrentArtifact: (promptSuffix: string, currentMarkdown: string) => Promise<void>; // Nouvelle fonction
   cancelCurrentStreaming: () => void; // New function to cancel streaming
+  resetChatAndArtifact: () => void; // Added new function signature
 }
 
 const defaultContext: DodaiContextType = {
@@ -44,6 +45,7 @@ const defaultContext: DodaiContextType = {
   updateCurrentArtifactContent: () => {},
   modifyCurrentArtifact: async () => {}, // Valeur par défaut
   cancelCurrentStreaming: () => {}, // Default for cancel
+  resetChatAndArtifact: () => {}, // Added default for new function
 };
 
 const DodaiContext = createContext<DodaiContextType>(defaultContext);
@@ -516,6 +518,22 @@ Vous pouvez le consulter dans le panneau de droite.`,
     setIsLoading(false);
   };
 
+  // Implementation for resetChatAndArtifact
+  const resetChatAndArtifact = useCallback(() => {
+    setMessages([]);
+    setCurrentArtifact(null);
+    setChatInput('');
+    // Potentially clear artifactHistory as well if a full reset is desired
+    // setArtifactHistory([]);
+    setIsLoading(false);
+    setIsStreamingArtifact(false);
+    // If a stream was active, ensure it is cleaned up
+    if (streamingPort.current) {
+      cleanupStreamingConnection();
+    }
+    console.log('[DodaiCanvas] Chat and artifact reset.');
+  }, [cleanupStreamingConnection]); // Added cleanupStreamingConnection as dependency
+
   const value = {
     messages,
     setMessages,
@@ -532,6 +550,7 @@ Vous pouvez le consulter dans le panneau de droite.`,
     updateCurrentArtifactContent,
     modifyCurrentArtifact,
     cancelCurrentStreaming,
+    resetChatAndArtifact, // Added new function to context value
   };
 
   return <DodaiContext.Provider value={value}>{children}</DodaiContext.Provider>;

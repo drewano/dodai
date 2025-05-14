@@ -5,9 +5,16 @@ interface ChatInputProps {
   setChatInput: (value: string) => void;
   handleSubmit: (e: React.FormEvent) => void;
   isLoading?: boolean;
+  placeholder?: string;
 }
 
-export const ChatInput: React.FC<ChatInputProps> = ({ chatInput, setChatInput, handleSubmit, isLoading = false }) => {
+export const ChatInput: React.FC<ChatInputProps> = ({
+  chatInput,
+  setChatInput,
+  handleSubmit,
+  isLoading = false,
+  placeholder,
+}) => {
   const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
     if (e.key === 'Enter' && !e.shiftKey) {
       e.preventDefault();
@@ -25,7 +32,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({ chatInput, setChatInput, h
           value={chatInput}
           onChange={e => setChatInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder="Posez votre question ou décrivez votre idée..."
+          placeholder={placeholder || 'Posez votre question ou décrivez votre idée...'}
           className="w-full p-2.5 pr-12 rounded-lg bg-slate-700 border border-slate-600 hover:border-slate-500 
           focus:ring-2 focus:ring-blue-500 focus:border-transparent text-white placeholder-slate-400 
           text-sm resize-none transition-colors"

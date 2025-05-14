@@ -9,6 +9,7 @@ import type {
   ModifySelectedTextResponse,
   SaveArtifactAsNoteResponseMessage,
 } from '../../../../chrome-extension/src/background/types';
+import { Maximize, Minimize, Save } from 'lucide-react';
 
 // BlockNote Imports
 import { useCreateBlockNote } from '@blocknote/react';
@@ -20,6 +21,7 @@ const ArtifactPanel = () => {
   const [saveSuccess, setSaveSuccess] = useState<boolean | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
+  const [isArtifactFullscreen, setIsArtifactFullscreen] = useState(false);
 
   // State for FloatingTextAction
   const [isFloatingActionVisible, setIsFloatingActionVisible] = useState(false);
@@ -28,13 +30,8 @@ const ArtifactPanel = () => {
   const [isModifyingSelectedText, setIsModifyingSelectedText] = useState(false);
   const artifactPanelRef = useRef<HTMLDivElement>(null);
 
-  const {
-    currentArtifact,
-    isLoading, // General loading from context (e.g., for initial generation, modification)
-    updateCurrentArtifactContent,
-    modifyCurrentArtifact,
-    isStreamingArtifact, // New state from context to know if artifact is streaming
-  } = useDodai();
+  const { currentArtifact, isLoading, updateCurrentArtifactContent, modifyCurrentArtifact, isStreamingArtifact } =
+    useDodai();
 
   // BlockNote Editor
   const editor = useCreateBlockNote();
@@ -44,6 +41,10 @@ const ArtifactPanel = () => {
 
   const isMarkdown = currentContent?.type === 'text';
   const isCode = currentContent?.type === 'code';
+
+  const toggleArtifactFullscreen = () => {
+    setIsArtifactFullscreen(!isArtifactFullscreen);
+  };
 
   // Effect to load/update editor content when currentArtifact changes, including during streaming
   useEffect(() => {
@@ -306,10 +307,13 @@ const ArtifactPanel = () => {
     setSelectedTextContent(''); // Clear selected text
   };
 
+  const headerButtonClasses =
+    'p-1.5 rounded-md text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm';
+
   return (
     <div
       ref={artifactPanelRef}
-      className="flex flex-col h-full bg-slate-100 dark:bg-slate-900 text-slate-900 dark:text-slate-100 relative">
+      className={`flex flex-col h-full bg-slate-900 text-slate-100 relative ${isArtifactFullscreen ? 'fixed inset-0 z-50 p-4' : ''}`}>
       {isMarkdown && floatingActionPosition && (
         <FloatingTextAction
           isVisible={isFloatingActionVisible}
@@ -318,140 +322,122 @@ const ArtifactPanel = () => {
           onSubmit={handleFloatingActionSubmit}
           onCancel={handleFloatingActionCancel}
           isLoading={isModifyingSelectedText}
-          zIndex={1050} // Ensure it's above other elements
+          zIndex={isArtifactFullscreen ? 1051 : 1050}
         />
       )}
-      <div className="p-2 border-b border-slate-300 dark:border-slate-700 flex justify-between items-center bg-slate-200 dark:bg-slate-800 shadow-sm">
-        <div className="flex items-center">
-          <div className="text-lg font-medium mr-2">
-            {currentContent?.title || (isStreamingArtifact ? 'Génération...' : 'Nouvel Artefact')}
+      <div className="flex justify-between items-center p-2 bg-slate-800 border-b border-slate-700 shadow-sm flex-shrink-0">
+        <div className="flex items-center truncate">
+          <div className="text-base font-medium mr-3 truncate">
+            {currentContent?.title || (isStreamingArtifact ? 'Génération en cours...' : 'Nouvel Artefact')}
           </div>
-          <div className="text-xs px-2 py-0.5 rounded bg-slate-300 dark:bg-slate-700 text-slate-700 dark:text-slate-300">
-            {currentContent?.type === 'text'
-              ? 'Markdown'
-              : currentContent?.type === 'code'
-                ? `Code ${(currentContent as ArtifactCodeV3).language}`
-                : 'Document'}
-          </div>
+          {currentContent && (
+            <div className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 whitespace-nowrap">
+              {currentContent.type === 'text'
+                ? 'Markdown'
+                : currentContent.type === 'code'
+                  ? `Code (${(currentContent as ArtifactCodeV3).language || 'N/A'})`
+                  : 'Document'}
+            </div>
+          )}
         </div>
-        <div className="flex space-x-2">
+        <div className="flex space-x-2 flex-shrink-0">
           <button
-            className="px-3 py-1 rounded-md text-sm font-medium transition-colors 
-            bg-purple-100 text-purple-700 hover:bg-purple-200 dark:bg-purple-900/30 dark:text-purple-300 dark:hover:bg-purple-800/50
-            focus:outline-none focus:ring-2 focus:ring-purple-500 dark:focus:ring-purple-500/50
-            disabled:opacity-50 disabled:cursor-not-allowed"
+            className={headerButtonClasses}
             onClick={saveToNotes}
-            disabled={isSaving || isLoading || isStreamingArtifact || !currentArtifact}>
-            {isSaving ? (
-              <div className="flex items-center">
-                <svg
-                  className="animate-spin -ml-1 mr-2 h-4 w-4 text-purple-700 dark:text-purple-300"
-                  xmlns="http://www.w3.org/2000/svg"
-                  fill="none"
-                  viewBox="0 0 24 24">
-                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                  <path
-                    className="opacity-75"
-                    fill="currentColor"
-                    d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                </svg>
-                Sauvegarde...
-              </div>
-            ) : (
-              'Sauvegarder dans Mes Notes'
-            )}
+            disabled={isSaving || isLoading || isStreamingArtifact || !currentArtifact}
+            title="Sauvegarder dans Mes Notes">
+            <Save size={16} />
+            <span className={isArtifactFullscreen ? 'hidden md:inline' : ''}>Sauvegarder</span>
+          </button>
+          <button
+            className={headerButtonClasses}
+            onClick={toggleArtifactFullscreen}
+            title={isArtifactFullscreen ? 'Quitter le plein écran' : 'Plein écran'}>
+            {isArtifactFullscreen ? <Minimize size={16} /> : <Maximize size={16} />}
+            <span className={isArtifactFullscreen ? 'hidden md:inline' : ''}>
+              {isArtifactFullscreen ? 'Réduire' : 'Plein écran'}
+            </span>
           </button>
         </div>
       </div>
 
-      {isMarkdown && !isLoading && !isStreamingArtifact && (
-        <MarkdownToolbar
-          onConcise={handleMakeConcise}
-          onProfessionalTone={handleProfessionalTone}
-          onExplainSimply={handleExplainSimply}
-        />
-      )}
-
-      {saveSuccess !== null && (
-        <div
-          className={`p-2 text-center text-sm font-medium ${
-            saveSuccess
-              ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300'
-              : 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300'
-          }`}>
-          {saveSuccess
-            ? 'Artefact sauvegardé avec succès dans vos notes !'
-            : saveError || "Erreur lors de la sauvegarde de l'artefact."}
-        </div>
-      )}
-
-      {(isLoading || isStreamingArtifact) && !isSaving && (
-        <div className="p-2 text-center text-sm font-medium bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300 animate-pulse">
-          <div className="flex items-center justify-center">
-            <svg
-              className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-700 dark:text-blue-300"
-              xmlns="http://www.w3.org/2000/svg"
-              fill="none"
-              viewBox="0 0 24 24">
-              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-              <path
-                className="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-            </svg>
-            {isStreamingArtifact ? "Réception de l'artefact en cours..." : "Mise à jour de l'artefact en cours..."}
-          </div>
-        </div>
-      )}
-
-      <div className="flex-1 overflow-auto">
-        {(isLoading || isStreamingArtifact) && isMarkdown ? (
-          // Show a simplified view or placeholder when BlockNote is loading/streaming markdown to avoid aggressive re-renders of the full editor.
-          // Or, allow BlockNoteView to render but ensure it's truly read-only and doesn't steal focus or cause jumps.
-          // For now, we let BlockNoteView handle its rendering, but it is set to editable=false.
-          <BlockNoteView
-            editor={editor}
-            editable={false} // Strictly non-editable during streaming/loading
-            theme="light"
-            // onChange should not fire if editable is false, but good to be defensive.
-            // onChange={handleEditorContentChange} // Potentially remove if editable=false guarantees no change events
+      <div className="flex-1 overflow-auto relative">
+        {isMarkdown && !isLoading && !isStreamingArtifact && (
+          <MarkdownToolbar
+            onConcise={handleMakeConcise}
+            onProfessionalTone={handleProfessionalTone}
+            onExplainSimply={handleExplainSimply}
           />
-        ) : isMarkdown ? (
-          <div className="h-full p-0">
-            <BlockNoteView
-              editor={editor}
-              editable={!isLoading && !isStreamingArtifact && isMarkdown} // Editable only when not loading/streaming
-              theme="light"
-              onChange={handleEditorContentChange}
-            />
+        )}
+
+        {saveSuccess !== null && (
+          <div
+            className={`p-2 text-center text-sm font-medium sticky top-0 z-10 ${
+              saveSuccess ? 'bg-green-700 text-green-100' : 'bg-red-700 text-red-100'
+            }`}>
+            {saveSuccess
+              ? 'Artefact sauvegardé avec succès dans vos notes !'
+              : saveError || "Erreur lors de la sauvegarde de l'artefact."}
           </div>
-        ) : isCode ? (
-          <div className="p-4 h-full">
-            <pre className="bg-slate-800 text-slate-200 p-4 rounded-lg overflow-auto h-full">
-              <code>{(currentContent as ArtifactCodeV3).code}</code>
-            </pre>
-          </div>
-        ) : (
-          <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400">
-            <div className="text-center">
+        )}
+
+        {(isLoading || isStreamingArtifact) && !isSaving && (
+          <div className="p-2 text-center text-sm font-medium bg-blue-800 text-blue-200 animate-pulse sticky top-0 z-10">
+            <div className="flex items-center justify-center">
               <svg
-                className="w-12 h-12 mb-3 mx-auto text-slate-400"
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-200"
+                xmlns="http://www.w3.org/2000/svg"
                 fill="none"
-                viewBox="0 0 24 24"
-                stroke="currentColor">
+                viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                 <path
-                  strokeLinecap="round"
-                  strokeLinejoin="round"
-                  strokeWidth={1.5}
-                  d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
-                />
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              {currentArtifact
-                ? "Type d'artefact non pris en charge pour l'instant."
-                : 'Aucun artefact sélectionné. Générez-en un avec le chat !'}
+              {isStreamingArtifact ? "Réception de l'artefact en cours..." : "Mise à jour de l'artefact en cours..."}
             </div>
           </div>
         )}
+
+        <div className={`p-1 ${isMarkdown ? 'md:p-2' : ''}`}>
+          {isMarkdown ? (
+            <div className="h-full min-h-[300px]">
+              <BlockNoteView
+                editor={editor}
+                editable={!isLoading && !isStreamingArtifact && isMarkdown}
+                theme={isArtifactFullscreen ? 'dark' : 'light'}
+                onChange={handleEditorContentChange}
+              />
+            </div>
+          ) : isCode ? (
+            <div className="p-0 md:p-2 h-full">
+              <pre className="bg-slate-800 text-slate-200 p-3 md:p-4 rounded-lg overflow-auto h-full text-sm">
+                <code>{(currentContent as ArtifactCodeV3).code}</code>
+              </pre>
+            </div>
+          ) : (
+            <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400 min-h-[300px]">
+              <div className="text-center p-4">
+                <svg
+                  className="w-12 h-12 mb-3 mx-auto text-slate-400"
+                  fill="none"
+                  viewBox="0 0 24 24"
+                  stroke="currentColor">
+                  <path
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                    strokeWidth={1.5}
+                    d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"
+                  />
+                </svg>
+                {currentArtifact
+                  ? "Type d'artefact non pris en charge pour l'instant."
+                  : 'Aucun artefact généré. Utilisez le chat pour commencer.'}
+              </div>
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );
