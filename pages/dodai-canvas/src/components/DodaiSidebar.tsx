@@ -20,18 +20,18 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({ onNavigate }) => {
   };
 
   const getTextClasses = (expanded: boolean): string => {
-    const base = 'ml-3 whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out';
-    const dynamic = expanded ? 'max-w-full opacity-100 delay-100' : 'max-w-0 opacity-0';
+    const base = 'whitespace-nowrap overflow-hidden transition-all duration-200 ease-in-out';
+    const dynamic = expanded ? 'ml-3 max-w-full opacity-100 delay-100' : 'max-w-0 opacity-0';
     return `${base} ${dynamic}`;
   };
 
   return (
     <div
-      className={`flex flex-col h-screen bg-slate-850 shadow-lg transition-all duration-300 ease-in-out ${isExpanded ? 'w-64' : 'w-16'}`}
+      className={`flex flex-col h-full bg-slate-850 shadow-lg rounded-md transition-all duration-300 ease-in-out ${isExpanded ? 'w-64' : 'w-16'}`}
       aria-label="Barre latérale Dodai">
       {/* Header: Toggle Button & Title */}
       <div
-        className={`flex items-center p-3 border-b border-slate-700/60 flex-shrink-0 h-[60px] ${isExpanded ? 'justify-start' : 'justify-center'}`}>
+        className={`flex items-center p-3 flex-shrink-0 h-[60px] ${isExpanded ? 'justify-start' : 'justify-center'}`}>
         <button
           onClick={toggleSidebar}
           className="p-2 rounded-md text-slate-400 hover:text-slate-100 hover:bg-slate-700/70 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500"
@@ -40,15 +40,15 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({ onNavigate }) => {
           {isExpanded ? <PanelLeftClose size={20} /> : <PanelRightClose size={20} />}
         </button>
         <h1
-          className={`ml-2 text-xl font-semibold text-slate-200 overflow-hidden transition-all duration-200 ease-in-out ${
-            isExpanded ? 'max-w-xs opacity-100 delay-100' : 'max-w-0 opacity-0'
+          className={`text-xl font-semibold text-slate-200 overflow-hidden transition-all duration-200 ease-in-out ${
+            isExpanded ? 'ml-2 max-w-xs opacity-100 delay-100' : 'max-w-0 opacity-0'
           }`}>
           Dodai
         </h1>
       </div>
 
       {/* Navigation */}
-      <nav className="flex-grow p-3 space-y-2 overflow-y-auto">
+      <nav className="flex-grow p-3 space-y-2 overflow-y-auto overflow-x-hidden">
         <button
           onClick={() => onNavigate('/dodai-canvas.html')}
           className={getNavItemClasses(isExpanded)}
@@ -60,7 +60,7 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({ onNavigate }) => {
         </button>
 
         <button
-          onClick={() => onNavigate('/notes-page.html')}
+          onClick={() => onNavigate('/notes-page/index.html')}
           className={getNavItemClasses(isExpanded)}
           aria-label="Mes Notes"
           title="Mes Notes">

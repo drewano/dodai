@@ -28,12 +28,12 @@ const DodaiCanvasContent = () => {
   const panelGroupKey = showArtifactPanel ? 'artifactMode' : 'hubMode'; // Key to force remount, changed to single quotes
 
   return (
-    <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans overflow-hidden">
+    <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans overflow-hidden p-1 gap-1">
       <DodaiSidebar onNavigate={handleNavigate} />
 
       <ResizablePanelGroup key={panelGroupKey} direction="horizontal" className="flex flex-1 overflow-hidden">
         <ResizablePanel defaultSize={showArtifactPanel ? 35 : 70} minSize={30} className="min-w-[300px]">
-          <div className="p-1 h-full">
+          <div className="h-full">
             <div className="bg-slate-800 rounded-md shadow-md h-full overflow-hidden">
               <ChatPanel />
             </div>
@@ -41,7 +41,7 @@ const DodaiCanvasContent = () => {
         </ResizablePanel>
         <ResizableHandle withHandle />
         <ResizablePanel defaultSize={showArtifactPanel ? 65 : 30} minSize={30} className="min-w-[300px]">
-          <div className="p-1 h-full">
+          <div className="h-full">
             <div className="bg-slate-800 rounded-md shadow-md h-full overflow-hidden">
               {showArtifactPanel ? (
                 <ArtifactPanel />

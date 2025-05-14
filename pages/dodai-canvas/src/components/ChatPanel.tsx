@@ -107,8 +107,7 @@ const ChatPanel = () => {
   return (
     <div className="flex flex-col h-full bg-slate-800 text-slate-100 shadow-md">
       {/* Header: Simplified, added History icon */}
-      <div className="p-3 border-b border-slate-700 flex justify-between items-center flex-shrink-0 h-[50px] bg-slate-800">
-        <h2 className="text-base font-semibold text-slate-200">Chat</h2>
+      <div className="p-3 flex justify-end items-center flex-shrink-0 h-[50px] bg-slate-800">
         <button
           className="p-1.5 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors"
           title="Historique des chats (fonctionnalité à venir)"
