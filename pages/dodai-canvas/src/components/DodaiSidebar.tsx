@@ -1,22 +1,49 @@
-import { useState } from 'react';
-import { PanelLeftClose, PanelRightClose, PlusCircle, NotebookText } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { PanelLeftClose, PanelRightClose } from 'lucide-react';
 
-interface DodaiSidebarProps {
-  onNavigate: (path: string) => void;
+// New interface for dynamic navigation items
+export interface NavItemProps {
+  id: string;
+  label: string;
+  icon: React.ReactElement;
+  onClick: () => void;
+  isActive: boolean;
+  title?: string; // Optional title for tooltip
 }
 
-const DodaiSidebar: React.FC<DodaiSidebarProps> = ({ onNavigate }) => {
-  const [isExpanded, setIsExpanded] = useState(false);
+interface DodaiSidebarProps {
+  navItems: NavItemProps[];
+  lowerContent?: React.ReactNode;
+  lowerContentTitle?: string;
+  initialIsExpanded?: boolean;
+  onExpansionChange?: (isExpanded: boolean) => void;
+}
 
-  const toggleSidebar = () => setIsExpanded(!isExpanded);
+const DodaiSidebar: React.FC<DodaiSidebarProps> = ({
+  navItems,
+  lowerContent,
+  lowerContentTitle,
+  initialIsExpanded,
+  onExpansionChange,
+}) => {
+  const [isExpanded, setIsExpanded] = useState(initialIsExpanded ?? true);
+
+  const toggleSidebar = () => {
+    const newState = !isExpanded;
+    setIsExpanded(newState);
+    if (onExpansionChange) {
+      onExpansionChange(newState);
+    }
+  };
 
   const navItemBaseClasses =
     'flex items-center p-2.5 rounded-md text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors group focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75';
   const iconClasses = 'flex-shrink-0 w-5 h-5 text-slate-400 group-hover:text-slate-100 transition-colors';
 
-  const getNavItemClasses = (expanded: boolean): string => {
+  const getNavItemClasses = (expanded: boolean, isActive: boolean): string => {
     const dynamic = expanded ? 'w-full justify-start' : 'justify-center';
-    return `${navItemBaseClasses} ${dynamic}`;
+    const activeClasses = isActive ? 'bg-slate-700 text-slate-100' : '';
+    return `${navItemBaseClasses} ${dynamic} ${activeClasses}`;
   };
 
   const getTextClasses = (expanded: boolean): string => {
@@ -42,46 +69,48 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({ onNavigate }) => {
         <h1
           className={`text-xl font-semibold text-slate-200 overflow-hidden transition-all duration-200 ease-in-out ${
             isExpanded ? 'ml-2 max-w-xs opacity-100 delay-100' : 'max-w-0 opacity-0'
-          }`}>
+          }`}
+          style={{ fontSize: '1.25rem', fontWeight: 600 }}>
           Dodai
         </h1>
       </div>
 
       {/* Navigation */}
       <nav className="flex-grow p-3 space-y-2 overflow-y-auto overflow-x-hidden">
-        <button
-          onClick={() => onNavigate('/dodai-canvas.html')}
-          className={getNavItemClasses(isExpanded)}
-          aria-label="Nouveau Canvas Dodai"
-          title="Nouveau Canvas">
-          <PlusCircle className={iconClasses} />
-          <span className={getTextClasses(isExpanded)}>Nouveau Canvas</span>
-          {!isExpanded && <span className="sr-only">Nouveau Canvas</span>}
-        </button>
-
-        <button
-          onClick={() => onNavigate('/notes-page/index.html')}
-          className={getNavItemClasses(isExpanded)}
-          aria-label="Mes Notes"
-          title="Mes Notes">
-          <NotebookText className={iconClasses} />
-          <span className={getTextClasses(isExpanded)}>Mes Notes</span>
-          {!isExpanded && <span className="sr-only">Mes Notes</span>}
-        </button>
+        {navItems.map(item => (
+          <button
+            key={item.id}
+            onClick={item.onClick}
+            className={getNavItemClasses(isExpanded, item.isActive)}
+            aria-label={item.label}
+            title={item.title || item.label}>
+            {/* Wrap icon in a span to apply classes safely */}
+            <span className={iconClasses}>{item.icon}</span>
+            <span className={getTextClasses(isExpanded)}>{item.label}</span>
+            {!isExpanded && <span className="sr-only">{item.label}</span>}
+          </button>
+        ))}
       </nav>
 
-      {/* History Placeholder */}
-      <div
-        className={`p-3 border-t border-slate-700/60 flex-shrink-0 transition-all duration-300 ease-in-out ${
-          isExpanded ? 'opacity-100 pt-3' : 'opacity-0 h-0 pt-0 overflow-hidden'
-        }`}>
-        {isExpanded && (
-          <>
-            <h3 className="mb-2 text-xs font-semibold uppercase text-slate-500 tracking-wider">Historique</h3>
-            <p className="text-sm text-slate-400">L'historique des conversations apparaîtra ici.</p>
-          </>
-        )}
-      </div>
+      {/* Lower Content Section */}
+      {(lowerContent || lowerContentTitle) && isExpanded && (
+        <div className="p-3 border-t border-slate-700/60 flex-shrink-0">
+          {lowerContentTitle && isExpanded && (
+            <h3 className="mb-2 text-xs font-semibold uppercase text-slate-500 tracking-wider">{lowerContentTitle}</h3>
+          )}
+          {isExpanded && lowerContent}
+        </div>
+      )}
+
+      {/* History Placeholder - This specific implementation will be passed via lowerContent if needed for canvas */}
+      {!lowerContent && !lowerContentTitle && (
+        <div
+          className={`p-3 border-t border-slate-700/60 flex-shrink-0 transition-all duration-300 ease-in-out ${
+            isExpanded ? 'opacity-100 pt-3' : 'opacity-0 h-0 pt-0 overflow-hidden'
+          }`}>
+          {isExpanded && <></>}
+        </div>
+      )}
     </div>
   );
 };
