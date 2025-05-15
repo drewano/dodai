@@ -61,8 +61,8 @@ const DodaiCanvasContent = () => {
     <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans overflow-hidden p-1 gap-1">
       <DodaiSidebar
         navItems={canvasNavItems}
-        lowerContentTitle="HISTORIQUE"
-        lowerContent={historyLowerContent}
+        mainContentTitle="HISTORIQUE"
+        mainContent={historyLowerContent}
         // initialIsExpanded and onExpansionChange can be added if needed,
         // otherwise DodaiSidebar handles its own state defaulting to expanded.
       />

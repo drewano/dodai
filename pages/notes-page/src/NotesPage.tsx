@@ -2,7 +2,7 @@ import { withErrorBoundary, withSuspense, exportNoteToMarkdown } from '@extensio
 import type React from 'react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
-import { Search, Settings, Github, Plus, LayoutGrid, NotebookText } from 'lucide-react';
+import { PlusCircle, LayoutDashboard, NotebookText } from 'lucide-react';
 
 // Hooks
 import { useNotes } from './hooks/useNotes';
@@ -392,18 +392,6 @@ const NotesPage = () => {
     }
   };
 
-  const handleSearchClick = useCallback(() => {
-    console.log('Search clicked');
-  }, []);
-
-  const handleSettingsClick = useCallback(() => {
-    chrome.runtime.openOptionsPage();
-  }, []);
-
-  const handleGithubClick = useCallback(() => {
-    chrome.tabs.create({ url: 'https://github.com/assefdev/dodai-notes-chrome-extension' });
-  }, []);
-
   const handleDodaiSidebarExpansionChange = useCallback((isExpanded: boolean) => {
     setIsDodaiSidebarExpanded(isExpanded);
   }, []);
@@ -412,7 +400,7 @@ const NotesPage = () => {
     {
       id: 'new-note',
       label: 'Nouvelle Note',
-      icon: <Plus />,
+      icon: <PlusCircle />,
       onClick: () => handleCreateNewNote(currentFolderId),
       isActive: false,
       title: 'Créer une nouvelle note',
@@ -420,7 +408,7 @@ const NotesPage = () => {
     {
       id: 'canvas',
       label: 'Canvas',
-      icon: <LayoutGrid />,
+      icon: <LayoutDashboard />,
       onClick: () => handleDodaiSidebarNavigation('canvas'),
       isActive: currentPage === 'canvas',
       title: 'Ouvrir Dodai Canvas',
@@ -433,30 +421,6 @@ const NotesPage = () => {
       isActive: currentPage === 'notes',
       title: 'Afficher mes notes',
     },
-    {
-      id: 'search',
-      label: 'Recherche',
-      icon: <Search />,
-      onClick: handleSearchClick,
-      isActive: false,
-      title: 'Rechercher dans les notes',
-    },
-    {
-      id: 'settings',
-      label: 'Paramètres',
-      icon: <Settings />,
-      onClick: handleSettingsClick,
-      isActive: false,
-      title: 'Ouvrir les paramètres',
-    },
-    {
-      id: 'github',
-      label: 'GitHub',
-      icon: <Github />,
-      onClick: handleGithubClick,
-      isActive: false,
-      title: 'Voir le code source sur GitHub',
-    },
   ];
 
   const lowerContentNotes = useMemo(() => {
@@ -464,11 +428,11 @@ const NotesPage = () => {
       <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
         <div className="flex flex-col h-full overflow-hidden">
           {folderPath && folderPath.length > 0 && (
-            <div className="p-2 border-b border-slate-700/60 flex-shrink-0">
+            <div className="border-b border-slate-700/60 flex-shrink-0">
               <FolderBreadcrumb path={folderPath} onNavigate={navigateToFolder} />
             </div>
           )}
-          <div className="flex-1 overflow-y-auto p-2 space-y-0.5">
+          <div className="flex-1 overflow-y-auto space-y-0.5">
             {notes && notes.length > 0 ? (
               <RecursiveNoteTree
                 notes={notes}
@@ -535,8 +499,8 @@ const NotesPage = () => {
         }}>
         <DodaiSidebar
           navItems={navItems}
-          lowerContentTitle={currentPage === 'notes' ? 'MES NOTES' : undefined}
-          lowerContent={
+          mainContentTitle={currentPage === 'notes' ? 'MES NOTES' : undefined}
+          mainContent={
             currentPage === 'notes' ? (
               lowerContentNotes
             ) : (
