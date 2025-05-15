@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { PlusCircle, LayoutDashboard, NotebookText } from 'lucide-react';
 import { DodaiSidebar, type NavItemProps } from '@extension/ui';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../../dodai-canvas/src/components/ui/resizable';
 
 // Hooks
 import { useNotes } from './hooks/useNotes';
@@ -19,7 +20,6 @@ import TagsPanel from './components/tag/TagsPanel';
 
 // Types
 import type { NoteEntry } from '@extension/storage';
-import Header from './components/layout/Header';
 
 interface ContextMenuState {
   isVisible: boolean;
@@ -316,36 +316,9 @@ const NotesPage = () => {
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
-      <Header
-        showRightSidebar={showRightSidebar && activePage === 'notes'}
-        toggleRightSidebar={toggleRightSidebar}
-        selectedNote={selectedNote}
-        selectedItemType={_selectedItemType}
-        folderPath={folderPath}
-        navigateToFolder={navigateToFolder}
-        currentFolderId={currentFolderId}
-        editedTitle={editedTitle}
-        setEditedTitle={setEditedTitle}
-        editedTags={editedTags}
-        tagInput={tagInput}
-        setTagInput={setTagInput}
-        saveStatus={saveStatus}
-        lastError={lastError}
-        isDirty={isDirty}
-        handleAddTag={handleAddTag}
-        handleRemoveTag={handleRemoveTag}
-        editedSourceUrl={editedSourceUrl}
-        setEditedSourceUrl={setEditedSourceUrl}
-        setEditedTags={setEditedTags}
-        handleSaveChanges={handleSaveChanges}
-        handleCancelEdit={handleCancelEdit}
-      />
       <main
-        ref={mainContainerRef}
-        className="flex-1 grid overflow-hidden relative"
-        style={{
-          gridTemplateColumns: `${isDodaiSidebarExpanded ? '256px' : '64px'} 1fr ${showRightSidebar && activePage === 'notes' ? rightSidebarWidth + 'px' : '0px'}`,
-        }}>
+        className="flex-1 flex overflow-hidden relative"
+        >
         <DodaiSidebar
           navItems={navItems}
           mainContentTitle={activePage === 'notes' ? 'MES NOTES' : undefined}
@@ -360,71 +333,70 @@ const NotesPage = () => {
           onExpansionChange={handleDodaiSidebarExpansionChange}
         />
 
-        {activePage === 'notes' ? (
-          <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner relative z-10">
-            <CenterPanel
-              editor={editor}
-              selectedItemType={_selectedItemType}
-              selectedNote={selectedNote}
-              selectedChatId={_selectedChatId}
-              onSyncInitialContent={syncInitialContent}
-              onNoteTextModified={handleContentModification}
-              editedTitle={editedTitle}
-              setEditedTitle={setEditedTitle}
-              editedTags={editedTags}
-              tagInput={tagInput}
-              setTagInput={setTagInput}
-              handleAddTag={handleAddTag}
-              handleRemoveTag={handleRemoveTag}
-              editedSourceUrl={editedSourceUrl}
-              setEditedSourceUrl={setEditedSourceUrl}
-              saveStatus={saveStatus}
-              lastError={lastError}
-              showRightSidebar={showRightSidebar}
-              toggleRightSidebar={toggleRightSidebar}
-            />
-          </div>
-        ) : (
-          <div className="flex flex-col items-center justify-center text-slate-400 bg-slate-850 p-8 h-full">
-            <h2 className="text-2xl font-semibold mb-4">Dodai Canvas</h2>
-            <p>Chargement du Canvas...</p>
-          </div>
-        )}
-
-        {activePage === 'notes' && showRightSidebar && (
-          <button
-            ref={rightResizeHandleRef}
-            type="button"
-            aria-label="Redimensionner la barre latérale droite"
-            style={{
-              left: `calc(${isDodaiSidebarExpanded ? '256px' : '64px'} + 1fr - ${rightSidebarWidth}px - 8px)`,
-              zIndex: 25,
-            }}
-            className={`absolute top-0 bottom-0 w-4 h-full cursor-col-resize group flex items-center justify-center ${
-              isResizingRight ? 'bg-blue-500/20' : ''
-            }`}
-            onMouseDown={handleMouseDownRight}>
-            <div className="w-1 h-10 bg-slate-600 rounded-full group-hover:bg-blue-500 transition-colors duration-150"></div>
-          </button>
-        )}
-        {activePage === 'notes' && (
-          <div
-            ref={rightSidebarRef}
-            className={`bg-slate-800 border-l border-slate-700/70 transition-all duration-100 ease-out overflow-hidden ${
-              !showRightSidebar ? 'w-0 !p-0 !border-l-0' : ''
-            }`}
-            style={{ width: showRightSidebar ? `${rightSidebarWidth}px` : '0px' }}>
-            {showRightSidebar && (
-              <TagsPanel
-                notes={notes || []}
-                allTags={allTags}
-                activeTag={activeTag}
-                onTagSelect={handleTagFilter}
-                onClearFilter={clearTagFilter}
-              />
-            )}
-          </div>
-        )}
+        <div className="flex-1 flex flex-col overflow-hidden">
+          {activePage === 'notes' ? (
+            <ResizablePanelGroup direction="horizontal" units="pixels" className="flex-grow min-h-0">
+              <ResizablePanel defaultSize={700} minSize={300}>
+                <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner h-full w-full">
+                  <CenterPanel
+                    editor={editor}
+                    selectedItemType={_selectedItemType}
+                    selectedNote={selectedNote}
+                    selectedChatId={_selectedChatId}
+                    onSyncInitialContent={syncInitialContent}
+                    onNoteTextModified={handleContentModification}
+                    editedTitle={editedTitle}
+                    setEditedTitle={setEditedTitle}
+                    editedTags={editedTags}
+                    tagInput={tagInput}
+                    setTagInput={setTagInput}
+                    handleAddTag={handleAddTag}
+                    handleRemoveTag={handleRemoveTag}
+                    editedSourceUrl={editedSourceUrl}
+                    setEditedSourceUrl={setEditedSourceUrl}
+                    saveStatus={saveStatus}
+                    lastError={lastError}
+                    showRightSidebar={showRightSidebar && activePage === 'notes'}
+                    toggleRightSidebar={toggleRightSidebar}
+                  />
+                </div>
+              </ResizablePanel>
+              {showRightSidebar && (
+                <>
+                  <ResizableHandle withHandle className="w-1.5 bg-slate-700 hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 data-[resize-handle-active=true]:bg-blue-600" />
+                  <ResizablePanel
+                    defaultSize={rightSidebarWidth}
+                    minSize={150}
+                    maxSize={500}
+                    onResize={(newSize: number) => {
+                      if (newSize !== undefined) {
+                        setRightSidebarWidth(newSize);
+                      }
+                    }}
+                    collapsible={true}
+                    collapsedSize={0}
+                    order={2}
+                  >
+                    <div ref={rightSidebarRef} className="bg-slate-800 border-l border-slate-700/70 h-full w-full overflow-hidden">
+                      <TagsPanel
+                        notes={notes || []}
+                        allTags={allTags}
+                        activeTag={activeTag}
+                        onTagSelect={handleTagFilter}
+                        onClearFilter={clearTagFilter}
+                      />
+                    </div>
+                  </ResizablePanel>
+                </>
+              )}
+            </ResizablePanelGroup>
+          ) : (
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-850 p-8 h-full">
+              <h2 className="text-2xl font-semibold mb-4">Dodai Canvas</h2>
+              <p>Chargement du Canvas...</p>
+            </div>
+          )}
+        </div>
       </main>
     </div>
   );
