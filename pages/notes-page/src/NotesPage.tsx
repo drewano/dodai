@@ -316,9 +316,7 @@ const NotesPage = () => {
 
   return (
     <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans overflow-hidden p-1 gap-1">
-      <main
-        className="flex flex-1 overflow-hidden gap-1"
-        >
+      <main className="flex flex-1 overflow-hidden gap-1">
         <DodaiSidebar
           navItems={navItems}
           mainContentTitle={activePage === 'notes' ? 'MES NOTES' : undefined}
@@ -335,7 +333,10 @@ const NotesPage = () => {
 
         <div className="flex-1 flex flex-col overflow-hidden rounded-md">
           {activePage === 'notes' ? (
-            <ResizablePanelGroup direction="horizontal" className="flex-grow min-h-0 rounded-md shadow-md">
+            <ResizablePanelGroup
+              direction="horizontal"
+              units="pixels"
+              className="flex-grow min-h-0 rounded-md shadow-md">
               <ResizablePanel defaultSize={700} minSize={300}>
                 <div className="flex flex-col overflow-hidden bg-slate-800 rounded-md shadow-md h-full w-full">
                   <CenterPanel
@@ -375,9 +376,10 @@ const NotesPage = () => {
                     }}
                     collapsible={true}
                     collapsedSize={0}
-                    order={2}
-                  >
-                    <div ref={rightSidebarRef} className="bg-slate-800 rounded-md shadow-md border-slate-700/70 h-full w-full overflow-hidden">
+                    order={2}>
+                    <div
+                      ref={rightSidebarRef}
+                      className="bg-slate-800 rounded-md shadow-md border-slate-700/70 h-full w-full overflow-hidden">
                       <TagsPanel
                         notes={notes || []}
                         allTags={allTags}
