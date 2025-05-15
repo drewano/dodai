@@ -949,7 +949,13 @@ Demande utilisateur: ${prompt}`;
     message: ModifyDodaiCanvasArtifactRequest,
     sender: chrome.runtime.MessageSender,
   ): Promise<ModifyDodaiCanvasArtifactResponse> {
-    const { prompt, currentArtifact, artifactType, history: chatHistoryPayload, modelName: modelNameFromPayload } = message.payload;
+    const {
+      prompt,
+      currentArtifact,
+      artifactType,
+      history: chatHistoryPayload,
+      modelName: modelNameFromPayload,
+    } = message.payload;
     logger.debug("[DodaiCanvas] Traitement de la requête de modification d'artefact", {
       promptLength: prompt.length,
       currentArtifactLength: currentArtifact.length,

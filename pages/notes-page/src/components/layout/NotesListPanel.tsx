@@ -1,6 +1,7 @@
 import type React from 'react';
 import { /* useState, */ useCallback, useMemo } from 'react';
 import type { NoteEntry } from '@extension/storage';
+// import { exportNoteToMarkdown } from '@extension/shared'; // Unused import removed in previous steps
 import NoteCard from '../list/NoteCard';
 import FolderCard from '../list/FolderCard';
 import { DndContext, useSensor, useSensors, MouseSensor, TouchSensor, closestCenter } from '@dnd-kit/core';
@@ -203,6 +204,7 @@ const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
       if (activeId === overId) return;
 
+      // const activeData = active.data.current as DragData | undefined; // Unused variable removed in previous steps
       const overData = over.data.current as DragData | undefined;
 
       const itemToMove = notes.find(n => n.id === activeId);

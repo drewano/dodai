@@ -13,14 +13,10 @@ type DodaiCanvasConfigStorageType = BaseStorage<DodaiCanvasSettings> & {
   updateSelectedModel: (model: string | null) => Promise<void>;
 };
 
-const storage = createStorage<DodaiCanvasSettings>(
-  'dodai-canvas-settings',
-  defaultDodaiCanvasSettings,
-  {
-    storageEnum: StorageEnum.Local, // Or StorageEnum.Sync if preferred
-    liveUpdate: true,
-  },
-);
+const storage = createStorage<DodaiCanvasSettings>('dodai-canvas-settings', defaultDodaiCanvasSettings, {
+  storageEnum: StorageEnum.Local, // Or StorageEnum.Sync if preferred
+  liveUpdate: true,
+});
 
 export const dodaiCanvasConfigStorage: DodaiCanvasConfigStorageType = {
   ...storage,
@@ -30,4 +26,4 @@ export const dodaiCanvasConfigStorage: DodaiCanvasConfigStorageType = {
       selectedModel: model,
     }));
   },
-}; 
+};

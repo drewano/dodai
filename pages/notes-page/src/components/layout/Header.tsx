@@ -6,9 +6,7 @@ import * as Popover from '@radix-ui/react-popover';
 import { Globe, Link2, Edit3, Check, X, Copy, ExternalLink } from 'lucide-react';
 
 interface HeaderProps {
-  showLeftSidebar: boolean;
   showRightSidebar: boolean;
-  toggleLeftSidebar: () => void;
   toggleRightSidebar: () => void;
   selectedNote: NoteEntry | null;
   selectedItemType: 'note' | 'chat';
@@ -34,9 +32,7 @@ interface HeaderProps {
 }
 
 const Header: React.FC<HeaderProps> = ({
-  showLeftSidebar,
   showRightSidebar,
-  toggleLeftSidebar,
   toggleRightSidebar,
   selectedNote,
   selectedItemType,
@@ -254,34 +250,6 @@ const Header: React.FC<HeaderProps> = ({
           DoDai Notes
         </span>
         <div className="flex items-center gap-1.5">
-          <button
-            onClick={toggleLeftSidebar}
-            className={`p-1.5 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${
-              showLeftSidebar
-                ? 'bg-slate-700/80 text-slate-200 hover:bg-slate-600'
-                : 'bg-slate-700/40 text-slate-400 hover:bg-slate-700/60 hover:text-slate-300'
-            }`}
-            title={showLeftSidebar ? 'Masquer la barre latérale gauche' : 'Afficher la barre latérale gauche'}>
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              xmlns="http://www.w3.org/2000/svg"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round">
-              {showLeftSidebar ? (
-                <path d="M18 6L6 18M6 6l12 12" />
-              ) : (
-                <>
-                  <rect width="18" height="18" x="3" y="3" rx="2" />
-                  <path d="M9 3v18" />
-                </>
-              )}
-            </svg>
-          </button>
           <button
             onClick={toggleRightSidebar}
             className={`p-1.5 rounded-md transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${

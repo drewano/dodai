@@ -3,6 +3,7 @@ import type React from 'react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 import { PlusCircle, LayoutDashboard, NotebookText } from 'lucide-react';
+import { DodaiSidebar, type NavItemProps } from '@extension/ui';
 
 // Hooks
 import { useNotes } from './hooks/useNotes';
@@ -11,18 +12,14 @@ import { useNoteSelection } from './hooks/useNoteSelection';
 import { useNoteEditing } from './hooks/useNoteEditing';
 
 // Components
-import DodaiSidebar, { type NavItemProps } from '../../dodai-canvas/src/components/DodaiSidebar';
+import NotesListPanel from './components/layout/NotesListPanel';
+import type { NotesListPanelProps } from './components/layout/NotesListPanel';
 import CenterPanel from './components/layout/CenterPanel';
 import TagsPanel from './components/tag/TagsPanel';
-import FolderBreadcrumb from './components/common/FolderBreadcrumb';
-import NoteCard from './components/list/NoteCard';
-import FolderCard from './components/list/FolderCard';
-import ContextMenu from './components/common/ContextMenu';
-import { DndContext, closestCenter, useSensor, useSensors, MouseSensor, TouchSensor } from '@dnd-kit/core';
-import type { DragEndEvent } from '@dnd-kit/core';
 
 // Types
 import type { NoteEntry } from '@extension/storage';
+import Header from './components/layout/Header';
 
 interface ContextMenuState {
   isVisible: boolean;
@@ -31,107 +28,6 @@ interface ContextMenuState {
   targetItem: NoteEntry | null;
   isFolder: boolean;
 }
-
-interface RecursiveNoteTreeProps {
-  notes: NoteEntry[];
-  parentId: string | null;
-  level: number;
-  expandedFolders: Record<string, boolean>;
-  onToggleFolderExpand: (folderId: string) => void;
-  selectedNoteId: string | null;
-  onSelectNote: (note: NoteEntry | null) => void;
-  onNavigateToFolder: (folderId: string | null) => void;
-  getChildrenOf: (folderId: string) => NoteEntry[];
-  handleOpenContextMenu: (event: React.MouseEvent, item: NoteEntry, isFolderItem?: boolean) => void;
-}
-
-const RecursiveNoteTree: React.FC<RecursiveNoteTreeProps> = ({
-  notes,
-  parentId,
-  level,
-  expandedFolders,
-  onToggleFolderExpand,
-  selectedNoteId,
-  onSelectNote,
-  onNavigateToFolder,
-  getChildrenOf,
-  handleOpenContextMenu,
-}) => {
-  const children = useMemo(() => {
-    return notes
-      .filter(note => note.parentId === parentId)
-      .sort((a, b) => {
-        if (a.type === 'folder' && b.type !== 'folder') return -1;
-        if (a.type !== 'folder' && b.type === 'folder') return 1;
-        const titleA = a.title || '';
-        const titleB = b.title || '';
-        return titleA.localeCompare(titleB);
-      });
-  }, [notes, parentId]);
-
-  if (children.length === 0 && level === 0) {
-    return (
-      <div className="p-4 text-center text-slate-500 text-sm">
-        Aucune note ou dossier ici.
-        <br />
-        Cliquez sur '+' dans la sidebar.
-      </div>
-    );
-  }
-
-  return (
-    <div className="space-y-0.5" style={{ paddingLeft: `${level > 0 ? 16 : 0}px` }}>
-      {children.map(item => {
-        const isSelected = selectedNoteId === item.id;
-        const itemChildren = item.type === 'folder' ? getChildrenOf(item.id) : [];
-        const hasChildren = itemChildren.length > 0;
-        const isExpanded = item.type === 'folder' ? !!expandedFolders[item.id] : false;
-
-        if (item.type === 'folder') {
-          return (
-            <div key={item.id}>
-              <FolderCard
-                folder={item}
-                isSelected={isSelected}
-                onSelect={onSelectNote}
-                onOpen={() => onNavigateToFolder(item.id)}
-                notesCount={itemChildren.length}
-                onContextMenu={event => handleOpenContextMenu(event, item, true)}
-                isExpanded={isExpanded}
-                hasChildren={hasChildren}
-                onToggleExpand={onToggleFolderExpand}
-              />
-              {isExpanded && hasChildren && (
-                <RecursiveNoteTree
-                  notes={notes}
-                  parentId={item.id}
-                  level={level + 1}
-                  expandedFolders={expandedFolders}
-                  onToggleFolderExpand={onToggleFolderExpand}
-                  selectedNoteId={selectedNoteId}
-                  onSelectNote={onSelectNote}
-                  onNavigateToFolder={onNavigateToFolder}
-                  getChildrenOf={getChildrenOf}
-                  handleOpenContextMenu={handleOpenContextMenu}
-                />
-              )}
-            </div>
-          );
-        } else {
-          return (
-            <NoteCard
-              key={item.id}
-              note={item}
-              isSelected={isSelected}
-              onSelect={onSelectNote}
-              onContextMenu={event => handleOpenContextMenu(event, item, false)}
-            />
-          );
-        }
-      })}
-    </div>
-  );
-};
 
 const NotesPage = () => {
   const rightSidebarRef = useRef<HTMLDivElement>(null);
@@ -142,7 +38,6 @@ const NotesPage = () => {
   const [isResizingRight, setIsResizingRight] = useState<boolean>(false);
   const [_selectedItemType, setSelectedItemType] = useState<'note' | 'chat'>('note');
   const [_selectedChatId, setSelectedChatId] = useState<string | null>(null);
-  const [currentPage, setCurrentPage] = useState<'notes' | 'canvas'>('notes');
   const [showRightSidebar, setShowRightSidebar] = useState<boolean>(true);
   const [isDodaiSidebarExpanded, setIsDodaiSidebarExpanded] = useState<boolean>(true);
 
@@ -175,6 +70,8 @@ const NotesPage = () => {
     handleContentModification,
     editedSourceUrl,
     setEditedSourceUrl,
+    handleCancelEdit,
+    setEditedTags,
   } = useNoteEditing(selectedNote, updateNote, editor);
 
   const [expandedFolders, setExpandedFolders] = useState<Record<string, boolean>>({});
@@ -185,11 +82,6 @@ const NotesPage = () => {
     targetItem: null,
     isFolder: false,
   });
-
-  const sensors = useSensors(
-    useSensor(MouseSensor, { activationConstraint: { distance: 10 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 250, tolerance: 5 } }),
-  );
 
   const handleToggleFolderExpand = useCallback((folderId: string) => {
     setExpandedFolders(prev => ({
@@ -213,6 +105,10 @@ const NotesPage = () => {
     [],
   );
 
+  const handleCloseContextMenu = useCallback(() => {
+    setContextMenu(prev => ({ ...prev, isVisible: false }));
+  }, []);
+
   const handleExportItemContext = useCallback(async () => {
     if (contextMenu.targetItem && contextMenu.targetItem.type !== 'folder') {
       try {
@@ -222,8 +118,8 @@ const NotesPage = () => {
         alert("Erreur lors de l'exportation.");
       }
     }
-    setContextMenu(prev => ({ ...prev, isVisible: false }));
-  }, [contextMenu.targetItem]);
+    handleCloseContextMenu();
+  }, [contextMenu.targetItem, handleCloseContextMenu]);
 
   const handleDeleteItemContext = useCallback(async () => {
     if (contextMenu.targetItem) {
@@ -235,68 +131,17 @@ const NotesPage = () => {
       if (window.confirm(confirmMessage)) {
         try {
           await deleteNote(itemToDelete.id);
+          if (selectedNote?.id === itemToDelete.id) {
+            handleSelectNote(null);
+          }
         } catch (error) {
           console.error('Erreur lors de la suppression via menu contextuel:', error);
           alert('Erreur lors de la suppression.');
         }
       }
     }
-    setContextMenu(prev => ({ ...prev, isVisible: false }));
-  }, [contextMenu.targetItem, deleteNote]);
-
-  type DragData = { type: 'note'; note: NoteEntry } | { type: 'folder'; folder: NoteEntry; folderId?: string };
-
-  const handleDragEnd = useCallback(
-    async (event: DragEndEvent) => {
-      const { active, over } = event;
-      if (!active || !over) return;
-
-      const activeId = active.id as string;
-      const overId = over.id as string;
-
-      if (activeId === overId) return;
-
-      const overData = over.data.current as DragData | undefined;
-
-      const itemToMove = notes.find(n => n.id === activeId);
-      if (!itemToMove) return;
-
-      let targetFolderIdForDrop: string | null = null;
-
-      if (overId.startsWith('droppable-')) {
-        targetFolderIdForDrop = overId.replace('droppable-', '');
-      } else if (overData?.type === 'folder') {
-        targetFolderIdForDrop = overData.folder.id;
-      } else if (overData?.type === 'note') {
-        const targetNote = overData.note;
-        if (activeId === targetNote.id) return;
-        console.warn('Feature: Converting note to folder on drop is temporarily adjusted. Note type not changed.');
-        targetFolderIdForDrop = targetNote.id;
-      }
-
-      if (itemToMove.type === 'folder' && targetFolderIdForDrop) {
-        let currentParentId: string | null = targetFolderIdForDrop;
-        while (currentParentId !== null) {
-          if (currentParentId === activeId) {
-            console.error('Cannot move folder into itself or a descendant.');
-            alert('Cannot move folder into itself or a descendant.');
-            return;
-          }
-          const parentFolder = notes.find(n => n.id === currentParentId);
-          currentParentId = parentFolder ? parentFolder.parentId : null;
-        }
-      }
-
-      if (itemToMove.type === 'note') {
-        await moveNoteToFolder(activeId, targetFolderIdForDrop);
-      } else if (itemToMove.type === 'folder') {
-        if (itemToMove.parentId !== targetFolderIdForDrop) {
-          await moveFolder(activeId, targetFolderIdForDrop);
-        }
-      }
-    },
-    [notes, moveNoteToFolder, moveFolder],
-  );
+    handleCloseContextMenu();
+  }, [contextMenu.targetItem, deleteNote, handleCloseContextMenu, selectedNote, handleSelectNote]);
 
   const toggleRightSidebar = useCallback(() => {
     setShowRightSidebar(prev => !prev);
@@ -341,13 +186,15 @@ const NotesPage = () => {
     if (isResizingRight) {
       document.addEventListener('mousemove', handleMouseMove);
       document.addEventListener('mouseup', handleMouseUp);
-      document.body.classList.add('resize-active');
+      document.body.style.cursor = 'col-resize';
+      document.body.style.userSelect = 'none';
     }
 
     return () => {
       document.removeEventListener('mousemove', handleMouseMove);
       document.removeEventListener('mouseup', handleMouseUp);
-      document.body.classList.remove('resize-active');
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
     };
   }, [isResizingRight]);
 
@@ -366,152 +213,154 @@ const NotesPage = () => {
     };
   }, [isDirty, handleSaveChanges]);
 
-  const handleDodaiSidebarNavigation = (pageOrPath: 'canvas' | 'notes' | string) => {
-    if (pageOrPath === 'canvas') {
-      setCurrentPage('canvas');
+  const [activePage, setActivePage] = useState<'notes' | 'canvas'>('notes');
+
+  const handleNavigateToPage = useCallback((page: 'notes' | 'canvas' | string) => {
+    if (page === 'canvas') {
+      setActivePage('canvas');
       const canvasUrl = chrome.runtime.getURL('pages/dodai-canvas/index.html');
-      if (window.location.pathname !== '/pages/dodai-canvas/index.html') {
-        window.location.href = canvasUrl;
-      }
-    } else if (pageOrPath === 'notes') {
-      setCurrentPage('notes');
-      if (window.location.pathname !== '/pages/notes-page/index.html') {
-        // If already on notes page, ensure we are on the root of it if coming from canvas
-        // window.location.href = chrome.runtime.getURL('pages/notes-page/index.html'); // Or simply ensure state is correct
-      }
-    } else if (typeof pageOrPath === 'string') {
-      if (pageOrPath.startsWith('http') || pageOrPath.startsWith('chrome://extensions')) {
-        chrome.tabs.create({ url: pageOrPath });
-      } else if (pageOrPath.includes('dodai-canvas')) {
-        setCurrentPage('canvas');
-        const canvasUrl = chrome.runtime.getURL('pages/dodai-canvas/index.html');
-        if (window.location.pathname !== '/pages/dodai-canvas/index.html') {
-          window.location.href = canvasUrl;
-        }
-      }
+      if (window.location.pathname.includes('/dodai-canvas/')) return;
+      window.location.href = canvasUrl;
+    } else if (page === 'notes') {
+      setActivePage('notes');
+      if (window.location.pathname.includes('/notes-page/')) return;
+      window.location.href = chrome.runtime.getURL('pages/notes-page/index.html');
+    } else if (typeof page === 'string' && page.startsWith('http')) {
+      chrome.tabs.create({ url: page });
     }
-  };
+  }, []);
 
   const handleDodaiSidebarExpansionChange = useCallback((isExpanded: boolean) => {
     setIsDodaiSidebarExpanded(isExpanded);
   }, []);
 
-  const navItems: NavItemProps[] = [
-    {
-      id: 'new-note',
-      label: 'Nouvelle Note',
-      icon: <PlusCircle />,
-      onClick: () => handleCreateNewNote(currentFolderId),
-      isActive: false,
-      title: 'Créer une nouvelle note',
-    },
-    {
-      id: 'canvas',
-      label: 'Canvas',
-      icon: <LayoutDashboard />,
-      onClick: () => handleDodaiSidebarNavigation('canvas'),
-      isActive: currentPage === 'canvas',
-      title: 'Ouvrir Dodai Canvas',
-    },
-    {
-      id: 'notes',
-      label: 'Mes Notes',
-      icon: <NotebookText />,
-      onClick: () => handleDodaiSidebarNavigation('notes'),
-      isActive: currentPage === 'notes',
-      title: 'Afficher mes notes',
-    },
-  ];
+  const navItems: NavItemProps[] = useMemo(
+    () => [
+      {
+        id: 'new-note',
+        label: 'Nouvelle Note',
+        icon: <PlusCircle />,
+        onClick: () => handleCreateNewNote(),
+        isActive: false,
+        title: 'Créer une nouvelle note',
+      },
+      {
+        id: 'canvas',
+        label: 'Canvas',
+        icon: <LayoutDashboard />,
+        onClick: () => handleNavigateToPage('canvas'),
+        isActive: activePage === 'canvas',
+        title: 'Ouvrir Dodai Canvas',
+      },
+      {
+        id: 'notes',
+        label: 'Mes Notes',
+        icon: <NotebookText />,
+        onClick: () => handleNavigateToPage('notes'),
+        isActive: activePage === 'notes',
+        title: 'Afficher mes notes',
+      },
+    ],
+    [handleCreateNewNote, handleNavigateToPage, activePage],
+  );
 
-  const lowerContentNotes = useMemo(() => {
-    return (
-      <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-        <div className="flex flex-col h-full overflow-hidden">
-          {folderPath && folderPath.length > 0 && (
-            <div className="border-b border-slate-700/60 flex-shrink-0">
-              <FolderBreadcrumb path={folderPath} onNavigate={navigateToFolder} />
-            </div>
-          )}
-          <div className="flex-1 overflow-y-auto space-y-0.5">
-            {notes && notes.length > 0 ? (
-              <RecursiveNoteTree
-                notes={notes}
-                parentId={currentFolderId}
-                level={0}
-                expandedFolders={expandedFolders}
-                onToggleFolderExpand={handleToggleFolderExpand}
-                selectedNoteId={selectedNote?.id || null}
-                onSelectNote={handleSelectNoteItem}
-                onNavigateToFolder={navigateToFolder}
-                getChildrenOf={getChildrenOf}
-                handleOpenContextMenu={handleOpenContextMenu}
-              />
-            ) : (
-              <div className="text-center py-6 text-slate-500 text-sm">Aucune note ou dossier ici.</div>
-            )}
-          </div>
-          {activeTag && (
-            <div className="p-2 bg-slate-700/80 border-t border-slate-700 flex items-center justify-between flex-shrink-0">
-              <div className="flex items-center">
-                <span className="text-xs text-slate-400 mr-2">Filtre actif:</span>
-                <span className="text-xs bg-blue-600 text-white px-2 py-0.5 rounded-md"># {activeTag}</span>
-              </div>
-            </div>
-          )}
-        </div>
-        <ContextMenu
-          isVisible={contextMenu.isVisible}
-          x={contextMenu.x}
-          y={contextMenu.y}
-          isFolder={contextMenu.isFolder}
-          onClose={() => setContextMenu(prev => ({ ...prev, isVisible: false }))}
-          onExport={handleExportItemContext}
-          onDelete={handleDeleteItemContext}
-        />
-      </DndContext>
-    );
+  useEffect(() => {
+    if (window.location.pathname.includes('/dodai-canvas/')) {
+      setActivePage('canvas');
+    } else if (window.location.pathname.includes('/notes-page/')) {
+      setActivePage('notes');
+    }
+  }, []);
+
+  const notesListPanelContent = useMemo(() => {
+    const panelProps: NotesListPanelProps = {
+      notes,
+      currentFolderId,
+      selectedNoteId: selectedNote?.id || null,
+      activeTag,
+      onSelectNote: handleSelectNoteItem,
+      onNavigateToFolder: navigateToFolder,
+      onMoveNoteToFolder: moveNoteToFolder,
+      onMoveFolder: moveFolder,
+      getChildrenOf,
+      onDeleteItem: handleDeleteItemContext,
+      onUpdateNote: updateNote,
+      expandedFolders,
+      onToggleFolderExpand: handleToggleFolderExpand,
+      handleOpenContextMenu,
+      contextMenuState: contextMenu,
+      onCloseContextMenu: handleCloseContextMenu,
+      onExportContextMenuItem: handleExportItemContext,
+      onDeleteContextMenuItem: handleDeleteItemContext,
+    };
+    return <NotesListPanel {...panelProps} />;
   }, [
     notes,
     currentFolderId,
-    folderPath,
-    expandedFolders,
     selectedNote,
     activeTag,
-    contextMenu,
-    sensors,
-    handleDragEnd,
-    navigateToFolder,
-    handleToggleFolderExpand,
     handleSelectNoteItem,
+    navigateToFolder,
+    moveNoteToFolder,
+    moveFolder,
     getChildrenOf,
+    updateNote,
+    expandedFolders,
+    handleToggleFolderExpand,
     handleOpenContextMenu,
+    contextMenu,
+    handleCloseContextMenu,
     handleExportItemContext,
     handleDeleteItemContext,
   ]);
 
   return (
     <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
+      <Header
+        showRightSidebar={showRightSidebar && activePage === 'notes'}
+        toggleRightSidebar={toggleRightSidebar}
+        selectedNote={selectedNote}
+        selectedItemType={_selectedItemType}
+        folderPath={folderPath}
+        navigateToFolder={navigateToFolder}
+        currentFolderId={currentFolderId}
+        editedTitle={editedTitle}
+        setEditedTitle={setEditedTitle}
+        editedTags={editedTags}
+        tagInput={tagInput}
+        setTagInput={setTagInput}
+        saveStatus={saveStatus}
+        lastError={lastError}
+        isDirty={isDirty}
+        handleAddTag={handleAddTag}
+        handleRemoveTag={handleRemoveTag}
+        editedSourceUrl={editedSourceUrl}
+        setEditedSourceUrl={setEditedSourceUrl}
+        setEditedTags={setEditedTags}
+        handleSaveChanges={handleSaveChanges}
+        handleCancelEdit={handleCancelEdit}
+      />
       <main
         ref={mainContainerRef}
         className="flex-1 grid overflow-hidden relative"
         style={{
-          gridTemplateColumns: `${isDodaiSidebarExpanded ? '256px' : '64px'} auto ${showRightSidebar && currentPage === 'notes' ? rightSidebarWidth + 'px' : '0'}`,
+          gridTemplateColumns: `${isDodaiSidebarExpanded ? '256px' : '64px'} 1fr ${showRightSidebar && activePage === 'notes' ? rightSidebarWidth + 'px' : '0px'}`,
         }}>
         <DodaiSidebar
           navItems={navItems}
-          mainContentTitle={currentPage === 'notes' ? 'MES NOTES' : undefined}
+          mainContentTitle={activePage === 'notes' ? 'MES NOTES' : undefined}
           mainContent={
-            currentPage === 'notes' ? (
-              lowerContentNotes
+            activePage === 'notes' ? (
+              notesListPanelContent
             ) : (
-              <div className="p-4 text-slate-400 text-sm">Contenu spécifique au Canvas ici...</div>
+              <div className="p-4 text-slate-400 text-sm">Vue Canvas (Contenu à venir)</div>
             )
           }
           initialIsExpanded={isDodaiSidebarExpanded}
           onExpansionChange={handleDodaiSidebarExpansionChange}
         />
 
-        {currentPage === 'notes' ? (
+        {activePage === 'notes' ? (
           <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner relative z-10">
             <CenterPanel
               editor={editor}
@@ -537,31 +386,34 @@ const NotesPage = () => {
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center text-slate-400 bg-slate-850 p-8 h-full">
-            <h2 className="text-2xl font-semibold mb-4">Page Canvas</h2>
+            <h2 className="text-2xl font-semibold mb-4">Dodai Canvas</h2>
             <p>Chargement du Canvas...</p>
           </div>
         )}
 
-        {currentPage === 'notes' && showRightSidebar && (
+        {activePage === 'notes' && showRightSidebar && (
           <button
             ref={rightResizeHandleRef}
             type="button"
             aria-label="Redimensionner la barre latérale droite"
-            style={{ right: `${rightSidebarWidth - 8}px` }}
-            className={`absolute top-0 bottom-0 w-4 cursor-col-resize z-30 group flex items-center justify-center ${
+            style={{
+              left: `calc(${isDodaiSidebarExpanded ? '256px' : '64px'} + 1fr - ${rightSidebarWidth}px - 8px)`,
+              zIndex: 25,
+            }}
+            className={`absolute top-0 bottom-0 w-4 h-full cursor-col-resize group flex items-center justify-center ${
               isResizingRight ? 'bg-blue-500/20' : ''
             }`}
             onMouseDown={handleMouseDownRight}>
             <div className="w-1 h-10 bg-slate-600 rounded-full group-hover:bg-blue-500 transition-colors duration-150"></div>
           </button>
         )}
-        {currentPage === 'notes' && (
+        {activePage === 'notes' && (
           <div
             ref={rightSidebarRef}
-            className={`bg-slate-800 border-l border-slate-700/70 transition-width duration-300 ease-in-out overflow-hidden ${
-              !showRightSidebar ? 'w-0 p-0 border-none' : ''
+            className={`bg-slate-800 border-l border-slate-700/70 transition-all duration-100 ease-out overflow-hidden ${
+              !showRightSidebar ? 'w-0 !p-0 !border-l-0' : ''
             }`}
-            style={{ width: showRightSidebar ? `${rightSidebarWidth}px` : '0' }}>
+            style={{ width: showRightSidebar ? `${rightSidebarWidth}px` : '0px' }}>
             {showRightSidebar && (
               <TagsPanel
                 notes={notes || []}
