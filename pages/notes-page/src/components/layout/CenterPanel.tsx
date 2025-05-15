@@ -204,7 +204,7 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
 
     return (
       <div className="h-full flex flex-col bg-slate-850">
-        <div className="flex items-center gap-2 p-2.5 border-b border-slate-700/70 bg-slate-800 flex-shrink-0 min-h-[52px]">
+        <div className="flex items-center gap-2 p-2 border-b border-slate-700 bg-slate-800 flex-shrink-0 min-h-[52px] shadow-sm">
           <div className="flex-grow min-w-0 flex items-center gap-2">
             {editedSourceUrl && (
               <Popover.Root open={isSourceUrlPopoverOpen} onOpenChange={setIsSourceUrlPopoverOpen}>

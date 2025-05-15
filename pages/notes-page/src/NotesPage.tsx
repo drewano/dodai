@@ -315,9 +315,9 @@ const NotesPage = () => {
   ]);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-slate-100 flex flex-col font-sans">
+    <div className="flex h-screen w-full bg-slate-900 text-slate-100 font-sans overflow-hidden p-1 gap-1">
       <main
-        className="flex-1 flex overflow-hidden relative"
+        className="flex flex-1 overflow-hidden gap-1"
         >
         <DodaiSidebar
           navItems={navItems}
@@ -333,11 +333,11 @@ const NotesPage = () => {
           onExpansionChange={handleDodaiSidebarExpansionChange}
         />
 
-        <div className="flex-1 flex flex-col overflow-hidden">
+        <div className="flex-1 flex flex-col overflow-hidden rounded-md">
           {activePage === 'notes' ? (
-            <ResizablePanelGroup direction="horizontal" units="pixels" className="flex-grow min-h-0">
+            <ResizablePanelGroup direction="horizontal" className="flex-grow min-h-0 rounded-md shadow-md">
               <ResizablePanel defaultSize={700} minSize={300}>
-                <div className="flex flex-col overflow-hidden bg-slate-850 shadow-inner h-full w-full">
+                <div className="flex flex-col overflow-hidden bg-slate-800 rounded-md shadow-md h-full w-full">
                   <CenterPanel
                     editor={editor}
                     selectedItemType={_selectedItemType}
@@ -363,7 +363,7 @@ const NotesPage = () => {
               </ResizablePanel>
               {showRightSidebar && (
                 <>
-                  <ResizableHandle withHandle className="w-1.5 bg-slate-700 hover:bg-blue-600 focus:outline-none focus:ring-1 focus:ring-blue-500 data-[resize-handle-active=true]:bg-blue-600" />
+                  <ResizableHandle withHandle />
                   <ResizablePanel
                     defaultSize={rightSidebarWidth}
                     minSize={150}
@@ -377,7 +377,7 @@ const NotesPage = () => {
                     collapsedSize={0}
                     order={2}
                   >
-                    <div ref={rightSidebarRef} className="bg-slate-800 border-l border-slate-700/70 h-full w-full overflow-hidden">
+                    <div ref={rightSidebarRef} className="bg-slate-800 rounded-md shadow-md border-slate-700/70 h-full w-full overflow-hidden">
                       <TagsPanel
                         notes={notes || []}
                         allTags={allTags}
@@ -391,7 +391,7 @@ const NotesPage = () => {
               )}
             </ResizablePanelGroup>
           ) : (
-            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-850 p-8 h-full">
+            <div className="flex-1 flex flex-col items-center justify-center text-slate-400 bg-slate-800 rounded-md shadow-md p-8 h-full">
               <h2 className="text-2xl font-semibold mb-4">Dodai Canvas</h2>
               <p>Chargement du Canvas...</p>
             </div>
