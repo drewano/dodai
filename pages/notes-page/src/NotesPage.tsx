@@ -216,19 +216,41 @@ const NotesPage = () => {
   const [activePage, setActivePage] = useState<'notes' | 'canvas'>('notes');
 
   const handleNavigateToPage = useCallback((page: 'notes' | 'canvas' | string) => {
+    if (isDirty && selectedNote && editor) {
+      console.log('Sauvegarde automatique avant navigation...');
+      handleSaveChanges();
+    }
+
     if (page === 'canvas') {
-      setActivePage('canvas');
-      const canvasUrl = chrome.runtime.getURL('pages/dodai-canvas/index.html');
-      if (window.location.pathname.includes('/dodai-canvas/')) return;
-      window.location.href = canvasUrl;
+      const canvasUrl = chrome.runtime.getURL('dodai-canvas/index.html');
+      if (window.location.pathname.includes('/dodai-canvas/')) {
+        return;
+      }
+      chrome.tabs.getCurrent(tab => {
+        if (tab?.id) {
+          chrome.tabs.update(tab.id, { url: canvasUrl });
+        } else {
+          console.warn('Current tab ID not found for canvas navigation, falling back to window.location.href');
+          window.location.href = canvasUrl;
+        }
+      });
     } else if (page === 'notes') {
-      setActivePage('notes');
-      if (window.location.pathname.includes('/notes-page/')) return;
-      window.location.href = chrome.runtime.getURL('pages/notes-page/index.html');
+      const notesUrl = chrome.runtime.getURL('notes-page/index.html');
+      if (window.location.pathname.includes('/notes-page/')) {
+        return;
+      }
+      chrome.tabs.getCurrent(tab => {
+        if (tab?.id) {
+          chrome.tabs.update(tab.id, { url: notesUrl });
+        } else {
+          console.warn('Current tab ID not found for notes navigation, falling back to window.location.href');
+          window.location.href = notesUrl;
+        }
+      });
     } else if (typeof page === 'string' && page.startsWith('http')) {
       chrome.tabs.create({ url: page });
     }
-  }, []);
+  }, [isDirty, selectedNote, editor, handleSaveChanges]);
 
   const handleDodaiSidebarExpansionChange = useCallback((isExpanded: boolean) => {
     setIsDodaiSidebarExpanded(isExpanded);
