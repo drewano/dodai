@@ -4,6 +4,7 @@ import type { ArtifactMarkdownV3, ArtifactCodeV3, ArtifactContentV3 } from '../t
 import { debounce } from 'lodash';
 import MarkdownToolbar from './MarkdownToolbar';
 import FloatingTextAction from '@extension/ui/lib/components/FloatingTextAction';
+import { dodaiDarkTheme } from '@extension/ui/lib/themes/blocknote-theme';
 import { MessageType } from '../../../../../../chrome-extension/src/background/types';
 import type {
   ModifySelectedTextResponse,
@@ -313,7 +314,11 @@ const ArtifactPanel = () => {
   return (
     <div
       ref={artifactPanelRef}
-      className={`flex flex-col h-full bg-slate-900 text-slate-100 relative ${isArtifactFullscreen ? 'fixed inset-0 z-50 p-4' : ''}`}>
+      className={`flex flex-col h-full relative ${isArtifactFullscreen ? 'fixed inset-0 z-50 p-4' : ''}`}
+      style={{
+        backgroundColor: dodaiDarkTheme.colors?.editor?.background ?? '#0f172a',
+        color: dodaiDarkTheme.colors?.editor?.text ?? '#f1f5f9',
+      }}>
       {isMarkdown && floatingActionPosition && (
         <FloatingTextAction
           isVisible={isFloatingActionVisible}
@@ -406,7 +411,7 @@ const ArtifactPanel = () => {
               <BlockNoteView
                 editor={editor}
                 editable={!isLoading && !isStreamingArtifact && isMarkdown}
-                theme={isArtifactFullscreen ? 'dark' : 'light'}
+                theme={dodaiDarkTheme}
                 onChange={handleEditorContentChange}
               />
             </div>
