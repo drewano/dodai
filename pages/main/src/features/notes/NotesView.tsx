@@ -3,7 +3,7 @@ import type React from 'react';
 import { useState, useCallback, useEffect, useRef, useMemo } from 'react';
 import { useCreateBlockNote } from '@blocknote/react';
 // Removed DodaiSidebar and related imports (PlusCircle, LayoutDashboard, NotebookText, NavItemProps)
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '../canvas/components/ui/resizable'; // Adjusted path
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@extension/ui'; // Adjusted path
 
 // Hooks
 import { useNotes } from './hooks/useNotes'; // Adjusted path

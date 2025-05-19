@@ -1,4 +1,4 @@
-import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from './components/ui/resizable';
+import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@extension/ui';
 import { useDodai } from './contexts/DodaiContext';
 import ChatPanel from './components/ChatPanel';
 import ArtifactPanel from './components/ArtifactPanel';
