@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Navigate } from 'react-router-dom';
 import MainLayout from '@src/components/layout/MainLayout';
 import CanvasView from '@src/features/canvas/CanvasView';
 import NotesView from '@src/features/notes/NotesView';
@@ -10,7 +10,7 @@ import { DodaiProvider } from '@src/features/canvas/contexts/DodaiContext';
 const App = () => {
   return (
     <DodaiProvider>
-      <BrowserRouter>
+      <HashRouter>
         <Routes>
           <Route path="/" element={<MainLayout />}>
             {/* Route d'index qui redirige vers /canvas */}
@@ -19,7 +19,7 @@ const App = () => {
             <Route path="notes" element={<NotesView />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+      </HashRouter>
     </DodaiProvider>
   );
 };
