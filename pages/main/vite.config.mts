@@ -10,8 +10,11 @@ export default withPageConfig({
       '@src': srcDir,
     },
   },
-  publicDir: resolve(rootDir, 'public'),
+  publicDir: resolve(rootDir, 'public'), // Assuming a public directory might be added
   build: {
-    outDir: resolve(rootDir, '..', '..', 'dist', 'notes-page'),
+    outDir: resolve(rootDir, '..', '..', 'dist', 'main'),
+    rollupOptions: {
+      input: resolve(rootDir, 'index.html'), // Make sure to point to the correct HTML file
+    },
   },
 });

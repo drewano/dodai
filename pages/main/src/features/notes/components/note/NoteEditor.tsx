@@ -6,9 +6,9 @@ import type { Theme } from '@blocknote/mantine';
 import '@blocknote/core/fonts/inter.css';
 import '@blocknote/mantine/style.css';
 import type { NoteEntry } from '@extension/storage';
-import FloatingTextAction from '../../../../../packages/ui/lib/components/FloatingTextAction';
-import { MessageType } from '../../../../../chrome-extension/src/background/types';
-import type { ModifySelectedTextResponse } from '../../../../../chrome-extension/src/background/types';
+import FloatingTextAction from '@extension/ui/lib/components/FloatingTextAction';
+import { MessageType } from '../../../../../../../chrome-extension/src/background/types';
+import type { ModifySelectedTextResponse } from '../../../../../../../chrome-extension/src/background/types';
 
 // Define the custom dark theme for BlockNote
 const dodaiDarkTheme: Theme = {

@@ -1,7 +1,7 @@
 import { createRoot } from 'react-dom/client';
-import '@src/index.css';
+import './index.css';
 import '@extension/ui/lib/global.css';
-import NotesPage from '@src/NotesPage';
+import App from './App';
 
 function init() {
   const appContainer = document.querySelector('#app-container');
@@ -9,7 +9,7 @@ function init() {
     throw new Error('Can not find #app-container');
   }
   const root = createRoot(appContainer);
-  root.render(<NotesPage />);
+  root.render(<App />);
 }
 
 init();

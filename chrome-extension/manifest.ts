@@ -60,15 +60,7 @@ const manifest = {
   ],
   web_accessible_resources: [
     {
-      resources: [
-        '*.js',
-        '*.css',
-        '*.svg',
-        'icon-128.png',
-        'icon-34.png',
-        'notes-page/index.html',
-        'dodai-canvas/index.html',
-      ],
+      resources: ['*.js', '*.css', '*.svg', 'icon-128.png', 'icon-34.png', 'main/index.html'],
       matches: ['*://*/*'],
     },
   ],

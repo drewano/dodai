@@ -3,12 +3,12 @@ import type React from 'react';
 import { createContext, useContext, useState, useCallback, useRef, useEffect } from 'react';
 import { v4 as uuidv4 } from 'uuid'; // Besoin pour les IDs de messages
 import type { Message, ArtifactV3, ArtifactMarkdownV3 } from '../types'; // ArtifactContentV3 supprimé
-import { MessageType, StreamEventType } from '../../../../chrome-extension/src/background/types'; // Importer MessageType and StreamEventType
+import { MessageType, StreamEventType } from '../../../../../../chrome-extension/src/background/types'; // Importer MessageType and StreamEventType
 import type {
   GenerateDodaiCanvasArtifactStreamResponse, // For handling stream responses
   ChatHistoryMessage,
   ModifyDodaiCanvasArtifactResponse, // Ajouter le type de réponse pour la modification
-} from '../../../../chrome-extension/src/background/types'; // Formatage import
+} from '../../../../../../chrome-extension/src/background/types'; // Formatage import
 
 interface DodaiContextType {
   messages: Message[];

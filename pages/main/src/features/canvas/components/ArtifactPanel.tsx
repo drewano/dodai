@@ -3,12 +3,12 @@ import { useDodai } from '../contexts/DodaiContext';
 import type { ArtifactMarkdownV3, ArtifactCodeV3, ArtifactContentV3 } from '../types';
 import { debounce } from 'lodash';
 import MarkdownToolbar from './MarkdownToolbar';
-import FloatingTextAction from '../../../../packages/ui/lib/components/FloatingTextAction';
-import { MessageType } from '../../../../chrome-extension/src/background/types';
+import FloatingTextAction from '@extension/ui/lib/components/FloatingTextAction';
+import { MessageType } from '../../../../../../chrome-extension/src/background/types';
 import type {
   ModifySelectedTextResponse,
   SaveArtifactAsNoteResponseMessage,
-} from '../../../../chrome-extension/src/background/types';
+} from '../../../../../../chrome-extension/src/background/types';
 import { Maximize, Minimize, Save } from 'lucide-react';
 
 // BlockNote Imports

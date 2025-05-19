@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { MessageType } from '../../../../chrome-extension/src/background/types';
+import { MessageType } from '../../../../../../chrome-extension/src/background/types';
 import { dodaiCanvasConfigStorage } from '@extension/storage';
 import { useDodai } from '../contexts/DodaiContext';
 
