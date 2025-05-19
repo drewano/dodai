@@ -263,8 +263,8 @@ const NoteEditor: React.FC<NoteEditorProps> = ({ editor, selectedNote, onSyncIni
         />
       )}
       {selectedNote && (
-        <div className="flex-1 flex flex-col overflow-hidden">
-          <div className="flex-1 w-full bg-slate-850 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 resize-none font-mono text-sm leading-relaxed editor-container">
+        <div className="flex-1 flex flex-col overflow-y-auto">
+          <div className="flex-1 w-full bg-slate-850 border border-gray-700 rounded-b-md text-gray-100 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-mono text-sm leading-relaxed editor-container">
             <BlockNoteView editor={editor} theme={dodaiDarkTheme} editable={true} />
           </div>
         </div>

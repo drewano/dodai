@@ -40,6 +40,31 @@
       opacity: 0.5;
     }
   }
+
+  /* For Webkit browsers (Chrome, Safari, Edge) */
+  .editor-container::-webkit-scrollbar {
+    width: 8px;
+  }
+
+  .editor-container::-webkit-scrollbar-track {
+    background: theme('colors.slate.800'); /* Or slightly darker than editor bg */
+    border-radius: 4px;
+  }
+
+  .editor-container::-webkit-scrollbar-thumb {
+    background: theme('colors.slate.600');
+    border-radius: 4px;
+  }
+
+  .editor-container::-webkit-scrollbar-thumb:hover {
+    background: theme('colors.slate.500');
+  }
+  
+  /* General scrollbar styling for firefox */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: theme('colors.slate.600') theme('colors.slate.800');
+  }
 }
 
 /* Styles spécifiques migrés depuis notes-page */

@@ -2,23 +2,29 @@ import { ResizablePanelGroup, ResizablePanel, ResizableHandle } from '@extension
 import { useDodai } from './contexts/DodaiContext';
 import ChatPanel from './components/ChatPanel';
 import ArtifactPanel from './components/ArtifactPanel';
-// Temporairement commenté car notes-page n'est pas encore migré
-// import TagGraphView from '../../../../notes-page/src/components/tag/TagGraphView';
-// import { useNotes } from '../../../../notes-page/src/hooks/useNotes';
-// import { useTagGraph } from '../../../../notes-page/src/hooks/useTagGraph';
+import { useState } from 'react';
+import TagGraphView from '../notes/components/tag/TagGraphView';
+import { useNotes } from '../notes/hooks/useNotes';
+import { useTagGraph } from '../notes/hooks/useTagGraph';
 
 const CanvasViewContent = () => {
   const { currentArtifact } = useDodai();
-  // const { notes } = useNotes();
-  // const tagData = useTagGraph(notes);
+  const { notes } = useNotes();
+  const tagData = useTagGraph(notes);
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   const showArtifactPanel = !!currentArtifact;
   const panelGroupKey = showArtifactPanel ? 'artifactMode' : 'hubMode';
 
-  // TODO: Remplacer TagGraphView par un placeholder ou une version migrée
-  const TagGraphViewPlaceholder = () => (
-    <div className="flex items-center justify-center h-full text-slate-400">Tag Graph View Placeholder</div>
-  );
+  const handleTagSelect = (tag: string) => {
+    setActiveTag(tag);
+    console.log('Tag selected in CanvasView Hub:', tag);
+  };
+
+  const handleClearFilter = () => {
+    setActiveTag(null);
+    console.log('Filter cleared in CanvasView Hub');
+  };
 
   return (
     <div className="flex flex-1 h-full bg-slate-900 text-slate-100 font-sans overflow-hidden p-1 gap-1">
@@ -37,13 +43,12 @@ const CanvasViewContent = () => {
             {showArtifactPanel ? (
               <ArtifactPanel />
             ) : (
-              // <TagGraphView
-              //   tagData={tagData}
-              //   activeTag={null}
-              //   onTagSelect={tag => console.log('Tag selected in Hub:', tag)}
-              //   onClearFilter={() => console.log('Filter cleared in Hub')}
-              // />
-              <TagGraphViewPlaceholder />
+              <TagGraphView
+                tagData={tagData}
+                activeTag={activeTag}
+                onTagSelect={handleTagSelect}
+                onClearFilter={handleClearFilter}
+              />
             )}
           </div>
         </ResizablePanel>
