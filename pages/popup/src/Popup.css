@@ -1,8 +1,8 @@
 .App {
   text-align: center;
-  min-width: 400px; /* Ensure minimum width */
-  min-height: 550px; /* Ensure minimum height */
-  max-height: 550px; /* Limit maximum height */
+  min-width: 350px; /* Réduire légèrement la largeur minimum */
+  min-height: 500px; /* Adapter la hauteur minimum */
+  max-height: 500px; /* Limiter la hauteur maximum */
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -28,6 +28,19 @@
   .App-logo {
     animation: none; /* Remove spinning animation for better UX */
   }
+}
+
+/* Styles spécifiques pour les boutons */
+button {
+  transition: all 0.2s ease;
+}
+
+button:hover {
+  transform: translateY(-1px);
+}
+
+button:active {
+  transform: translateY(1px);
 }
 
 /* Custom scrollbar for better UX */
@@ -61,4 +74,14 @@ code {
   background: rgba(148, 163, 184, 0.5);
   border-radius: 0.25rem;
   padding: 0.2rem 0.5rem;
+}
+
+/* Style pour le textarea */
+textarea {
+  resize: none;
+  transition: all 0.2s ease;
+}
+
+textarea:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
 }

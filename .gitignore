@@ -26,3 +26,5 @@ tsconfig.tsbuildinfo
 **/tailwind-output.css
 **/*.crusor
 **/.cursor
+repomix-output.xml
+repomix.md

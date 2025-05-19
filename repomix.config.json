@@ -1,0 +1,13 @@
+{
+  "output": {
+    "style": "markdown",
+    "filePath": "repomix.md",
+    "directoryStructure": true,
+    "removeComments": false,
+    "showLineNumbers": false,
+    "compress": false
+  },
+  "ignore": {
+    "customPatterns": ["**/*.svg"]
+  }
+}

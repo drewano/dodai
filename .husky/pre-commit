@@ -1,1 +1,4 @@
-pnpm dlx lint-staged --allow-empty
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh" # Ligne standard de Husky
+
+pnpm dlx lint-staged --allow-empty # La commande importante !
