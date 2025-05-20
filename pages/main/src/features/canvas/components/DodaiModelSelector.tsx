@@ -85,7 +85,7 @@ export const DodaiModelSelector: React.FC = () => {
       </button>
 
       {showDropdown && (
-        <div className="absolute left-0 mt-1 w-64 bg-slate-850 border border-slate-700 rounded-md shadow-xl z-20 overflow-hidden animate-fadeInUpMenu">
+        <div className="absolute left-0 mt-1 w-64 bg-slate-800 border border-slate-700 rounded-md shadow-xl z-20 overflow-hidden animate-fadeInUpMenu">
           <div className="p-2 border-b border-slate-700 flex justify-between items-center">
             <h3 className="text-xs font-semibold text-slate-400 uppercase tracking-wider">Modèles Disponibles</h3>
             <button
