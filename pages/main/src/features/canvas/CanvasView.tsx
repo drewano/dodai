@@ -54,7 +54,7 @@ const CanvasViewContent = () => {
         </ResizablePanelGroup>
       ) : (
         <div className="flex flex-col flex-1 h-full">
-          <div className="h-[56px] flex-shrink-0 bg-slate-800 rounded-t-md overflow-hidden">
+          <div className="h-[56px] flex-shrink-0 bg-slate-800 rounded-t-md">
             <ChatPanel activeViewMode={activeViewMode} setActiveViewMode={setActiveViewMode} />
           </div>
           <div className="flex-1 overflow-hidden bg-slate-800 rounded-b-md">

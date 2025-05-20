@@ -147,28 +147,29 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
         {activeViewMode === 'canvas' && <div className="w-[36px] h-[36px]" />}
       </div>
 
-      {messages.length === 0 && !isLoading ? (
-        renderInitialHubView()
-      ) : (
-        <>
-          <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background-secondary space-y-3 sm:space-y-4">
-            {messages.map(message => (
-              <ChatMessage key={message.id} message={message} />
-            ))}
-            <div ref={messagesEndRef} />
-          </div>
+      {activeViewMode === 'canvas' &&
+        (messages.length === 0 && !isLoading ? (
+          renderInitialHubView()
+        ) : (
+          <>
+            <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background-secondary space-y-3 sm:space-y-4">
+              {messages.map(message => (
+                <ChatMessage key={message.id} message={message} />
+              ))}
+              <div ref={messagesEndRef} />
+            </div>
 
-          <div className="p-3 sm:p-4 border-t border-border-primary bg-background-tertiary">
-            <ChatInput
-              chatInput={chatInput}
-              setChatInput={setChatInput}
-              handleSubmit={handleSendMessage}
-              isLoading={isLoading}
-              placeholder="Envoyer un message..."
-            />
-          </div>
-        </>
-      )}
+            <div className="p-3 sm:p-4 border-t border-border-primary bg-background-tertiary">
+              <ChatInput
+                chatInput={chatInput}
+                setChatInput={setChatInput}
+                handleSubmit={handleSendMessage}
+                isLoading={isLoading}
+                placeholder="Envoyer un message..."
+              />
+            </div>
+          </>
+        ))}
     </div>
   );
 };
