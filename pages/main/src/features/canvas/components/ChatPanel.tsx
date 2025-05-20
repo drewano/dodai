@@ -34,11 +34,9 @@ const ChatPanel = () => {
     setChatInput,
     isLoading,
     sendPromptAndGenerateArtifact,
-    currentArtifact,
-    isStreamingArtifact,
   } = useDodai();
   const messagesEndRef = useRef<HTMLDivElement>(null);
-  const [initialHubPrompt, setInitialHubPrompt] = useState(''); // For the dedicated input in hub empty state
+  const [initialHubPrompt, setInitialHubPrompt] = useState('');
 
   useEffect(() => {
     if (messages.length > 0) {
@@ -51,30 +49,19 @@ const ChatPanel = () => {
     const currentInput = (promptToSend || chatInput || initialHubPrompt).trim();
     if (!currentInput) return;
     await sendPromptAndGenerateArtifact(currentInput);
-    setInitialHubPrompt(''); // Clear hub-specific input after sending
-    // setChatInput('') is handled by sendPromptAndGenerateArtifact or DodaiContext
+    setInitialHubPrompt('');
   };
 
   const handleSuggestionClick = (prompt: string) => {
-    setInitialHubPrompt(prompt); // Set for the initial prompt area
-    // Or, if preferred, directly send it:
-    // sendPromptAndGenerateArtifact(prompt);
+    setInitialHubPrompt(prompt);
   };
 
   const renderInitialHubView = () => (
     <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 bg-background-secondary text-text-primary">
-      {/* Model Selector - Rendered conditionally at the top of the hub view */}
-      {messages.length === 0 && !currentArtifact && !isLoading && !isStreamingArtifact && (
-        <div className="w-full max-w-md lg:max-w-lg mb-6 sm:mb-8 flex justify-start">
-          <DodaiModelSelector />
-        </div>
-      )}
-
       <h2 className="text-2xl sm:text-3xl font-semibold text-text-primary mb-6 sm:mb-8 text-center">
         Comment puis-je vous aider aujourd'hui ?
       </h2>
 
-      {/* Initial Prompt Input Area */}
       <form
         onSubmit={e => handleSendMessage(e, initialHubPrompt)}
         className="w-full max-w-md lg:max-w-lg relative flex flex-col items-center mb-6">
@@ -122,19 +109,12 @@ const ChatPanel = () => {
 
   return (
     <div className="flex flex-col h-full bg-background-tertiary text-text-primary shadow-md">
-      {/* Header: Simplified, added History icon */}
       <div className="p-3 flex justify-between items-center flex-shrink-0 h-[56px] bg-background-tertiary border-b border-border-primary">
-        {/* Conditional Model Selector for active chat */} 
-        {messages.length > 0 && !isLoading && (
-          <div className="flex-shrink-0">
-             <DodaiModelSelector />
-          </div>
-        )}
-        {/* Spacer to push history button to the right if model selector is not visible or to balance it*/} 
-        {(messages.length === 0 || isLoading) && <div className="flex-1"></div>} 
-
+        <div className="flex-shrink-0">
+          <DodaiModelSelector />
+        </div>
         <button
-          className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors ml-auto"
+          className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors"
           title="Historique des chats (fonctionnalité à venir)"
           aria-label="Historique des chats"
           onClick={() => alert("Fonctionnalité d'historique à implémenter")}>
@@ -146,7 +126,6 @@ const ChatPanel = () => {
         renderInitialHubView()
       ) : (
         <>
-          {/* Zone d'affichage des messages */}
           <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background-secondary space-y-3 sm:space-y-4">
             {messages.map(message => (
               <ChatMessage key={message.id} message={message} />
@@ -154,7 +133,6 @@ const ChatPanel = () => {
             <div ref={messagesEndRef} />
           </div>
 
-          {/* Zone de saisie */}
           <div className="p-3 sm:p-4 border-t border-border-primary bg-background-tertiary">
             <ChatInput
               chatInput={chatInput}
