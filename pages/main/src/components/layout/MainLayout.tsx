@@ -15,52 +15,67 @@ const MainLayout: React.FC = () => {
   const { notes, addNote, getNote } = useNotes();
   const { handleCreateNewNote } = useNoteSelection(notes, getNote, addNote);
 
-  const navItems: NavItemProps[] = [
-    {
-      id: 'canvas',
-      label: 'Canvas',
-      icon: <LayoutDashboard size={20} />,
-      onClick: () => navigate('/canvas'),
-      isActive: location.pathname.startsWith('/canvas'),
-      title: 'Accéder au Canvas',
+  // Define individual button configurations
+  const newCanvasButton: NavItemProps = {
+    id: 'new-canvas',
+    label: 'Nouveau Canvas',
+    icon: <PlusCircle size={20} />,
+    onClick: () => {
+      resetChatAndArtifact();
+      navigate('/canvas'); // Navigate to ensure canvas view is shown
     },
-    {
-      id: 'notes',
-      label: 'Notes',
-      icon: <BookText size={20} />,
-      onClick: () => navigate('/notes'),
-      isActive: location.pathname.startsWith('/notes'),
-      title: 'Accéder aux Notes',
-    },
-  ];
+    isActive: false, // Action buttons are not typically "active"
+    title: 'Commencer un nouveau Canvas',
+  };
 
-  if (location.pathname.startsWith('/canvas')) {
-    navItems.push({
-      id: 'new-canvas',
-      label: 'Nouveau Canvas',
-      icon: <PlusCircle size={20} />,
-      onClick: () => {
-        resetChatAndArtifact();
-        navigate('/canvas');
-      },
-      isActive: false,
-      title: 'Commencer un nouveau Canvas',
-    });
+  const canvasButton: NavItemProps = {
+    id: 'canvas',
+    label: 'Canvas',
+    icon: <LayoutDashboard size={20} />,
+    onClick: () => navigate('/canvas'),
+    isActive: location.pathname.startsWith('/canvas'),
+    title: 'Accéder au Canvas',
+  };
+
+  const newNoteButton: NavItemProps = {
+    id: 'new-note',
+    label: 'Nouvelle Note',
+    icon: <FilePlus2 size={20} />,
+    onClick: async () => {
+      await handleCreateNewNote(null);
+      navigate('/notes'); // Ensure notes view and list are active/updated
+    },
+    isActive: false,
+    title: 'Créer une nouvelle note',
+  };
+
+  const notesButton: NavItemProps = {
+    id: 'notes',
+    label: 'Notes',
+    icon: <BookText size={20} />,
+    onClick: () => navigate('/notes'),
+    isActive: location.pathname.startsWith('/notes'),
+    title: 'Accéder aux Notes',
+  };
+
+  let navItems: NavItemProps[] = [];
+  const isCanvasPath = location.pathname.startsWith('/canvas');
+  const isNotesPath = location.pathname.startsWith('/notes');
+
+  // Determine which "New" button to show based on the active path
+  // If neither, or on a different path, default to newCanvas or make a specific choice.
+  let primaryNewButton = newCanvasButton; // Default
+  if (isCanvasPath) {
+    primaryNewButton = newCanvasButton;
+  } else if (isNotesPath) {
+    primaryNewButton = newNoteButton;
+  } else {
+    // Fallback if on a path other than /canvas or /notes
+    // Decide what the default "+" button should be. For instance, new canvas.
+    primaryNewButton = newCanvasButton;
   }
 
-  if (location.pathname.startsWith('/notes')) {
-    navItems.push({
-      id: 'new-note',
-      label: 'Nouvelle Note',
-      icon: <FilePlus2 size={20} />,
-      onClick: async () => {
-        await handleCreateNewNote(null);
-        navigate('/notes');
-      },
-      isActive: false,
-      title: 'Créer une nouvelle note',
-    });
-  }
+  navItems = [primaryNewButton, canvasButton, notesButton];
 
   return (
     <div className="flex h-screen bg-background-primary text-text-primary">
