@@ -1075,6 +1075,7 @@ Instruction de modification: ${prompt}`;
       };
     }
     const { port } = streamingPortInfo;
+    let effectiveModelName: string | undefined;
 
     try {
       const isReady = await agentService.isAgentReady();
@@ -1089,12 +1090,12 @@ Instruction de modification: ${prompt}`;
 
       const history = chatHistoryPayload ? convertChatHistory(chatHistoryPayload) : [];
       const settings = await aiAgentStorage.get();
-      const modelToUse = modelNameFromPayload || settings.selectedModel;
+      effectiveModelName = modelNameFromPayload || settings.selectedModel;
 
-      port.postMessage({ type: StreamEventType.STREAM_START, model: modelToUse });
+      port.postMessage({ type: StreamEventType.STREAM_START, model: effectiveModelName });
 
       agentService
-        .streamArtifactGeneration(prompt, history, port, modelToUse)
+        .streamArtifactGeneration(prompt, history, port, effectiveModelName)
         .then(() => {
           logger.debug('[DodaiCanvasStream] Streaming terminé avec succès par agentService pour le port', portId);
         })
@@ -1105,7 +1106,7 @@ Instruction de modification: ${prompt}`;
               type: StreamEventType.STREAM_ERROR,
               error: error instanceof Error ? error.message : "Erreur inconnue durant le streaming d'artefact",
             });
-            port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: modelToUse });
+            port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: effectiveModelName });
           } catch (portError) {
             logger.warn(
               "[DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après échec agentService:",
@@ -1122,7 +1123,7 @@ Instruction de modification: ${prompt}`;
           type: StreamEventType.STREAM_ERROR,
           error: error instanceof Error ? error.message : "Erreur inconnue avant le lancement du streaming d'artefact",
         });
-        port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: modelToUse });
+        port.postMessage({ type: StreamEventType.STREAM_END, success: false, model: effectiveModelName });
       } catch (portError) {
         logger.warn("[DodaiCanvasStream] Impossible d'envoyer l'erreur sur le port après erreur majeure:", portError);
       }

@@ -3,6 +3,8 @@ export interface Message {
   role: 'user' | 'assistant' | 'system';
   content: string;
   timestamp: number;
+  isStreaming?: boolean;
+  model?: string;
 }
 
 export type ArtifactType = 'text' | 'code';

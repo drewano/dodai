@@ -124,7 +124,8 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
             ))}
         </div>
 
-        <div className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-amber-400' : 'text-amber-500 group-hover:text-amber-400'}`}>
+        <div
+          className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-amber-400' : 'text-amber-500 group-hover:text-amber-400'}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -137,7 +138,8 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
           </svg>
         </div>
 
-        <h3 className={`font-medium truncate text-sm flex-grow ${isSelected ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
+        <h3
+          className={`font-medium truncate text-sm flex-grow ${isSelected ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
           {folder.title || 'Dossier sans nom'}
         </h3>
 
