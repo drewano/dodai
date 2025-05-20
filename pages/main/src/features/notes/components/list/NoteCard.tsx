@@ -63,14 +63,13 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       ref={setNodeRef}
       {...listeners}
       {...attributes}
-      className={`relative p-3.5 rounded-md cursor-pointer transition-all duration-200
-        ${
-          isSelected
-            ? 'bg-slate-700 shadow-md shadow-slate-900/30 ring-1 ring-blue-500/20'
-            : 'bg-slate-800/90 hover:bg-slate-700/80 hover:shadow-sm hover:shadow-slate-900/10'
+      className={`relative p-3 rounded-lg cursor-pointer transition-all duration-150 ease-in-out group
+        ${isSelected
+          ? 'bg-background-tertiary shadow-lg shadow-slate-900/40 ring-2 ring-border-accent'
+          : 'bg-background-tertiary/60 hover:bg-background-tertiary/90 hover:shadow-md hover:shadow-slate-900/20'
         }
-        ${isDragging ? 'opacity-70 border-dashed border-2 border-blue-400 bg-slate-700/60 shadow-lg scale-[1.01]' : ''}
-        ${isOver ? 'ring-2 ring-green-500 bg-slate-700/70 shadow-lg' : ''}`}
+        ${isDragging ? 'opacity-60 border-dashed border-2 border-blue-400 bg-background-tertiary/80 shadow-xl scale-[1.02] z-10' : ''}
+        ${isOver ? 'ring-2 ring-green-500/70 bg-background-tertiary/90 shadow-lg' : ''}`}
       onClick={() => onSelect(note)}
       onKeyDown={handleKeyDown}
       tabIndex={0}
@@ -78,11 +77,11 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       aria-pressed={isSelected}
       style={style}
       onContextMenu={e => onContextMenu(e, note)}>
-      {/* Sélection marker */}
-      {isSelected && <div className="absolute left-0 top-0 bottom-0 w-1 bg-blue-500 rounded-l-md" />}
+      {/* Sélection marker - more subtle */}
+      {isSelected && <div className="absolute left-0 top-2 bottom-2 w-1 bg-border-accent rounded-r-full" />}
 
-      <div className="flex items-center gap-2.5">
-        <div className={`text-blue-400 w-5 h-5 flex-shrink-0 ${isSelected ? 'text-blue-400' : 'text-slate-400'}`}>
+      <div className="flex items-center gap-3">
+        <div className={`flex-shrink-0 w-5 h-5 ${isSelected ? 'text-text-accent' : 'text-text-secondary group-hover:text-text-accent'}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -98,37 +97,37 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
             <line x1="10" y1="9" x2="8" y2="9" />
           </svg>
         </div>
-        <h3 className={`font-medium truncate text-base leading-tight ${isSelected ? 'text-white' : 'text-slate-200'}`}>
+        <h3 className={`font-medium truncate text-sm leading-tight ${isSelected ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
           {note.title || 'Sans titre'}
         </h3>
       </div>
 
       {/* Footer avec métadonnées */}
-      <div className="mt-3 ml-7 flex flex-wrap items-center gap-y-2">
+      <div className="mt-2.5 ml-8 flex flex-col gap-2 text-xs">
         {/* Tags */}
         {note.tags && note.tags.length > 0 && (
-          <div className="flex flex-wrap gap-1.5 mr-auto">
+          <div className="flex flex-wrap gap-1.5">
             {note.tags.slice(0, 3).map(tag => (
               <span
                 key={tag}
-                className="text-xs px-1.5 py-0.5 rounded-full bg-slate-700/80 text-blue-300 border border-slate-600/30">
-                #{tag}
+                className="text-xs px-2 py-0.5 rounded-md bg-slate-700/70 text-sky-300 group-hover:bg-slate-600/70 group-hover:text-sky-200 border border-slate-600/50">
+                {tag} {/* Removed #, assuming tags are stored without it, or add it here if needed */}
               </span>
             ))}
             {note.tags.length > 3 && (
-              <span className="text-xs px-1.5 py-0.5 rounded-full bg-slate-700/80 text-slate-400 border border-slate-600/30">
-                +{note.tags.length - 3}
+              <span className="text-xs px-2 py-0.5 rounded-md bg-slate-700/70 text-text-muted group-hover:bg-slate-600/70 border border-slate-600/50">
+                +{note.tags.length - 3} autres
               </span>
             )}
           </div>
         )}
 
-        {/* Info */}
-        <div className="flex items-center gap-2 text-xs text-slate-500 ml-auto">
-          {/* Date */}
+        {/* Info - Source Web only if it exists, date can be more subtle or integrated elsewhere if too cluttered */}
+        <div className="flex items-center gap-2 text-text-muted">
+          {/* Date - can be made more subtle if needed */}
           <span className="flex items-center">
             <svg
-              className="w-3 h-3 mr-1 text-slate-500"
+              className="w-3 h-3 mr-1 flex-shrink-0"
               xmlns="http://www.w3.org/2000/svg"
               viewBox="0 0 24 24"
               fill="none"
@@ -141,12 +140,10 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
             </svg>
             {formatDate(note.updatedAt)}
           </span>
-
-          {/* Source Web */}
           {note.sourceUrl && (
-            <span className="flex items-center text-blue-400">
+            <span className="flex items-center text-blue-400 hover:text-blue-300 transition-colors">
               <svg
-                className="w-3 h-3 mr-1"
+                className="w-3 h-3 mr-1 flex-shrink-0"
                 xmlns="http://www.w3.org/2000/svg"
                 viewBox="0 0 24 24"
                 fill="none"
@@ -165,7 +162,7 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       </div>
       {isOver && (
         <div
-          className="absolute inset-0 bg-green-500 opacity-20 rounded-md pointer-events-none"
+          className="absolute inset-0 bg-green-600 opacity-10 rounded-lg pointer-events-none ring-1 ring-green-500"
           aria-hidden="true"></div>
       )}
     </div>

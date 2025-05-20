@@ -27,7 +27,7 @@ const CanvasViewContent = () => {
   };
 
   return (
-    <div className="flex flex-1 h-full bg-slate-900 text-slate-100 font-sans overflow-hidden p-1 gap-1">
+    <div className="flex flex-1 h-full bg-background-primary text-text-primary font-sans overflow-hidden">
       <ResizablePanelGroup
         key={panelGroupKey}
         direction="horizontal"

@@ -309,15 +309,15 @@ const ArtifactPanel = () => {
   };
 
   const headerButtonClasses =
-    'p-1.5 rounded-md text-slate-300 hover:bg-slate-700 hover:text-slate-100 transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-sm';
+    'p-2 rounded-lg text-text-secondary hover:bg-background-quaternary hover:text-text-primary transition-colors focus:outline-none focus:ring-2 focus:ring-border-accent disabled:opacity-50 disabled:cursor-not-allowed flex items-center gap-1.5 text-xs sm:text-sm font-medium';
 
   return (
     <div
       ref={artifactPanelRef}
-      className={`flex flex-col h-full relative ${isArtifactFullscreen ? 'fixed inset-0 z-50 p-4' : ''}`}
+      className={`flex flex-col h-full relative ${isArtifactFullscreen ? 'fixed inset-0 z-50 p-2 sm:p-4' : ''}`}
       style={{
-        backgroundColor: dodaiDarkTheme.colors?.editor?.background ?? '#0f172a',
-        color: dodaiDarkTheme.colors?.editor?.text ?? '#f1f5f9',
+        backgroundColor: 'var(--color-bg-secondary)',
+        color: 'var(--color-text-primary)',
       }}>
       {isMarkdown && floatingActionPosition && (
         <FloatingTextAction
@@ -330,13 +330,13 @@ const ArtifactPanel = () => {
           zIndex={isArtifactFullscreen ? 1051 : 1050}
         />
       )}
-      <div className="flex justify-between items-center p-2 bg-slate-800 border-b border-slate-700 shadow-sm flex-shrink-0">
-        <div className="flex items-center truncate">
-          <div className="text-base font-medium mr-3 truncate">
+      <div className="flex justify-between items-center p-3 bg-background-tertiary border-b border-border-primary shadow-sm flex-shrink-0 h-[56px]">
+        <div className="flex items-center truncate gap-2">
+          <div className="text-base font-semibold mr-2 truncate text-text-primary">
             {currentContent?.title || (isStreamingArtifact ? 'Génération en cours...' : 'Nouvel Artefact')}
           </div>
           {currentContent && (
-            <div className="text-xs px-2 py-0.5 rounded bg-slate-700 text-slate-300 whitespace-nowrap">
+            <div className="text-xs px-2.5 py-1 rounded-md bg-background-quaternary text-text-secondary whitespace-nowrap font-medium">
               {currentContent.type === 'text'
                 ? 'Markdown'
                 : currentContent.type === 'code'
@@ -387,10 +387,10 @@ const ArtifactPanel = () => {
         )}
 
         {(isLoading || isStreamingArtifact) && !isSaving && (
-          <div className="p-2 text-center text-sm font-medium bg-blue-800 text-blue-200 animate-pulse sticky top-0 z-10">
+          <div className="p-2.5 text-center text-sm font-medium bg-blue-700/80 text-blue-100 animate-pulse sticky top-0 z-10 rounded-b-md">
             <div className="flex items-center justify-center">
               <svg
-                className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-200"
+                className="animate-spin -ml-1 mr-2 h-4 w-4 text-blue-100"
                 xmlns="http://www.w3.org/2000/svg"
                 fill="none"
                 viewBox="0 0 24 24">
@@ -405,7 +405,7 @@ const ArtifactPanel = () => {
           </div>
         )}
 
-        <div className={`p-1 ${isMarkdown ? 'md:p-2' : ''}`}>
+        <div className={`p-0 ${isMarkdown ? 'md:px-1 md:pb-1' : ''}`}>
           {isMarkdown ? (
             <div className="h-full min-h-[300px]">
               <BlockNoteView
@@ -416,13 +416,13 @@ const ArtifactPanel = () => {
               />
             </div>
           ) : isCode ? (
-            <div className="p-0 md:p-2 h-full">
-              <pre className="bg-slate-800 text-slate-200 p-3 md:p-4 rounded-lg overflow-auto h-full text-sm">
+            <div className="p-0 h-full">
+              <pre className="bg-slate-900 text-slate-200 p-4 rounded-lg overflow-auto h-full text-sm leading-relaxed font-mono">
                 <code>{(currentContent as ArtifactCodeV3).code}</code>
               </pre>
             </div>
           ) : (
-            <div className="flex items-center justify-center h-full text-slate-500 dark:text-slate-400 min-h-[300px]">
+            <div className="flex items-center justify-center h-full text-text-muted min-h-[300px]">
               <div className="text-center p-4">
                 <svg
                   className="w-12 h-12 mb-3 mx-auto text-slate-400"

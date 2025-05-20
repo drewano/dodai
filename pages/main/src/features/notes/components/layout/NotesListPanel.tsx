@@ -275,14 +275,13 @@ const NotesListPanel: React.FC<NotesListPanelProps> = ({
 
   return (
     <DndContext sensors={sensors} onDragEnd={handleDragEnd} collisionDetection={closestCenter}>
-      <div className="h-full flex flex-col overflow-hidden bg-transparent text-slate-100 select-none">
+      <div className="h-full flex flex-col overflow-hidden bg-transparent text-text-primary select-none">
         {/* Header removed */}
 
         {/* Main Content */}
-        <div className="flex-1 overflow-y-auto p-1 space-y-0.5">
-          {' '}
-          {/* Adjusted padding slightly */}
-          {notes && (notes.length > 0 || currentFolderId !== null) ? ( // Show tree even if current folder is empty but exists
+        <div className="flex-1 overflow-y-auto p-2 space-y-1">
+          {/* Adjusted padding to p-2 and space-y-1 */}
+          {notes && (notes.length > 0 || currentFolderId !== null) ? (
             <RecursiveNoteTree
               notes={notes}
               parentId={currentFolderId} // Display content of the current folder

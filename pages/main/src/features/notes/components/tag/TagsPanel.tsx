@@ -19,31 +19,27 @@ const TagsPanel: FC<TagsPanelProps> = ({ notes, allTags, activeTag, onTagSelect,
   const tagGraphData = useTagGraph(notes);
 
   return (
-    <div className="h-full flex flex-col bg-slate-800 text-slate-100">
+    <div className="h-full flex flex-col bg-background-tertiary text-text-primary">
       {/* Navigation tabs */}
-      <div className="p-2 bg-slate-800 border-b border-slate-700 shadow-sm flex-shrink-0">
-        <div className="flex">
+      <div className="p-2 bg-background-tertiary border-b border-border-primary shadow-sm flex-shrink-0">
+        <div className="flex space-x-1 bg-background-secondary p-1 rounded-lg">
           <button
             onClick={() => setViewMode('list')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-150 rounded-t-md focus:outline-none focus:ring-1 focus:ring-blue-500/50 relative ${
-              viewMode === 'list'
-                ? 'text-slate-100 bg-slate-850'
-                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
-            }`}>
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-secondary relative ${viewMode === 'list'
+                ? 'bg-background-tertiary text-text-primary shadow-sm'
+                : 'text-text-secondary hover:text-text-primary hover:bg-background-quaternary/50'
+              }`}>
             <List size={16} />
             Liste
-            {viewMode === 'list' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"></div>}
           </button>
           <button
             onClick={() => setViewMode('graph')}
-            className={`flex items-center gap-1.5 px-3 py-2 text-sm font-medium transition-colors duration-150 rounded-t-md focus:outline-none focus:ring-1 focus:ring-blue-500/50 relative ${
-              viewMode === 'graph'
-                ? 'text-slate-100 bg-slate-850'
-                : 'text-slate-400 hover:text-slate-100 hover:bg-slate-700/50'
-            }`}>
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-secondary relative ${viewMode === 'graph'
+                ? 'bg-background-tertiary text-text-primary shadow-sm'
+                : 'text-text-secondary hover:text-text-primary hover:bg-background-quaternary/50'
+              }`}>
             <GitBranch size={16} />
             Graphe
-            {viewMode === 'graph' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-500"></div>}
           </button>
         </div>
       </div>

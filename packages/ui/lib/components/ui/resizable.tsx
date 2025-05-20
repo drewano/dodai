@@ -36,14 +36,15 @@ interface ResizableHandleProps extends React.ComponentProps<typeof ResizablePrim
 export const ResizableHandle = ({ className, withHandle, ...props }: ResizableHandleProps) => (
   <ResizablePrimitive.PanelResizeHandle
     className={cn(
-      'relative flex w-1 items-center justify-center bg-slate-700/50 rounded-md transition-colors hover:bg-blue-500/50',
-      'data-[panel-group-direction=vertical]:h-1 data-[panel-group-direction=vertical]:w-full',
+      'relative flex w-1.5 items-center justify-center bg-background-quaternary/40 rounded-sm transition-colors hover:bg-border-accent/70 data-[resize-handle-state=drag]:bg-border-accent',
+      'focus-visible:ring-1 focus-visible:ring-border-accent focus-visible:outline-none',
+      'data-[panel-group-direction=vertical]:h-1.5 data-[panel-group-direction=vertical]:w-full',
       className || '',
     )}
     {...props}>
     {withHandle && (
-      <div className="z-10 flex h-8 w-1.5 items-center justify-center">
-        <div className="w-0.5 h-4 bg-slate-400 rounded-full hover:bg-blue-400"></div>
+      <div className="z-10 flex h-10 w-full items-center justify-center">
+        <div className="w-1 h-5 bg-slate-500/70 group-hover:bg-blue-400/70 rounded-full transition-colors data-[resize-handle-state=drag]:bg-blue-300"></div>
       </div>
     )}
   </ResizablePrimitive.PanelResizeHandle>

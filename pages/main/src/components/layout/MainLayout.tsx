@@ -63,7 +63,7 @@ const MainLayout: React.FC = () => {
   }
 
   return (
-    <div className="flex h-screen bg-slate-900 text-slate-100">
+    <div className="flex h-screen bg-background-primary text-text-primary">
       <DodaiSidebar navItems={navItems} initialIsExpanded={true} />
       <main className="flex-1 p-6 overflow-auto">
         <Outlet />

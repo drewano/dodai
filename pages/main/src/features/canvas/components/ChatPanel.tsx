@@ -62,30 +62,30 @@ const ChatPanel = () => {
   };
 
   const renderInitialHubView = () => (
-    <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 bg-slate-850 text-slate-200">
+    <div className="flex-1 flex flex-col items-center justify-center p-4 sm:p-8 bg-background-secondary text-text-primary">
       {/* Model Selector - Rendered conditionally at the top of the hub view */}
       {messages.length === 0 && !currentArtifact && !isLoading && !isStreamingArtifact && (
-        <div className="w-full max-w-xl lg:max-w-2xl mb-6 sm:mb-8 flex justify-start">
+        <div className="w-full max-w-md lg:max-w-lg mb-6 sm:mb-8 flex justify-start">
           <DodaiModelSelector />
         </div>
       )}
 
-      <h2 className="text-2xl sm:text-3xl font-semibold text-slate-100 mb-6 sm:mb-8 text-center">
+      <h2 className="text-2xl sm:text-3xl font-semibold text-text-primary mb-6 sm:mb-8 text-center">
         Comment puis-je vous aider aujourd'hui ?
       </h2>
 
       {/* Initial Prompt Input Area */}
       <form
         onSubmit={e => handleSendMessage(e, initialHubPrompt)}
-        className="w-full max-w-xl lg:max-w-2xl relative flex flex-col items-center mb-6">
+        className="w-full max-w-md lg:max-w-lg relative flex flex-col items-center mb-6">
         <div className="w-full relative flex items-center">
-          <PlusCircle className="text-slate-400 w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
+          <PlusCircle className="text-text-muted w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 pointer-events-none" />
           <textarea
             rows={2}
             value={initialHubPrompt}
             onChange={e => setInitialHubPrompt(e.target.value)}
             placeholder="Votre chef-d'œuvre commence ici..."
-            className="w-full p-3.5 pl-12 pr-12 rounded-lg bg-slate-800 border border-slate-700 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 text-slate-100 resize-none shadow-md focus:shadow-lg transition-shadow duration-200 h-auto min-h-[56px] text-sm sm:text-base"
+            className="w-full p-4 pl-12 pr-14 rounded-xl bg-background-tertiary border border-border-primary focus:ring-2 focus:ring-border-accent focus:border-border-accent text-text-primary resize-none shadow-sm focus:shadow-lg transition-all duration-200 h-auto min-h-[60px] text-sm sm:text-base leading-relaxed"
             onKeyDown={e => {
               if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
@@ -96,7 +96,7 @@ const ChatPanel = () => {
           <button
             type="submit"
             disabled={!initialHubPrompt.trim() || isLoading}
-            className="absolute right-3 top-1/2 -translate-y-1/2 p-2 rounded-md hover:bg-slate-700 text-slate-400 hover:text-blue-500 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
+            className="absolute right-3.5 top-1/2 -translate-y-1/2 p-2.5 rounded-lg hover:bg-background-quaternary text-text-muted hover:text-text-accent disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-150"
             aria-label="Envoyer le prompt"
             title="Envoyer">
             <Send className="w-5 h-5 transition-colors duration-150" />
@@ -104,16 +104,16 @@ const ChatPanel = () => {
         </div>
       </form>
 
-      <p className="text-slate-400 mb-4 sm:mb-6 text-sm">ou inspirez-vous de nos suggestions :</p>
+      <p className="text-text-muted mb-4 sm:mb-6 text-sm">ou inspirez-vous de nos suggestions :</p>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full max-w-3xl">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4 w-full max-w-2xl">
         {suggestionPrompts.map((suggestion, index) => (
           <button
             key={index}
-            className="bg-slate-800 p-3 sm:p-4 rounded-lg border border-slate-700 hover:border-blue-500 cursor-pointer transition-all duration-200 hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-opacity-75 text-left"
+            className="bg-background-tertiary p-4 rounded-xl border border-border-primary hover:border-border-accent cursor-pointer transition-all duration-200 hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-border-accent focus:ring-opacity-75 text-left group"
             onClick={() => handleSuggestionClick(suggestion.fullPrompt)}>
-            <h4 className="font-semibold text-slate-100 mb-1 text-sm sm:text-base">{suggestion.title}</h4>
-            <p className="text-slate-400 text-xs sm:text-sm">{suggestion.description}</p>
+            <h4 className="font-semibold text-text-primary group-hover:text-text-accent mb-1 text-sm sm:text-base transition-colors duration-150">{suggestion.title}</h4>
+            <p className="text-text-secondary text-xs sm:text-sm">{suggestion.description}</p>
           </button>
         ))}
       </div>
@@ -121,15 +121,24 @@ const ChatPanel = () => {
   );
 
   return (
-    <div className="flex flex-col h-full bg-slate-800 text-slate-100 shadow-md">
+    <div className="flex flex-col h-full bg-background-tertiary text-text-primary shadow-md">
       {/* Header: Simplified, added History icon */}
-      <div className="p-3 flex justify-end items-center flex-shrink-0 h-[50px] bg-slate-800">
+      <div className="p-3 flex justify-between items-center flex-shrink-0 h-[56px] bg-background-tertiary border-b border-border-primary">
+        {/* Conditional Model Selector for active chat */} 
+        {messages.length > 0 && !isLoading && (
+          <div className="flex-shrink-0">
+             <DodaiModelSelector />
+          </div>
+        )}
+        {/* Spacer to push history button to the right if model selector is not visible or to balance it*/} 
+        {(messages.length === 0 || isLoading) && <div className="flex-1"></div>} 
+
         <button
-          className="p-1.5 rounded-full text-slate-400 hover:text-slate-100 hover:bg-slate-700 transition-colors"
+          className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors ml-auto"
           title="Historique des chats (fonctionnalité à venir)"
           aria-label="Historique des chats"
           onClick={() => alert("Fonctionnalité d'historique à implémenter")}>
-          <History size={18} />
+          <History size={20} />
         </button>
       </div>
 
@@ -138,7 +147,7 @@ const ChatPanel = () => {
       ) : (
         <>
           {/* Zone d'affichage des messages */}
-          <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-slate-850 space-y-3 sm:space-y-4">
+          <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background-secondary space-y-3 sm:space-y-4">
             {messages.map(message => (
               <ChatMessage key={message.id} message={message} />
             ))}
@@ -146,9 +155,9 @@ const ChatPanel = () => {
           </div>
 
           {/* Zone de saisie */}
-          <div className="p-3 sm:p-4 border-t border-slate-700 bg-slate-800">
+          <div className="p-3 sm:p-4 border-t border-border-primary bg-background-tertiary">
             <ChatInput
-              chatInput={chatInput} // Standard chat input for ongoing conversations
+              chatInput={chatInput}
               setChatInput={setChatInput}
               handleSubmit={handleSendMessage}
               isLoading={isLoading}

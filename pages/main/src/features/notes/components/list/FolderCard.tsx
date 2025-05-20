@@ -92,10 +92,10 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
         ref={setNodeRef}
         {...listeners}
         {...attributes}
-        className={`group relative flex items-center gap-2.5 pr-3 py-1 rounded cursor-pointer transition-colors duration-100
-          ${isSelected ? 'bg-slate-700' : 'hover:bg-slate-700/60'}
-          ${isDragging ? 'opacity-50 border-dashed border border-blue-400 bg-slate-700/50 shadow-lg scale-[1.01]' : ''}
-          ${isOver ? 'bg-slate-600/80 ring-1 ring-blue-500/30' : ''}`}
+        className={`group relative flex items-center gap-2 pr-3 pl-1 py-2 rounded-lg cursor-pointer transition-colors duration-100 ease-in-out
+          ${isSelected ? 'bg-background-tertiary shadow-md' : 'hover:bg-background-tertiary/70'}
+          ${isDragging ? 'opacity-50 border-dashed border border-blue-400 bg-background-tertiary/60 shadow-lg scale-[1.01] z-10' : ''}
+          ${isOver ? 'bg-background-quaternary/50 ring-1 ring-blue-500/40' : ''}`}
         onClick={() => onSelect(folder)}
         onDoubleClick={() => onOpen(folder)}
         onKeyDown={handleKeyDown}
@@ -118,13 +118,13 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
           {hasChildren &&
             onToggleExpand &&
             (isExpanded ? (
-              <ChevronDown size={16} className="text-slate-400" />
+              <ChevronDown size={18} className="text-text-muted group-hover:text-text-secondary" />
             ) : (
-              <ChevronRight size={16} className="text-slate-400" />
+              <ChevronRight size={18} className="text-text-muted group-hover:text-text-secondary" />
             ))}
         </div>
 
-        <div className={`text-amber-400 w-5 h-5 flex-shrink-0 ${isSelected ? 'text-amber-300' : 'text-amber-400/80'}`}>
+        <div className={`w-5 h-5 flex-shrink-0 ${isSelected ? 'text-amber-400' : 'text-amber-500 group-hover:text-amber-400'}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -137,18 +137,18 @@ const FolderCard = forwardRef<HTMLDivElement, FolderCardProps>(
           </svg>
         </div>
 
-        <h3 className={`font-medium truncate text-sm flex-grow ${isSelected ? 'text-slate-100' : 'text-slate-300'}`}>
+        <h3 className={`font-medium truncate text-sm flex-grow ${isSelected ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
           {folder.title || 'Dossier sans nom'}
         </h3>
 
         <div className="flex-shrink-0 ml-auto">
           <span
-            className={`text-xs px-1.5 py-0.5 rounded-full ${notesCount > 0 ? 'bg-slate-600 text-slate-300' : 'text-slate-500'}`}>
+            className={`text-xs px-2 py-0.5 rounded-full ${notesCount > 0 ? 'bg-slate-700 text-text-secondary group-hover:text-text-primary' : 'text-text-muted'}`}>
             {notesCount}
           </span>
         </div>
 
-        {isOver && <div className="absolute inset-0 border border-blue-400/50 rounded pointer-events-none"></div>}
+        {isOver && <div className="absolute inset-0 border border-blue-400/50 rounded-lg pointer-events-none"></div>}
       </div>
     );
   },

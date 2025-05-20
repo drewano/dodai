@@ -203,14 +203,14 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
     }
 
     return (
-      <div className="h-full flex flex-col bg-slate-850">
-        <div className="flex items-center gap-2 p-2 border-b border-slate-700 bg-slate-800 flex-shrink-0 min-h-[52px] shadow-sm">
+      <div className="h-full flex flex-col bg-background-secondary">
+        <div className="flex items-center gap-2 px-3 py-2 border-b border-border-primary bg-background-tertiary flex-shrink-0 min-h-[56px] shadow-sm">
           <div className="flex-grow min-w-0 flex items-center gap-2">
             {editedSourceUrl && (
               <Popover.Root open={isSourceUrlPopoverOpen} onOpenChange={setIsSourceUrlPopoverOpen}>
                 <Popover.Trigger asChild>
                   <button
-                    className="p-1.5 rounded-md text-slate-400 hover:text-slate-200 hover:bg-slate-700/60 focus:outline-none focus:ring-1 focus:ring-blue-500/40 flex-shrink-0"
+                    className="p-2 rounded-lg text-text-muted hover:text-text-secondary hover:bg-background-quaternary focus:outline-none focus:ring-1 focus:ring-border-accent flex-shrink-0"
                     title="Voir/Modifier l'URL source">
                     <Link2 size={18} />
                   </button>
@@ -305,11 +305,11 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
                 onBlur={handleTitleBlur}
                 onKeyDown={handleTitleInputKeyDown}
                 placeholder="Sans titre"
-                className="font-semibold text-lg text-slate-100 bg-transparent px-1 py-0.5 focus:outline-none focus:ring-1 focus:ring-blue-500 rounded-md min-w-[150px] w-full"
+                className="font-semibold text-base sm:text-lg text-text-primary bg-transparent px-1.5 py-1 focus:outline-none focus:ring-1 focus:ring-border-accent rounded-md min-w-[150px] w-full"
               />
             ) : (
               <div
-                className="font-semibold text-lg text-slate-100 truncate cursor-text px-1 py-0.5 min-w-[150px] w-full hover:bg-slate-700/50 rounded-md"
+                className="font-semibold text-base sm:text-lg text-text-primary truncate cursor-text px-1.5 py-1 min-w-[150px] w-full hover:bg-background-quaternary/60 rounded-md transition-colors"
                 onClick={handleTitleClick}
                 onKeyDown={handleTitleDivKeyDown}
                 role="button"
@@ -324,13 +324,13 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
             {editedTags.map(tag => (
               <div
                 key={tag}
-                className="flex items-center bg-violet-600/90 hover:bg-violet-500/90 text-white px-2 py-1 rounded-md text-xs cursor-default">
+                className="flex items-center bg-violet-600 hover:bg-violet-500 text-white pl-2.5 pr-1.5 py-1 rounded-md text-xs font-medium cursor-default shadow-sm">
                 <span>{tag}</span>
                 <button
                   onClick={() => handleRemoveTag(tag)}
-                  className="ml-1.5 p-0.5 rounded-full text-violet-200 hover:text-white hover:bg-violet-700/50 focus:outline-none"
+                  className="ml-1.5 p-0.5 rounded-full text-violet-200 hover:text-white hover:bg-violet-700/60 focus:outline-none transition-colors"
                   aria-label={`Supprimer le tag ${tag}`}>
-                  <X size={12} />
+                  <X size={14} />
                 </button>
               </div>
             ))}
@@ -343,22 +343,22 @@ const CenterPanel: React.FC<CenterPanelProps> = ({
                 onKeyDown={handleNewTagKeyDown}
                 onBlur={handleNewTagInputBlur}
                 placeholder="#nouveau-tag"
-                className="text-xs bg-slate-700 text-slate-100 placeholder-slate-400 px-2 py-1 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-500 w-28"
+                className="text-xs bg-background-quaternary/70 text-text-primary placeholder-text-muted px-2.5 py-1.5 rounded-md focus:outline-none focus:ring-1 focus:ring-violet-500 w-32 shadow-sm"
               />
             ) : (
               <button
                 onClick={openTagInput}
-                className="p-1.5 rounded-md text-violet-400 hover:text-violet-300 hover:bg-violet-600/30 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                className="p-2 rounded-lg text-violet-400 hover:text-violet-300 hover:bg-violet-600/20 focus:outline-none focus:ring-1 focus:ring-violet-500 transition-colors"
                 title="Ajouter un tag">
-                <Tag size={16} />
+                <Tag size={18} />
               </button>
             )}
             <SaveStatusIndicator />
             <button
               onClick={toggleRightSidebar}
-              className={`p-1.5 rounded-md transition-colors duration-150 focus:outline-none focus:ring-2 focus:ring-blue-500/40 ${showRightSidebar ? 'bg-slate-700 text-slate-200 hover:bg-slate-600' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-700/60'}`}
+              className={`p-2 rounded-lg transition-colors duration-150 focus:outline-none focus:ring-1 focus:ring-border-accent ${showRightSidebar ? 'bg-background-quaternary text-text-primary hover:bg-slate-600/80' : 'text-text-muted hover:text-text-secondary hover:bg-background-quaternary/60'}`}
               title={showRightSidebar ? 'Masquer le panneau des tags' : 'Afficher le panneau des tags'}>
-              {showRightSidebar ? <PanelRightClose size={18} /> : <PanelRightOpen size={18} />}
+              {showRightSidebar ? <PanelRightClose size={20} /> : <PanelRightOpen size={20} />}
             </button>
           </div>
         </div>
