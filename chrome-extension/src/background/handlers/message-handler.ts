@@ -56,8 +56,8 @@ export class MessageHandler {
     string,
     (message: BaseRuntimeMessage, sender: chrome.runtime.MessageSender) => Promise<unknown>
   > = {
-    [MessageType.AI_CHAT_REQUEST]: (message: BaseRuntimeMessage) =>
-      this.handleAiChatRequest(message as AIChatRequestMessage),
+    [MessageType.AI_CHAT_REQUEST]: (message: BaseRuntimeMessage, sender: chrome.runtime.MessageSender) =>
+      this.handleAiChatRequest(message as AIChatRequestMessage, sender),
     [MessageType.CHAT_WITH_TOOLS]: (message: BaseRuntimeMessage) =>
       this.handleChatWithTools(message as ChatWithToolsMessage),
     [MessageType.CHECK_AGENT_STATUS]: this.handleCheckAgentStatus.bind(this),
@@ -72,8 +72,8 @@ export class MessageHandler {
       this.handleListKeyPoints(message as ListKeyPointsMessage),
     [MessageType.CUSTOM_PAGE_PROMPT_REQUEST]: (message: BaseRuntimeMessage) =>
       this.handleCustomPagePrompt(message as CustomPagePromptMessage),
-    [MessageType.RAG_CHAT_REQUEST]: (message: BaseRuntimeMessage) =>
-      this.handleRagChatRequest(message as RagChatRequestMessage),
+    [MessageType.RAG_CHAT_REQUEST]: (message: BaseRuntimeMessage, sender: chrome.runtime.MessageSender) =>
+      this.handleRagChatRequest(message as RagChatRequestMessage, sender),
     [MessageType.SAVE_MESSAGE_AS_NOTE]: (message: BaseRuntimeMessage) =>
       this.handleSaveMessageAsNote(message as SaveMessageAsNoteMessage),
     [MessageType.GET_INLINE_COMPLETION_REQUEST]: (message: BaseRuntimeMessage) =>
@@ -422,8 +422,12 @@ export class MessageHandler {
   /**
    * Gestionnaire pour les requêtes de chat avec l'agent AI
    */
-  private async handleAiChatRequest(message: AIChatRequestMessage): Promise<ChatResponse> {
+  private async handleAiChatRequest(
+    message: AIChatRequestMessage,
+    sender?: chrome.runtime.MessageSender,
+  ): Promise<ChatResponse> {
     logger.debug('Reçu AI_CHAT_REQUEST', message.payload);
+    logger.debug('Request sender:', sender);
 
     // Vérifier si on veut du streaming
     const {
@@ -441,9 +445,11 @@ export class MessageHandler {
       // Convertir l'historique du chat
       const history = convertChatHistory(chatHistory);
 
-      // Récupérer le contenu de la page active si non fourni
+      // Récupérer le contenu de la page active si non fourni et si l'expéditeur n'est pas interne
       let pageContent = providedPageContent;
-      if (!pageContent) {
+      const senderIsInternal = sender?.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`);
+
+      if (!pageContent && !senderIsInternal) {
         try {
           pageContent = await this.fetchCurrentPageContent();
           logger.debug(
@@ -452,7 +458,12 @@ export class MessageHandler {
           );
         } catch (error) {
           logger.warn('Erreur lors de la récupération du contenu de la page pour le streaming:', error);
+          // pageContent reste undefined, ce qui est géré par l'agent
         }
+      } else if (senderIsInternal && !pageContent) {
+        logger.debug(
+          'Requête interne (streaming) et pas de providedPageContent. pageContent non récupéré via fetchCurrentPageContent.',
+        );
       }
 
       // Lancer le streaming en asynchrone
@@ -479,15 +490,22 @@ export class MessageHandler {
     try {
       const history = convertChatHistory(chatHistory);
 
-      // Récupérer le contenu de la page active si non fourni
+      // Récupérer le contenu de la page active si non fourni et si l'expéditeur n'est pas interne
       let pageContent = providedPageContent;
-      if (!pageContent) {
+      const senderIsInternal = sender?.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`);
+
+      if (!pageContent && !senderIsInternal) {
         try {
           pageContent = await this.fetchCurrentPageContent();
           logger.debug('Contenu de la page récupéré:', pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun');
         } catch (error) {
           logger.warn('Erreur lors de la récupération du contenu de la page:', error);
+          // pageContent reste undefined, ce qui est géré par l'agent
         }
+      } else if (senderIsInternal && !pageContent) {
+        logger.debug(
+          'Requête interne (non-streaming) et pas de providedPageContent. pageContent non récupéré via fetchCurrentPageContent.',
+        );
       }
 
       // Utiliser l'agent ou fallback au LLM direct selon l'état
@@ -752,7 +770,10 @@ export class MessageHandler {
   /**
    * Gestionnaire pour les requêtes de chat RAG avec les notes de l'utilisateur
    */
-  private async handleRagChatRequest(message: RagChatRequestMessage): Promise<RagChatResponse> {
+  private async handleRagChatRequest(
+    message: RagChatRequestMessage,
+    sender?: chrome.runtime.MessageSender,
+  ): Promise<RagChatResponse> {
     logger.debug('Reçu RAG_CHAT_REQUEST', message.payload);
     const { message: userInput, chatHistory = [], streamHandler = false, portId, selectedModel } = message.payload;
 
