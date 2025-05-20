@@ -6,25 +6,63 @@ import { BookText, LayoutDashboard, PlusCircle, FilePlus2 } from 'lucide-react';
 import { useDodai } from '@src/features/canvas/contexts/DodaiContext';
 import { useNotes } from '@src/features/notes/hooks/useNotes';
 import { useNoteSelection } from '@src/features/notes/hooks/useNoteSelection';
+import { useDodaiCanvasHistory } from '@src/features/canvas/hooks/useDodaiCanvasHistory';
 
 const MainLayout: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
 
-  const { resetChatAndArtifact } = useDodai();
+  const {
+    resetChatAndArtifact,
+    messages: dodaiContextMessages,
+    selectedDodaiModel: dodaiContextSelectedModel,
+    setMessages: dodaiContextSetMessages,
+  } = useDodai();
   const { notes, addNote, getNote } = useNotes();
   const { handleCreateNewNote } = useNoteSelection(notes, getNote, addNote);
+  const { saveCurrentChatSession, createNewConversation } = useDodaiCanvasHistory();
 
   // Define individual button configurations
   const newCanvasButton: NavItemProps = {
     id: 'new-canvas',
     label: 'Nouveau Canvas',
     icon: <PlusCircle size={20} />,
-    onClick: () => {
-      resetChatAndArtifact();
-      navigate('/canvas'); // Navigate to ensure canvas view is shown
+    onClick: async () => {
+      console.log('[MainLayout] New Canvas button clicked.');
+      await resetChatAndArtifact(async () => {
+        if (dodaiContextMessages.length > 0) {
+          console.log('[MainLayout] Saving current session before reset...');
+          await saveCurrentChatSession(dodaiContextMessages, dodaiContextSelectedModel || undefined);
+          console.log('[MainLayout] Current session saved.');
+        } else {
+          console.log('[MainLayout] No active session to save before reset.');
+        }
+      });
+
+      console.log('[MainLayout] Creating new conversation in history...');
+      const newChatData = await createNewConversation(
+        "Nouvelle conversation. Comment puis-je vous aider aujourd'hui ?",
+        dodaiContextSelectedModel || undefined,
+      );
+
+      if (newChatData.success && newChatData.initialMessages) {
+        console.log('[MainLayout] New conversation created in history, setting initial messages in context.');
+        dodaiContextSetMessages(newChatData.initialMessages);
+      } else {
+        console.error('[MainLayout] Failed to create new conversation in history:', newChatData.error);
+        dodaiContextSetMessages([
+          {
+            id: 'fallback-new-chat',
+            role: 'assistant',
+            content: 'Impossible de créer une nouvelle session, veuillez réessayer.',
+            timestamp: Date.now(),
+          },
+        ]);
+      }
+
+      navigate('/canvas');
     },
-    isActive: false, // Action buttons are not typically "active"
+    isActive: false,
     title: 'Commencer un nouveau Canvas',
   };
 
@@ -43,7 +81,7 @@ const MainLayout: React.FC = () => {
     icon: <FilePlus2 size={20} />,
     onClick: async () => {
       await handleCreateNewNote(null);
-      navigate('/notes'); // Ensure notes view and list are active/updated
+      navigate('/notes');
     },
     isActive: false,
     title: 'Créer une nouvelle note',
@@ -62,16 +100,12 @@ const MainLayout: React.FC = () => {
   const isCanvasPath = location.pathname.startsWith('/canvas');
   const isNotesPath = location.pathname.startsWith('/notes');
 
-  // Determine which "New" button to show based on the active path
-  // If neither, or on a different path, default to newCanvas or make a specific choice.
-  let primaryNewButton = newCanvasButton; // Default
+  let primaryNewButton = newCanvasButton;
   if (isCanvasPath) {
     primaryNewButton = newCanvasButton;
   } else if (isNotesPath) {
     primaryNewButton = newNoteButton;
   } else {
-    // Fallback if on a path other than /canvas or /notes
-    // Decide what the default "+" button should be. For instance, new canvas.
     primaryNewButton = newCanvasButton;
   }
 

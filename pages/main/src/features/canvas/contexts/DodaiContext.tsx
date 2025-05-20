@@ -28,7 +28,8 @@ interface DodaiContextType {
   updateCurrentArtifactContent: (newMarkdown: string) => void;
   modifyCurrentArtifact: (promptSuffix: string, currentMarkdown: string) => Promise<void>; // Nouvelle fonction
   cancelCurrentStreaming: () => void; // New function to cancel streaming
-  resetChatAndArtifact: () => void; // Added new function signature
+  resetChatAndArtifact: (onBeforeResetCallback?: () => Promise<void>) => Promise<void>; // Modified signature
+  setOnChatTurnEnd: (handler: ((finalMessages: Message[], modelUsed?: string) => void) | null) => void; // New setter
 }
 
 const defaultContext: DodaiContextType = {
@@ -49,7 +50,8 @@ const defaultContext: DodaiContextType = {
   updateCurrentArtifactContent: () => {},
   modifyCurrentArtifact: async () => {}, // Valeur par défaut
   cancelCurrentStreaming: () => {}, // Default for cancel
-  resetChatAndArtifact: () => {}, // Added default for new function
+  resetChatAndArtifact: async () => {}, // Modified default
+  setOnChatTurnEnd: () => {}, // New default
 };
 
 const DodaiContext = createContext<DodaiContextType>(defaultContext);
@@ -72,6 +74,11 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
   const streamingPort = useRef<chrome.runtime.Port | null>(null);
   const streamingPortId = useRef<string | null>(null);
   const currentStreamingPrompt = useRef<string | null>(null); // To store the prompt that initiated streaming
+  const onChatTurnEndCallbackRef = useRef<((finalMessages: Message[], modelUsed?: string) => void) | null>(null);
+
+  const setOnChatTurnEnd = useCallback((handler: ((finalMessages: Message[], modelUsed?: string) => void) | null) => {
+    onChatTurnEndCallbackRef.current = handler;
+  }, []);
 
   // Fonction utilitaire pour générer un titre simple
   const generateTitleFromMarkdown = (markdown: string): string => {
@@ -177,6 +184,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
                 ? {
                     ...msg,
                     content: `Génération avec ${message.model || 'le modèle par défaut'} commencée...`,
+                    model: message.model, // Sauvegarder le modèle ici aussi
                   }
                 : msg,
             ),
@@ -206,13 +214,21 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
         case StreamEventType.STREAM_END:
           console.log("[DodaiCanvas] Fin du streaming d'artefact, succès:", message.success);
           if (message.success) {
-            // Le message de succès est maintenant géré par ARTIFACT_CHAT_RESPONSE
-            // ou affiché s'il n'y a pas de réponse chat.
-            // On garde une trace de l'artefact ici.
             if (currentArtifact) {
               setArtifactHistory(prev => [...prev, currentArtifact]);
             }
-            // Ne pas appeler cleanupStreamingConnection() ici si on attend ARTIFACT_CHAT_RESPONSE
+            const finalMessages = messages.map((msg: Message) =>
+              msg.id === assistantPlaceholderId && !msg.content.includes('Réponse chat reçue')
+                ? {
+                    ...msg,
+                    content: `Artefact généré avec succès ! (Modèle: ${message.model || 'inconnu'})\nVous pouvez le consulter dans le panneau de droite.`,
+                    model: message.model,
+                    isStreaming: false,
+                  }
+                : msg,
+            );
+            setMessages(finalMessages);
+            onChatTurnEndCallbackRef.current?.(finalMessages, message.model);
           } else {
             setMessages(prev =>
               prev.map(msg =>
@@ -236,38 +252,26 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
           }
           break;
 
-        case StreamEventType.ARTIFACT_CHAT_RESPONSE:
+        case StreamEventType.ARTIFACT_CHAT_RESPONSE: {
           console.log('[DodaiCanvas] Réponse chat reçue:', message.chatResponse);
-          if (message.chatResponse) {
-            setMessages(prev =>
-              prev.map(msg =>
-                msg.id === assistantPlaceholderId
-                  ? {
-                      ...msg,
-                      content: `${message.chatResponse} (Modèle: ${message.model || 'inconnu'})`,
-                    }
-                  : msg,
-              ),
-            );
-          } else {
-            // Fallback si ARTIFACT_CHAT_RESPONSE est vide mais STREAM_END était success
-            setMessages(prev =>
-              prev.map(msg =>
-                msg.id === assistantPlaceholderId
-                  ? {
-                      ...msg,
-                      content: `Artefact généré avec succès ! (Modèle: ${message.model || 'inconnu'})
-Vous pouvez le consulter dans le panneau de droite.`,
-                    }
-                  : msg,
-              ),
-            );
-          }
-          // C'est le vrai signal de fin de la séquence complète.
+          const updatedMessages = messages.map((msg: Message) =>
+            msg.id === assistantPlaceholderId
+              ? {
+                  ...msg,
+                  content: message.chatResponse
+                    ? `${message.chatResponse} (Modèle: ${message.model || 'inconnu'})`
+                    : `Artefact généré avec succès ! (Modèle: ${message.model || 'inconnu'})\nVous pouvez le consulter dans le panneau de droite.`,
+                  model: message.model,
+                  isStreaming: false,
+                }
+              : msg,
+          );
+          setMessages(updatedMessages);
+          onChatTurnEndCallbackRef.current?.(updatedMessages, message.model);
           cleanupStreamingConnection();
           break;
-
-        case StreamEventType.STREAM_ERROR:
+        }
+        case StreamEventType.STREAM_ERROR: {
           console.error("[DodaiCanvas] Erreur de streaming d'artefact:", message.error);
           setMessages(prev =>
             prev.map(msg =>
@@ -275,15 +279,18 @@ Vous pouvez le consulter dans le panneau de droite.`,
                 ? {
                     ...msg,
                     content: `Erreur de streaming : ${message.error || 'Erreur inconnue'}`,
+                    model: message.model,
+                    isStreaming: false,
                   }
                 : msg,
             ),
           );
           cleanupStreamingConnection();
           break;
-
-        default:
+        }
+        default: {
           console.warn("[DodaiCanvas] Message de streaming d'artefact inconnu:", message);
+        }
       }
     });
 
@@ -435,8 +442,9 @@ Vous pouvez le consulter dans le panneau de droite.`,
     const assistantPlaceholderMessage: Message = {
       id: assistantPlaceholderId,
       role: 'assistant',
-      content: "Modification de l'artefact en cours...", // Guillemets doubles, sans échappement inutile
+      content: "Modification de l'artefact en cours...",
       timestamp: Date.now() + 1,
+      isStreaming: true, // Indiquer que c'est en cours
     };
 
     setMessages(prev => [...prev, userMessage, assistantPlaceholderMessage]);
@@ -487,16 +495,18 @@ Vous pouvez le consulter dans le panneau de droite.`,
           return newArtifactState;
         });
 
-        setMessages(prev =>
-          prev.map(msg =>
-            msg.id === assistantPlaceholderId
-              ? {
-                  ...msg,
-                  content: `Artefact modifié avec succès ! (Modèle: ${response.model || 'inconnu'})`,
-                }
-              : msg,
-          ),
+        const updatedMessages = messages.map((msg: Message) =>
+          msg.id === assistantPlaceholderId
+            ? {
+                ...msg,
+                content: `Artefact modifié avec succès ! (Modèle: ${response.model || 'inconnu'})`,
+                model: response.model,
+                isStreaming: false,
+              }
+            : msg,
         );
+        setMessages(updatedMessages);
+        onChatTurnEndCallbackRef.current?.(updatedMessages, response.model);
       } else {
         setMessages(prev =>
           prev.map(msg =>
@@ -504,6 +514,8 @@ Vous pouvez le consulter dans le panneau de droite.`,
               ? {
                   ...msg,
                   content: `Erreur lors de la modification : ${response.error || 'Erreur inconnue'}`,
+                  model: response.model,
+                  isStreaming: false,
                 }
               : msg,
           ),
@@ -517,6 +529,7 @@ Vous pouvez le consulter dans le panneau de droite.`,
             ? {
                 ...msg,
                 content: `Erreur de communication: ${error instanceof Error ? error.message : String(error)}`,
+                isStreaming: false,
               }
             : msg,
         ),
@@ -526,20 +539,27 @@ Vous pouvez le consulter dans le panneau de droite.`,
   };
 
   // Implementation for resetChatAndArtifact
-  const resetChatAndArtifact = useCallback(() => {
-    setMessages([]);
-    setCurrentArtifact(null);
-    // setSelectedDodaiModel(null); // Reset model selection if needed, or retain user preference
-    setChatInput('');
-    // Potentially clear artifactHistory as well if a full reset is desired
-    setIsLoading(false);
-    setIsStreamingArtifact(false);
-    // If a stream was active, ensure it is cleaned up
-    if (streamingPort.current) {
-      cleanupStreamingConnection();
-    }
-    console.log('[DodaiCanvas] Chat and artifact reset.');
-  }, [cleanupStreamingConnection]); // Added cleanupStreamingConnection as dependency
+  const resetChatAndArtifact = useCallback(
+    async (onBeforeResetCallback?: () => Promise<void>) => {
+      if (onBeforeResetCallback) {
+        console.log('[DodaiContext] Executing onBeforeResetCallback...');
+        await onBeforeResetCallback();
+        console.log('[DodaiContext] onBeforeResetCallback finished.');
+      }
+
+      setMessages([]);
+      setCurrentArtifact(null);
+      setChatInput('');
+      setIsLoading(false);
+      setIsStreamingArtifact(false);
+
+      if (streamingPort.current) {
+        cleanupStreamingConnection();
+      }
+      console.log('[DodaiContext] Chat and artifact state has been reset.');
+    },
+    [cleanupStreamingConnection],
+  );
 
   const value = {
     messages,
@@ -553,13 +573,14 @@ Vous pouvez le consulter dans le panneau de droite.`,
     isLoading,
     setIsLoading,
     isStreamingArtifact,
-    selectedDodaiModel, // Expose selected model
-    setSelectedDodaiModel, // Expose setter
+    selectedDodaiModel,
+    setSelectedDodaiModel,
     sendPromptAndGenerateArtifact,
     updateCurrentArtifactContent,
     modifyCurrentArtifact,
     cancelCurrentStreaming,
-    resetChatAndArtifact, // Added new function to context value
+    resetChatAndArtifact,
+    setOnChatTurnEnd,
   };
 
   return <DodaiContext.Provider value={value}>{children}</DodaiContext.Provider>;

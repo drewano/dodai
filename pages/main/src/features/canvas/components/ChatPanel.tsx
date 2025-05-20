@@ -30,9 +30,10 @@ const suggestionPrompts = [
 type ChatPanelProps = {
   activeViewMode: 'canvas' | 'chat';
   setActiveViewMode: (mode: 'canvas' | 'chat') => void;
+  onToggleHistory?: () => void;
 };
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode }) => {
+const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode, onToggleHistory }) => {
   const { messages, chatInput, setChatInput, isLoading, sendPromptAndGenerateArtifact } = useDodai();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [initialHubPrompt, setInitialHubPrompt] = useState('');
@@ -137,9 +138,9 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
         {activeViewMode === 'chat' && (
           <button
             className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors"
-            title="Historique des chats (fonctionnalité à venir)"
+            title="Afficher/Masquer l'historique des chats"
             aria-label="Historique des chats"
-            onClick={() => alert("Fonctionnalité d'historique à implémenter")}>
+            onClick={onToggleHistory}>
             <History size={20} />
           </button>
         )}
