@@ -63,7 +63,7 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({
 
   return (
     <div
-      className={`flex flex-col h-full bg-background-secondary shadow-lg rounded-md transition-all duration-300 ease-in-out ${currentIsExpanded ? 'w-60' : 'w-16'} overflow-x-hidden`}
+      className={`flex flex-col h-full bg-background-secondary shadow-lg rounded-md transition-all duration-300 ease-in-out ${currentIsExpanded ? 'w-56' : 'w-16'} overflow-x-hidden`}
       aria-label="Dodai Sidebar">
       {/* Spacer to align with main content's top padding */}
       <div className="h-6 flex-shrink-0"></div>
