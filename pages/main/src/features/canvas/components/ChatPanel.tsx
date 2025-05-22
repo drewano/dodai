@@ -135,7 +135,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
             <span className="hidden sm:inline">Chat</span>
           </button>
         </div>
-        {activeViewMode === 'chat' && (
+        {onToggleHistory && (
           <button
             className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors"
             title="Afficher/Masquer l'historique des chats"
@@ -145,7 +145,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
           </button>
         )}
         {/* Placeholder for alignment if history button is hidden */}
-        {activeViewMode === 'canvas' && <div className="w-[36px] h-[36px]" />}
+        {!onToggleHistory && <div className="w-[36px] h-[36px]" />}
       </div>
 
       {activeViewMode === 'canvas' &&
