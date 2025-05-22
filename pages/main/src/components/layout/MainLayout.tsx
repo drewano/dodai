@@ -16,11 +16,10 @@ const MainLayout: React.FC = () => {
     resetChatAndArtifact,
     messages: dodaiContextMessages,
     selectedDodaiModel: dodaiContextSelectedModel,
-    setMessages: dodaiContextSetMessages,
   } = useDodai();
   const { notes, addNote, getNote } = useNotes();
   const { handleCreateNewNote } = useNoteSelection(notes, getNote, addNote);
-  const { saveCurrentChatSession, createNewConversation } = useDodaiCanvasHistory();
+  const { saveCurrentChatSession } = useDodaiCanvasHistory();
 
   // Define individual button configurations
   const newCanvasButton: NavItemProps = {
@@ -32,33 +31,14 @@ const MainLayout: React.FC = () => {
       await resetChatAndArtifact(async () => {
         if (dodaiContextMessages.length > 0) {
           console.log('[MainLayout] Saving current session before reset...');
-          await saveCurrentChatSession(dodaiContextMessages, dodaiContextSelectedModel || undefined);
+          await saveCurrentChatSession(dodaiContextMessages, null, dodaiContextSelectedModel || undefined);
           console.log('[MainLayout] Current session saved.');
         } else {
           console.log('[MainLayout] No active session to save before reset.');
         }
       });
 
-      console.log('[MainLayout] Creating new conversation in history...');
-      const newChatData = await createNewConversation(
-        "Nouvelle conversation. Comment puis-je vous aider aujourd'hui ?",
-        dodaiContextSelectedModel || undefined,
-      );
-
-      if (newChatData.success && newChatData.initialMessages) {
-        console.log('[MainLayout] New conversation created in history, setting initial messages in context.');
-        dodaiContextSetMessages(newChatData.initialMessages);
-      } else {
-        console.error('[MainLayout] Failed to create new conversation in history:', newChatData.error);
-        dodaiContextSetMessages([
-          {
-            id: 'fallback-new-chat',
-            role: 'assistant',
-            content: 'Impossible de créer une nouvelle session, veuillez réessayer.',
-            timestamp: Date.now(),
-          },
-        ]);
-      }
+      console.log('[MainLayout] New Canvas session started - ready for user input.');
 
       navigate('/canvas');
     },

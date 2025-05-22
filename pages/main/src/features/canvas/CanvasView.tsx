@@ -6,7 +6,6 @@ import { useState, useCallback, useEffect } from 'react';
 import TagGraphView from '../notes/components/tag/TagGraphView';
 import { useNotes } from '../notes/hooks/useNotes';
 import { useTagGraph } from '../notes/hooks/useTagGraph';
-import TextChatView from '../text-chat/components/TextChatView';
 import DodaiCanvasHistoryPanel from './components/DodaiCanvasHistoryPanel';
 import { useDodaiCanvasHistory } from './hooks/useDodaiCanvasHistory';
 import { v4 as uuidv4 } from 'uuid';
@@ -14,12 +13,13 @@ import { v4 as uuidv4 } from 'uuid';
 const CanvasViewContent = () => {
   const {
     currentArtifact,
-    selectedDodaiModel,
     setMessages,
     setCurrentArtifact,
     setSelectedDodaiModel,
     resetChatAndArtifact,
     setOnChatTurnEnd,
+    isArtifactModeActive,
+    isStreamingArtifact,
   } = useDodai();
   const {
     chatHistory,
@@ -27,17 +27,16 @@ const CanvasViewContent = () => {
     loadConversation,
     deleteConversation,
     saveCurrentChatSession,
-    createNewConversation,
     renameConversationInHistory,
   } = useDodaiCanvasHistory();
 
   const { notes } = useNotes();
   const tagData = useTagGraph(notes);
   const [activeTag, setActiveTag] = useState<string | null>(null);
-  const [activeViewMode, setActiveViewMode] = useState<'canvas' | 'chat'>('canvas');
   const [showHistoryPanel, setShowHistoryPanel] = useState<boolean>(false);
 
-  const showArtifactPanel = !!currentArtifact;
+  // Determine what to show in the right panel
+  const shouldShowArtifactPanel = isArtifactModeActive && (currentArtifact !== null || isStreamingArtifact);
 
   const handleTagSelect = (tag: string) => {
     setActiveTag(tag);
@@ -89,24 +88,13 @@ const CanvasViewContent = () => {
               timestamp: Date.now(),
             },
           ]);
-          // Optionnel: Créer automatiquement une nouvelle conversation vide dans l'historique ?
-          // Pour l'instant, on laisse l'utilisateur choisir ou le contexte se réinitialiser.
         }
-        // Pas besoin de fermer le panneau ici, car la liste se mettra à jour
-        // et si la conv active a été supprimée, l'état du chat est déjà réinitialisé.
       } else {
         console.error('[CanvasView] Failed to delete conversation:', result.error);
         // Afficher une notification à l'utilisateur ici si nécessaire
       }
     },
-    [
-      deleteConversation,
-      resetChatAndArtifact,
-      setMessages,
-      createNewConversation,
-      setSelectedDodaiModel,
-      selectedDodaiModel,
-    ],
+    [deleteConversation, resetChatAndArtifact, setMessages],
   );
 
   const handleRenameConversation = useCallback(
@@ -143,47 +131,29 @@ const CanvasViewContent = () => {
 
   return (
     <div className="flex flex-1 h-full bg-background-primary text-text-primary font-sans overflow-hidden relative">
-      {activeViewMode === 'canvas' ? (
-        <ResizablePanelGroup direction="horizontal" className="flex flex-1 overflow-hidden rounded-md shadow-md">
-          <ResizablePanel defaultSize={showArtifactPanel ? 35 : 70} minSize={30} className="min-w-[300px] relative">
-            <div className="h-full bg-slate-800 rounded-md overflow-hidden">
-              <ChatPanel
-                activeViewMode={activeViewMode}
-                setActiveViewMode={setActiveViewMode}
-                onToggleHistory={toggleHistoryPanel}
+      <ResizablePanelGroup direction="horizontal" className="flex flex-1 overflow-hidden rounded-md shadow-md">
+        <ResizablePanel defaultSize={shouldShowArtifactPanel ? 35 : 70} minSize={30} className="min-w-[300px] relative">
+          <div className="h-full bg-slate-800 rounded-md overflow-hidden">
+            <ChatPanel onToggleHistory={toggleHistoryPanel} />
+          </div>
+        </ResizablePanel>
+        <ResizableHandle withHandle />
+        <ResizablePanel defaultSize={shouldShowArtifactPanel ? 65 : 30} minSize={30} className="min-w-[300px]">
+          <div className="h-full bg-slate-800 rounded-md overflow-hidden">
+            {shouldShowArtifactPanel ? (
+              <ArtifactPanel />
+            ) : (
+              <TagGraphView
+                tagData={tagData}
+                activeTag={activeTag}
+                onTagSelect={handleTagSelect}
+                onClearFilter={handleClearFilter}
               />
-            </div>
-          </ResizablePanel>
-          <ResizableHandle withHandle />
-          <ResizablePanel defaultSize={showArtifactPanel ? 65 : 30} minSize={30} className="min-w-[300px]">
-            <div className="h-full bg-slate-800 rounded-md overflow-hidden">
-              {showArtifactPanel ? (
-                <ArtifactPanel />
-              ) : (
-                <TagGraphView
-                  tagData={tagData}
-                  activeTag={activeTag}
-                  onTagSelect={handleTagSelect}
-                  onClearFilter={handleClearFilter}
-                />
-              )}
-            </div>
-          </ResizablePanel>
-        </ResizablePanelGroup>
-      ) : (
-        <div className="flex flex-col flex-1 h-full">
-          <div className="h-[56px] flex-shrink-0 bg-slate-800 rounded-t-md relative">
-            <ChatPanel
-              activeViewMode={activeViewMode}
-              setActiveViewMode={setActiveViewMode}
-              onToggleHistory={toggleHistoryPanel}
-            />
+            )}
           </div>
-          <div className="flex-1 overflow-hidden bg-slate-800 rounded-b-md">
-            <TextChatView />
-          </div>
-        </div>
-      )}
+        </ResizablePanel>
+      </ResizablePanelGroup>
+
       {showHistoryPanel && (
         <DodaiCanvasHistoryPanel
           chatHistory={chatHistory || []}

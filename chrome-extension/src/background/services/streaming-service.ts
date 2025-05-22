@@ -41,7 +41,8 @@ export class StreamingService {
       port.name.startsWith('ai_streaming_') ||
       port.name.startsWith('rag_streaming_') ||
       port.name.startsWith('dodai_canvas_artifact_stream_') ||
-      port.name.startsWith('simple_text_chat_stream_')
+      port.name.startsWith('simple_text_chat_stream_') ||
+      port.name.startsWith('simple_chat_stream_')
     ) {
       const portId = port.name;
       logger.debug(`Nouvelle connexion de streaming établie: ${portId}`);

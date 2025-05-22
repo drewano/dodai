@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { useDodai } from '../contexts/DodaiContext';
-import { History, Send, PlusCircle, LayoutDashboard, MessagesSquare } from 'lucide-react';
+import { History, Send, PlusCircle, Sparkles, MessageSquare } from 'lucide-react';
 import { DodaiModelSelector } from './DodaiModelSelector';
 
 // Re-defined suggestion prompts (simplified for this example)
@@ -28,13 +28,12 @@ const suggestionPrompts = [
 ];
 
 type ChatPanelProps = {
-  activeViewMode: 'canvas' | 'chat';
-  setActiveViewMode: (mode: 'canvas' | 'chat') => void;
   onToggleHistory?: () => void;
 };
 
-const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode, onToggleHistory }) => {
-  const { messages, chatInput, setChatInput, isLoading, sendPromptAndGenerateArtifact } = useDodai();
+const ChatPanel: React.FC<ChatPanelProps> = ({ onToggleHistory }) => {
+  const { messages, chatInput, setChatInput, isLoading, sendMessage, isArtifactModeActive, setIsArtifactModeActive } =
+    useDodai();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [initialHubPrompt, setInitialHubPrompt] = useState('');
 
@@ -48,7 +47,7 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
     e.preventDefault();
     const currentInput = (promptToSend || chatInput || initialHubPrompt).trim();
     if (!currentInput) return;
-    await sendPromptAndGenerateArtifact(currentInput);
+    await sendMessage(currentInput);
     setInitialHubPrompt('');
   };
 
@@ -115,26 +114,28 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
         <div className="flex-shrink-0">
           <DodaiModelSelector />
         </div>
+
         <div className="flex items-center bg-background-quaternary rounded-full p-0.5">
           <button
-            onClick={() => setActiveViewMode('canvas')}
+            onClick={() => setIsArtifactModeActive(true)}
             className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-background-quaternary
-              ${activeViewMode === 'canvas' ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-700 hover:text-text-primary'}`}
-            aria-pressed={activeViewMode === 'canvas'}
-            title="Vue Canvas">
-            <LayoutDashboard size={14} />
-            <span className="hidden sm:inline">Canvas</span>
+              ${isArtifactModeActive ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-700 hover:text-text-primary'}`}
+            aria-pressed={isArtifactModeActive}
+            title="Mode Artefact">
+            <Sparkles size={14} />
+            <span className="hidden sm:inline">Artefact</span>
           </button>
           <button
-            onClick={() => setActiveViewMode('chat')}
+            onClick={() => setIsArtifactModeActive(false)}
             className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-background-quaternary
-              ${activeViewMode === 'chat' ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-700 hover:text-text-primary'}`}
-            aria-pressed={activeViewMode === 'chat'}
-            title="Vue Chat">
-            <MessagesSquare size={14} />
+              ${!isArtifactModeActive ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-700 hover:text-text-primary'}`}
+            aria-pressed={!isArtifactModeActive}
+            title="Mode Chat Simple">
+            <MessageSquare size={14} />
             <span className="hidden sm:inline">Chat</span>
           </button>
         </div>
+
         {onToggleHistory && (
           <button
             className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors"
@@ -144,33 +145,31 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ activeViewMode, setActiveViewMode
             <History size={20} />
           </button>
         )}
-        {/* Placeholder for alignment if history button is hidden */}
         {!onToggleHistory && <div className="w-[36px] h-[36px]" />}
       </div>
 
-      {activeViewMode === 'canvas' &&
-        (messages.length === 0 && !isLoading ? (
-          renderInitialHubView()
-        ) : (
-          <>
-            <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background-secondary space-y-3 sm:space-y-4">
-              {messages.map(message => (
-                <ChatMessage key={message.id} message={message} />
-              ))}
-              <div ref={messagesEndRef} />
-            </div>
+      {messages.length === 0 && !isLoading ? (
+        renderInitialHubView()
+      ) : (
+        <>
+          <div className="flex-1 p-3 sm:p-4 overflow-y-auto bg-background-secondary space-y-3 sm:space-y-4">
+            {messages.map(message => (
+              <ChatMessage key={message.id} message={message} />
+            ))}
+            <div ref={messagesEndRef} />
+          </div>
 
-            <div className="p-3 sm:p-4 border-t border-border-primary bg-background-tertiary">
-              <ChatInput
-                chatInput={chatInput}
-                setChatInput={setChatInput}
-                handleSubmit={handleSendMessage}
-                isLoading={isLoading}
-                placeholder="Envoyer un message..."
-              />
-            </div>
-          </>
-        ))}
+          <div className="p-3 sm:p-4 border-t border-border-primary bg-background-tertiary">
+            <ChatInput
+              chatInput={chatInput}
+              setChatInput={setChatInput}
+              handleSubmit={handleSendMessage}
+              isLoading={isLoading}
+              placeholder="Envoyer un message..."
+            />
+          </div>
+        </>
+      )}
     </div>
   );
 };
