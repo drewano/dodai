@@ -4,8 +4,10 @@ import {
   chatHistoryStorage,
   type ChatConversation, // Sera utilisé dans Omit<ChatConversation, ...>
   type ChatMessage,
+  type ChatArtifact,
+  type ChatArtifactWithHistory,
 } from '@extension/storage';
-import type { Message } from '../types'; // Importer le type Message spécifique au Canvas
+import type { Message, ArtifactV3, ArtifactMarkdownV3 } from '../types'; // Importer le type Message spécifique au Canvas
 
 /**
  * Hook pour gérer l'historique des conversations spécifiquement pour Dodai Canvas.
@@ -51,15 +53,51 @@ export function useDodaiCanvasHistory() {
     }));
   };
 
+  const canvasArtifactToStorage = (artifact: ArtifactV3): ChatArtifactWithHistory => {
+    return {
+      currentIndex: artifact.currentIndex,
+      contents: artifact.contents.map(content => {
+        const markdownContent = content as ArtifactMarkdownV3;
+        return {
+          type: markdownContent.type,
+          title: markdownContent.title,
+          fullMarkdown: markdownContent.fullMarkdown,
+        };
+      }),
+    };
+  };
+
+  const storageArtifactToCanvas = (artifact: ChatArtifactWithHistory): ArtifactV3 => {
+    return {
+      currentIndex: artifact.currentIndex,
+      contents: artifact.contents.map(content => {
+        return {
+          type: content.type,
+          title: content.title,
+          fullMarkdown: content.fullMarkdown,
+        };
+      }),
+    };
+  };
+
   const loadConversation = useCallback(
-    async (id: string): Promise<{ success: boolean; messages?: Message[]; model?: string; error?: string }> => {
+    async (id: string): Promise<{ success: boolean; messages?: Message[]; artifact?: ArtifactV3 | null; model?: string; error?: string }> => {
       try {
         const conversation = await chatHistoryStorage.getConversation(id);
         if (conversation) {
           setActiveConversationId(conversation.id);
           setCurrentChatName(conversation.name);
           const canvasMessages = storageMessagesToCanvas(conversation.messages, conversation.id);
-          return { success: true, messages: canvasMessages, model: conversation.model };
+          let canvasArtifact = null;
+          if (conversation.artifact) {
+            canvasArtifact = storageArtifactToCanvas(conversation.artifact);
+          }
+          return { 
+            success: true, 
+            messages: canvasMessages, 
+            artifact: canvasArtifact, 
+            model: conversation.model 
+          };
         }
         return { success: false, error: 'Conversation non trouvée.' };
       } catch (error) {
@@ -115,6 +153,7 @@ export function useDodaiCanvasHistory() {
         name: 'Nouvelle conversation', // Nom par défaut, pourrait être généré plus tard
         messages: [assistantChatMessage],
         model: model, // Modèle global pour la conversation
+        artifact: null, // Pas d'artefact au départ
       };
 
       try {
@@ -218,8 +257,13 @@ export function useDodaiCanvasHistory() {
   };
 
   const saveCurrentChatSession = useCallback(
-    async (messages: Message[], model?: string): Promise<boolean> => {
+    async (messages: Message[], currentArtifact?: ArtifactV3 | null, model?: string): Promise<boolean> => {
       const storageChatMessages = canvasMessagesToStorage(messages);
+      let storageArtifact = null;
+      if (currentArtifact) {
+        storageArtifact = canvasArtifactToStorage(currentArtifact);
+      }
+      
       try {
         if (!activeConversationId) {
           // Nouvelle conversation
@@ -228,6 +272,7 @@ export function useDodaiCanvasHistory() {
             name,
             messages: storageChatMessages,
             model,
+            artifact: storageArtifact,
           };
           const newId = await chatHistoryStorage.addConversation(newConversationData);
           setActiveConversationId(newId);
@@ -235,6 +280,13 @@ export function useDodaiCanvasHistory() {
         } else {
           // Conversation existante
           await chatHistoryStorage.updateMessages(activeConversationId, storageChatMessages);
+          
+          // Update artifact
+          await chatHistoryStorage.updateConversation(activeConversationId, { 
+            artifact: storageArtifact
+          });
+          
+          // Update model if changed
           const currentConversation = await chatHistoryStorage.getConversation(activeConversationId);
           if (model && currentConversation && currentConversation.model !== model) {
             await chatHistoryStorage.updateConversation(activeConversationId, { model });

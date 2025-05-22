@@ -59,7 +59,7 @@ const CanvasViewContent = () => {
       const result = await loadConversation(id);
       if (result.success && result.messages) {
         setMessages(result.messages);
-        setCurrentArtifact(null);
+        setCurrentArtifact(result.artifact || null);
         if (result.model) {
           setSelectedDodaiModel(result.model);
         }
@@ -131,7 +131,7 @@ const CanvasViewContent = () => {
     console.log('[CanvasView] Registering onChatTurnEnd handler.');
     setOnChatTurnEnd((finalMessages, modelUsed) => {
       console.log('[CanvasView] onChatTurnEnd triggered. Saving session.');
-      saveCurrentChatSession(finalMessages, modelUsed || undefined);
+      saveCurrentChatSession(finalMessages, currentArtifact, modelUsed || undefined);
     });
 
     // Cleanup: Unregister handler when component unmounts or dependencies change
@@ -139,7 +139,7 @@ const CanvasViewContent = () => {
       console.log('[CanvasView] Unregistering onChatTurnEnd handler.');
       setOnChatTurnEnd(null);
     };
-  }, [setOnChatTurnEnd, saveCurrentChatSession]); // Dependencies for registering the handler
+  }, [setOnChatTurnEnd, saveCurrentChatSession, currentArtifact]); // Added currentArtifact as a dependency
 
   return (
     <div className="flex flex-1 h-full bg-background-primary text-text-primary font-sans overflow-hidden relative">

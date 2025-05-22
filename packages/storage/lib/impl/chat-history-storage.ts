@@ -11,6 +11,19 @@ export interface ChatMessage {
   model?: string;
 }
 
+// Définition de la structure pour l'artefact
+export interface ChatArtifact {
+  type: string;
+  title: string;
+  fullMarkdown: string;
+}
+
+// Définition de la structure d'un artefact complet avec historique
+export interface ChatArtifactWithHistory {
+  currentIndex: number;
+  contents: ChatArtifact[];
+}
+
 // Définition de la structure d'une conversation
 export interface ChatConversation {
   id: string;
@@ -19,6 +32,7 @@ export interface ChatConversation {
   createdAt: number;
   updatedAt: number;
   model?: string;
+  artifact?: ChatArtifactWithHistory | null;
 }
 
 // État initial pour l'historique des conversations
