@@ -38,7 +38,7 @@ export default withUI({
           850: 'var(--color-bg-secondary)',
         },
       },
-      typography: (theme) => ({
+      typography: theme => ({
         DEFAULT: {
           css: {
             color: 'var(--color-text-secondary)',

@@ -64,9 +64,10 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       {...listeners}
       {...attributes}
       className={`relative p-3 rounded-lg cursor-pointer transition-all duration-150 ease-in-out group
-        ${isSelected
-          ? 'bg-background-tertiary shadow-lg shadow-slate-900/40 ring-2 ring-border-accent'
-          : 'bg-background-tertiary/60 hover:bg-background-tertiary/90 hover:shadow-md hover:shadow-slate-900/20'
+        ${
+          isSelected
+            ? 'bg-background-tertiary shadow-lg shadow-slate-900/40 ring-2 ring-border-accent'
+            : 'bg-background-tertiary/60 hover:bg-background-tertiary/90 hover:shadow-md hover:shadow-slate-900/20'
         }
         ${isDragging ? 'opacity-60 border-dashed border-2 border-blue-400 bg-background-tertiary/80 shadow-xl scale-[1.02] z-10' : ''}
         ${isOver ? 'ring-2 ring-green-500/70 bg-background-tertiary/90 shadow-lg' : ''}`}
@@ -81,7 +82,8 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
       {isSelected && <div className="absolute left-0 top-2 bottom-2 w-1 bg-border-accent rounded-r-full" />}
 
       <div className="flex items-center gap-3">
-        <div className={`flex-shrink-0 w-5 h-5 ${isSelected ? 'text-text-accent' : 'text-text-secondary group-hover:text-text-accent'}`}>
+        <div
+          className={`flex-shrink-0 w-5 h-5 ${isSelected ? 'text-text-accent' : 'text-text-secondary group-hover:text-text-accent'}`}>
           <svg
             xmlns="http://www.w3.org/2000/svg"
             viewBox="0 0 24 24"
@@ -97,7 +99,8 @@ const NoteCard = forwardRef<HTMLDivElement, NoteCardProps>(({ note, isSelected, 
             <line x1="10" y1="9" x2="8" y2="9" />
           </svg>
         </div>
-        <h3 className={`font-medium truncate text-sm leading-tight ${isSelected ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
+        <h3
+          className={`font-medium truncate text-sm leading-tight ${isSelected ? 'text-text-primary' : 'text-text-secondary group-hover:text-text-primary'}`}>
           {note.title || 'Sans titre'}
         </h3>
       </div>

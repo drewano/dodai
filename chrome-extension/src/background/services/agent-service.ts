@@ -483,6 +483,12 @@ Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. 
     try {
       const llm = await this.createLLMInstance(modelName);
 
+      // Envoyer STREAM_START pour notifier l'UI que le streaming commence
+      port.postMessage({
+        type: StreamEventType.STREAM_START,
+        model: modelName,
+      });
+
       const systemPromptArtifact = `Tu es un assistant expert en rédaction. En te basant sur la demande suivante, génère un document Markdown complet et bien structuré.\\nTa réponse DOIT être uniquement le contenu Markdown brut et directement utilisable.\\nN'inclus AUCUNE introduction, phrase de politesse, conclusion, explication, commentaire, ni aucun type d'encapsulation de code (comme \\\`\\\`\\\`markdown ... \\\`\\\`\\\` ou des backticks simples autour de la réponse entière).\\nLa sortie doit commencer directement par le contenu Markdown (par exemple, un titre comme '# Mon Titre', une liste, ou du texte simple).\\n\\nSi la demande est explicitement de générer du CODE SOURCE (par exemple Python, JavaScript, etc.), alors seulement tu généreras uniquement le code demandé. Dans ce cas de figure, tu peux utiliser des backticks pour délimiter des blocs de code si cela fait partie de la syntaxe standard du langage demandé ou si c'est pour imbriquer un bloc de code dans un autre format. Mais pour une demande de document MARKDOWN, la sortie doit être le Markdown pur.\\n\\nDemande utilisateur: ${prompt}`;
 
       const streamIterator = await llm.stream([
@@ -509,32 +515,77 @@ Complète l'entrée de l'utilisateur avec une suggestion pertinente et concise. 
       );
 
       // Génération de la réponse conversationnelle après la génération de l'artefact
-      if (fullArtifactForLog.trim()) {
-        const systemPromptChat = `L'utilisateur a fait la demande suivante : "${prompt}".\nEn réponse, tu as généré l'artefact suivant :\n---\n${fullArtifactForLog.substring(0, 2000)}${fullArtifactForLog.length > 2000 ? '...' : ''}\n---\nFournis une réponse conversationnelle courte et pertinente à l'utilisateur, en accusant réception de sa demande et en mentionnant brièvement l'artefact généré. Ne répète pas le contenu de l'artefact. Sois concis.`;
+      try {
+        let systemPromptChat: string;
+        if (fullArtifactForLog.trim()) {
+          systemPromptChat = `L'utilisateur a fait la demande suivante : "${prompt}".
+
+En réponse, tu as généré un artefact de ${fullArtifactForLog.length} caractères.
+
+Fournis une réponse conversationnelle courte et engageante à l'utilisateur, en:
+- Confirmant que tu as créé l'artefact
+- Proposant des modifications ou améliorations possibles
+- Invitant l'utilisateur à continuer la conversation
+
+Sois concis, utile et encourage l'interaction.`;
+        } else {
+          systemPromptChat = `L'utilisateur a fait la demande suivante : "${prompt}".
+
+Cependant, la génération de l'artefact semble avoir échoué ou être vide.
+
+Fournis une réponse conversationnelle courte pour:
+- Expliquer qu'il y a eu un problème avec la génération
+- Proposer de reformuler ou préciser la demande
+- Rester helpful et positif
+
+Sois concis et encourage l'utilisateur à réessayer.`;
+        }
+
+        const chatResponseContent = await llm.invoke([
+          ...history, // Inclure l'historique pour un meilleur contexte
+          { type: 'system', content: systemPromptChat },
+          { type: 'human', content: prompt },
+        ]);
+
+        if (typeof chatResponseContent.content === 'string' && chatResponseContent.content.trim()) {
+          port.postMessage({
+            type: StreamEventType.ARTIFACT_CHAT_RESPONSE,
+            chatResponse: chatResponseContent.content.trim(),
+            model: modelName,
+          });
+          logger.debug('[AgentService/DodaiCanvasStream] Réponse conversationnelle générée et envoyée.');
+        } else {
+          // Fallback si la génération de réponse échoue complètement
+          const fallbackMessage = fullArtifactForLog.trim()
+            ? "J'ai créé l'artefact demandé. Souhaitez-vous y apporter des modifications ou avez-vous d'autres questions ?"
+            : 'Il semble y avoir eu un problème avec la génération. Pouvez-vous reformuler votre demande ?';
+
+          port.postMessage({
+            type: StreamEventType.ARTIFACT_CHAT_RESPONSE,
+            chatResponse: fallbackMessage,
+            model: modelName,
+          });
+          logger.warn('[AgentService/DodaiCanvasStream] Utilisation du message de fallback.');
+        }
+      } catch (chatError) {
+        logger.error(
+          '[AgentService/DodaiCanvasStream] Erreur lors de la génération de la réponse conversationnelle:',
+          chatError,
+        );
+        // Fallback message en cas d'erreur complète
+        const fallbackMessage = fullArtifactForLog.trim()
+          ? 'Artefact généré avec succès ! Souhaitez-vous y apporter des modifications ?'
+          : 'Il y a eu un problème avec la génération. Pouvez-vous réessayer ?';
 
         try {
-          const chatResponseContent = await llm.invoke([
-            // On pourrait inclure l'historique ici aussi si pertinent pour la réponse chat
-            { type: 'system', content: systemPromptChat },
-            { type: 'human', content: `J'ai bien reçu l'artefact. Que devrais-je dire à l'utilisateur ?` }, // Prompt simple pour déclencher la réponse
-          ]);
-
-          if (typeof chatResponseContent.content === 'string' && chatResponseContent.content.trim()) {
-            port.postMessage({
-              type: StreamEventType.ARTIFACT_CHAT_RESPONSE,
-              chatResponse: chatResponseContent.content.trim(),
-              model: modelName, // On peut aussi inclure le modèle ici
-            });
-            logger.debug('[AgentService/DodaiCanvasStream] Réponse conversationnelle générée et envoyée.');
-          } else {
-            logger.warn('[AgentService/DodaiCanvasStream] La réponse conversationnelle générée est vide.');
-          }
-        } catch (chatError) {
-          logger.error(
-            '[AgentService/DodaiCanvasStream] Erreur lors de la génération de la réponse conversationnelle:',
-            chatError,
-          );
-          // Ne pas bloquer la fin du stream principal pour ça, mais logger l'erreur.
+          port.postMessage({
+            type: StreamEventType.ARTIFACT_CHAT_RESPONSE,
+            chatResponse: fallbackMessage,
+            model: modelName,
+          });
+          logger.debug('[AgentService/DodaiCanvasStream] Message de fallback envoyé après erreur.');
+        } catch (portError) {
+          logger.error("[AgentService/DodaiCanvasStream] Impossible d'envoyer le message de fallback:", portError);
         }
       }
 

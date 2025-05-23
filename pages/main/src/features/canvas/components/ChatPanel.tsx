@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { useDodai } from '../contexts/DodaiContext';
-import { History, Send, PlusCircle } from 'lucide-react';
+import { History, Send, PlusCircle, Sparkles, MessageSquare } from 'lucide-react';
 import { DodaiModelSelector } from './DodaiModelSelector';
 
 // Re-defined suggestion prompts (simplified for this example)
@@ -27,14 +27,13 @@ const suggestionPrompts = [
   },
 ];
 
-const ChatPanel = () => {
-  const {
-    messages,
-    chatInput,
-    setChatInput,
-    isLoading,
-    sendPromptAndGenerateArtifact,
-  } = useDodai();
+type ChatPanelProps = {
+  onToggleHistory?: () => void;
+};
+
+const ChatPanel: React.FC<ChatPanelProps> = ({ onToggleHistory }) => {
+  const { messages, chatInput, setChatInput, isLoading, sendMessage, isArtifactModeActive, setIsArtifactModeActive } =
+    useDodai();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [initialHubPrompt, setInitialHubPrompt] = useState('');
 
@@ -48,7 +47,7 @@ const ChatPanel = () => {
     e.preventDefault();
     const currentInput = (promptToSend || chatInput || initialHubPrompt).trim();
     if (!currentInput) return;
-    await sendPromptAndGenerateArtifact(currentInput);
+    await sendMessage(currentInput);
     setInitialHubPrompt('');
   };
 
@@ -99,7 +98,9 @@ const ChatPanel = () => {
             key={index}
             className="bg-background-tertiary p-4 rounded-xl border border-border-primary hover:border-border-accent cursor-pointer transition-all duration-200 hover:shadow-lg transform hover:-translate-y-0.5 focus:outline-none focus:ring-2 focus:ring-border-accent focus:ring-opacity-75 text-left group"
             onClick={() => handleSuggestionClick(suggestion.fullPrompt)}>
-            <h4 className="font-semibold text-text-primary group-hover:text-text-accent mb-1 text-sm sm:text-base transition-colors duration-150">{suggestion.title}</h4>
+            <h4 className="font-semibold text-text-primary group-hover:text-text-accent mb-1 text-sm sm:text-base transition-colors duration-150">
+              {suggestion.title}
+            </h4>
             <p className="text-text-secondary text-xs sm:text-sm">{suggestion.description}</p>
           </button>
         ))}
@@ -113,13 +114,38 @@ const ChatPanel = () => {
         <div className="flex-shrink-0">
           <DodaiModelSelector />
         </div>
-        <button
-          className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors"
-          title="Historique des chats (fonctionnalité à venir)"
-          aria-label="Historique des chats"
-          onClick={() => alert("Fonctionnalité d'historique à implémenter")}>
-          <History size={20} />
-        </button>
+
+        <div className="flex items-center bg-background-quaternary rounded-full p-0.5">
+          <button
+            onClick={() => setIsArtifactModeActive(true)}
+            className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-background-quaternary
+              ${isArtifactModeActive ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-700 hover:text-text-primary'}`}
+            aria-pressed={isArtifactModeActive}
+            title="Mode Artefact">
+            <Sparkles size={14} />
+            <span className="hidden sm:inline">Artefact</span>
+          </button>
+          <button
+            onClick={() => setIsArtifactModeActive(false)}
+            className={`flex items-center justify-center gap-1.5 py-1 px-3 rounded-full text-xs font-medium transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-background-quaternary
+              ${!isArtifactModeActive ? 'bg-blue-600 text-white shadow-sm' : 'text-text-secondary hover:bg-slate-700 hover:text-text-primary'}`}
+            aria-pressed={!isArtifactModeActive}
+            title="Mode Chat Simple">
+            <MessageSquare size={14} />
+            <span className="hidden sm:inline">Chat</span>
+          </button>
+        </div>
+
+        {onToggleHistory && (
+          <button
+            className="p-2 rounded-full text-text-secondary hover:text-text-primary hover:bg-background-quaternary transition-colors"
+            title="Afficher/Masquer l'historique des chats"
+            aria-label="Historique des chats"
+            onClick={onToggleHistory}>
+            <History size={20} />
+          </button>
+        )}
+        {!onToggleHistory && <div className="w-[36px] h-[36px]" />}
       </div>
 
       {messages.length === 0 && !isLoading ? (

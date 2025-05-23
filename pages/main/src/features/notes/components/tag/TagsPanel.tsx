@@ -25,19 +25,21 @@ const TagsPanel: FC<TagsPanelProps> = ({ notes, allTags, activeTag, onTagSelect,
         <div className="flex space-x-1 bg-background-secondary p-1 rounded-lg">
           <button
             onClick={() => setViewMode('list')}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-secondary relative ${viewMode === 'list'
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-secondary relative ${
+              viewMode === 'list'
                 ? 'bg-background-tertiary text-text-primary shadow-sm'
                 : 'text-text-secondary hover:text-text-primary hover:bg-background-quaternary/50'
-              }`}>
+            }`}>
             <List size={16} />
             Liste
           </button>
           <button
             onClick={() => setViewMode('graph')}
-            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-secondary relative ${viewMode === 'graph'
+            className={`flex-1 flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs sm:text-sm font-medium transition-all duration-150 rounded-md focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 focus-visible:ring-offset-background-secondary relative ${
+              viewMode === 'graph'
                 ? 'bg-background-tertiary text-text-primary shadow-sm'
                 : 'text-text-secondary hover:text-text-primary hover:bg-background-quaternary/50'
-              }`}>
+            }`}>
             <GitBranch size={16} />
             Graphe
           </button>

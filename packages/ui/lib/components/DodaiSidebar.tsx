@@ -51,7 +51,9 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({
 
   const getNavItemClasses = (expanded: boolean, isActive: boolean): string => {
     const dynamic = expanded ? 'w-full justify-start' : 'justify-center';
-    const activeClasses = isActive ? 'bg-blue-600/25 text-blue-200 hover:bg-blue-600/30' : 'hover:bg-background-quaternary/60'; // Enhanced active state
+    const activeClasses = isActive
+      ? 'bg-blue-600/25 text-blue-200 hover:bg-blue-600/30'
+      : 'hover:bg-background-quaternary/60'; // Enhanced active state
     return `${navItemBaseClasses} ${dynamic} ${activeClasses}`;
   };
 
