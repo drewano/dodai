@@ -16,10 +16,11 @@ const MainLayout: React.FC = () => {
     resetChatAndArtifact,
     messages: dodaiContextMessages,
     selectedDodaiModel: dodaiContextSelectedModel,
+    currentArtifact: dodaiContextCurrentArtifact,
   } = useDodai();
   const { notes, addNote, getNote } = useNotes();
   const { handleCreateNewNote } = useNoteSelection(notes, getNote, addNote);
-  const { saveCurrentChatSession } = useDodaiCanvasHistory();
+  const { resetActiveSession, saveCurrentChatSessionAsNew } = useDodaiCanvasHistory();
 
   // Define individual button configurations
   const newCanvasButton: NavItemProps = {
@@ -31,10 +32,16 @@ const MainLayout: React.FC = () => {
       await resetChatAndArtifact(async () => {
         if (dodaiContextMessages.length > 0) {
           console.log('[MainLayout] Saving current session before reset...');
-          await saveCurrentChatSession(dodaiContextMessages, null, dodaiContextSelectedModel || undefined);
+          await saveCurrentChatSessionAsNew(
+            dodaiContextMessages,
+            dodaiContextCurrentArtifact,
+            dodaiContextSelectedModel || undefined,
+          );
           console.log('[MainLayout] Current session saved.');
+          resetActiveSession();
         } else {
           console.log('[MainLayout] No active session to save before reset.');
+          resetActiveSession();
         }
       });
 

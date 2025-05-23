@@ -1,7 +1,7 @@
 import type React from 'react';
 import { useState } from 'react';
 import type { ChatConversation } from '@extension/storage';
-import { XIcon, Trash2Icon, Edit3Icon, CheckIcon, XCircleIcon } from 'lucide-react';
+import { XIcon, Trash2Icon, Edit3Icon, CheckIcon, XCircleIcon, PlusIcon } from 'lucide-react';
 
 interface DodaiCanvasHistoryPanelProps {
   chatHistory: ChatConversation[];
@@ -9,6 +9,7 @@ interface DodaiCanvasHistoryPanelProps {
   onLoadConversation: (id: string) => void;
   onDeleteConversation: (id: string) => void;
   onRenameConversation: (id: string, newName: string) => Promise<void>;
+  onNewConversation?: () => void;
   onClose: () => void;
 }
 
@@ -21,6 +22,7 @@ export const DodaiCanvasHistoryPanel: React.FC<DodaiCanvasHistoryPanelProps> = (
   onLoadConversation,
   onDeleteConversation,
   onRenameConversation,
+  onNewConversation,
   onClose,
 }) => {
   const [editingConversationId, setEditingConversationId] = useState<string | null>(null);
@@ -51,7 +53,15 @@ export const DodaiCanvasHistoryPanel: React.FC<DodaiCanvasHistoryPanelProps> = (
       {/* En-tête du panneau */}
       <div className="p-3 flex justify-between items-center border-b border-border-primary flex-shrink-0">
         <h3 className="text-base font-semibold text-text-primary">Historique des Chats</h3>
-        <div className="flex items-center">
+        <div className="flex items-center gap-2">
+          {onNewConversation && (
+            <button
+              className="p-1.5 text-text-secondary hover:text-green-400 rounded-md hover:bg-background-quaternary"
+              onClick={onNewConversation}
+              title="Nouvelle conversation">
+              <PlusIcon size={18} />
+            </button>
+          )}
           <button
             className="p-1.5 text-text-secondary hover:text-text-accent rounded-md hover:bg-background-quaternary"
             onClick={onClose}

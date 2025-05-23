@@ -240,6 +240,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
                 if (hasReceivedChatResponse) {
                   // Une réponse chat a déjà été reçue, ne pas écraser
                   // Mais quand même appeler le callback pour signaler la fin
+                  console.log('[DodaiContext] Calling onChatTurnEnd with artifact completion');
                   onChatTurnEndCallbackRef.current?.(prev, message.model);
                   return prev;
                 }
@@ -256,6 +257,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
                 );
 
                 // Appeler le callback avec les messages mis à jour
+                console.log('[DodaiContext] Calling onChatTurnEnd with artifact completion');
                 onChatTurnEndCallbackRef.current?.(updatedMessages, message.model);
                 return updatedMessages;
               });
@@ -299,6 +301,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
                   : msg,
               );
               // Appeler le callback avec les messages mis à jour
+              console.log('[DodaiContext] Calling onChatTurnEnd with artifact completion');
               onChatTurnEndCallbackRef.current?.(updatedMessages, message.model);
               return updatedMessages;
             });
@@ -548,6 +551,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
             : msg,
         );
         setMessages(updatedMessages);
+        console.log('[DodaiContext] Calling onChatTurnEnd with artifact completion');
         onChatTurnEndCallbackRef.current?.(updatedMessages, response.model);
       } else {
         setMessages(prev =>
@@ -648,6 +652,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
             }
 
             // Call onChatTurnEnd for simple chat
+            console.log('[DodaiContext] Calling onChatTurnEnd with artifact completion');
             onChatTurnEndCallbackRef.current?.(
               messages.map(m => (m.id === assistantMsgId ? { ...m, isStreaming: false, model: msg.model } : m)),
               msg.model,

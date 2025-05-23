@@ -81,7 +81,15 @@ export function useDodaiCanvasHistory() {
   };
 
   const loadConversation = useCallback(
-    async (id: string): Promise<{ success: boolean; messages?: Message[]; artifact?: ArtifactV3 | null; model?: string; error?: string }> => {
+    async (
+      id: string,
+    ): Promise<{
+      success: boolean;
+      messages?: Message[];
+      artifact?: ArtifactV3 | null;
+      model?: string;
+      error?: string;
+    }> => {
       try {
         const conversation = await chatHistoryStorage.getConversation(id);
         if (conversation) {
@@ -92,11 +100,11 @@ export function useDodaiCanvasHistory() {
           if (conversation.artifact) {
             canvasArtifact = storageArtifactToCanvas(conversation.artifact);
           }
-          return { 
-            success: true, 
-            messages: canvasMessages, 
-            artifact: canvasArtifact, 
-            model: conversation.model 
+          return {
+            success: true,
+            messages: canvasMessages,
+            artifact: canvasArtifact,
+            model: conversation.model,
           };
         }
         return { success: false, error: 'Conversation non trouvée.' };
@@ -257,16 +265,35 @@ export function useDodaiCanvasHistory() {
   };
 
   const saveCurrentChatSession = useCallback(
-    async (messages: Message[], currentArtifact?: ArtifactV3 | null, model?: string): Promise<boolean> => {
+    async (
+      messages: Message[],
+      currentArtifact?: ArtifactV3 | null,
+      model?: string,
+      forceNewConversation: boolean = false,
+    ): Promise<boolean> => {
+      console.log('[useDodaiCanvasHistory] saveCurrentChatSession called with:', {
+        messagesCount: messages.length,
+        hasArtifact: !!currentArtifact,
+        model,
+        activeConversationId,
+        forceNewConversation,
+      });
+
+      if (messages.length === 0) {
+        console.log('[useDodaiCanvasHistory] No messages to save, skipping.');
+        return true;
+      }
+
       const storageChatMessages = canvasMessagesToStorage(messages);
       let storageArtifact = null;
       if (currentArtifact) {
         storageArtifact = canvasArtifactToStorage(currentArtifact);
       }
-      
+
       try {
-        if (!activeConversationId) {
+        if (!activeConversationId || forceNewConversation) {
           // Nouvelle conversation
+          console.log('[useDodaiCanvasHistory] Creating new conversation');
           const name = extractNameFromMessages(messages);
           const newConversationData: Omit<ChatConversation, 'id' | 'createdAt' | 'updatedAt'> = {
             name,
@@ -275,30 +302,46 @@ export function useDodaiCanvasHistory() {
             artifact: storageArtifact,
           };
           const newId = await chatHistoryStorage.addConversation(newConversationData);
+          console.log('[useDodaiCanvasHistory] New conversation created with ID:', newId);
           setActiveConversationId(newId);
           setCurrentChatName(name);
         } else {
           // Conversation existante
+          console.log('[useDodaiCanvasHistory] Updating existing conversation:', activeConversationId);
           await chatHistoryStorage.updateMessages(activeConversationId, storageChatMessages);
-          
+
           // Update artifact
-          await chatHistoryStorage.updateConversation(activeConversationId, { 
-            artifact: storageArtifact
+          await chatHistoryStorage.updateConversation(activeConversationId, {
+            artifact: storageArtifact,
           });
-          
+
           // Update model if changed
           const currentConversation = await chatHistoryStorage.getConversation(activeConversationId);
           if (model && currentConversation && currentConversation.model !== model) {
             await chatHistoryStorage.updateConversation(activeConversationId, { model });
           }
+          console.log('[useDodaiCanvasHistory] Existing conversation updated');
         }
         return true;
       } catch (error) {
-        console.error('Erreur lors de la sauvegarde de la session de chat:', error);
+        console.error('[useDodaiCanvasHistory] Error saving chat session:', error);
         return false;
       }
     },
     [activeConversationId],
+  );
+
+  const resetActiveSession = useCallback(() => {
+    setActiveConversationId(null);
+    setCurrentChatName('Nouvelle conversation');
+    console.log('[useDodaiCanvasHistory] Active session reset for new canvas.');
+  }, []);
+
+  const saveCurrentChatSessionAsNew = useCallback(
+    async (messages: Message[], currentArtifact?: ArtifactV3 | null, model?: string): Promise<boolean> => {
+      return saveCurrentChatSession(messages, currentArtifact, model, true);
+    },
+    [saveCurrentChatSession],
   );
 
   return {
@@ -314,5 +357,7 @@ export function useDodaiCanvasHistory() {
     renameConversationInHistory,
     addMessageToCurrentConversation,
     saveCurrentChatSession,
+    saveCurrentChatSessionAsNew,
+    resetActiveSession,
   };
 }

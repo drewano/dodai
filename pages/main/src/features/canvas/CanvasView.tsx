@@ -28,6 +28,7 @@ const CanvasViewContent = () => {
     deleteConversation,
     saveCurrentChatSession,
     renameConversationInHistory,
+    resetActiveSession,
   } = useDodaiCanvasHistory();
 
   const { notes } = useNotes();
@@ -56,6 +57,7 @@ const CanvasViewContent = () => {
     async (id: string) => {
       console.log('[CanvasView] Attempting to load conversation:', id);
       const result = await loadConversation(id);
+      console.log('[CanvasView] loadConversation result:', result);
       if (result.success && result.messages) {
         setMessages(result.messages);
         setCurrentArtifact(result.artifact || null);
@@ -114,12 +116,23 @@ const CanvasViewContent = () => {
     [renameConversationInHistory],
   );
 
+  const handleNewConversation = useCallback(() => {
+    console.log('[CanvasView] Creating new conversation...');
+    resetActiveSession();
+    resetChatAndArtifact();
+    setShowHistoryPanel(false);
+    console.log('[CanvasView] New conversation ready.');
+  }, [resetActiveSession, resetChatAndArtifact, setShowHistoryPanel]);
+
   // Effect to register the onChatTurnEnd handler
   useEffect(() => {
     console.log('[CanvasView] Registering onChatTurnEnd handler.');
     setOnChatTurnEnd((finalMessages, modelUsed) => {
-      console.log('[CanvasView] onChatTurnEnd triggered. Saving session.');
-      saveCurrentChatSession(finalMessages, currentArtifact, modelUsed || undefined);
+      console.log('[CanvasView] onChatTurnEnd triggered. Saving session with current artifact.');
+      // Get the current artifact at the time of the callback
+      const artifactToSave = currentArtifact;
+      console.log('[CanvasView] Current artifact at save time:', artifactToSave ? 'present' : 'null');
+      saveCurrentChatSession(finalMessages, artifactToSave, modelUsed || undefined);
     });
 
     // Cleanup: Unregister handler when component unmounts or dependencies change
@@ -162,6 +175,7 @@ const CanvasViewContent = () => {
           onDeleteConversation={handleDeleteConversation}
           onRenameConversation={handleRenameConversation}
           onClose={() => setShowHistoryPanel(false)}
+          onNewConversation={handleNewConversation}
         />
       )}
     </div>
