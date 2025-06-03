@@ -93,6 +93,7 @@ export class RagService {
   private textSplitter: RecursiveCharacterTextSplitter;
   private isInitialized = false;
   private isInitializing = false;
+  private unsubscribeFromNotes: (() => void) | null = null;
 
   constructor() {
     this.textSplitter = new RecursiveCharacterTextSplitter({
@@ -101,7 +102,8 @@ export class RagService {
     });
     // Listen for note changes to re-index
     if (typeof notesStorage.onChange === 'function') {
-      notesStorage.onChange(this.handleNotesChanged.bind(this));
+      this.unsubscribeFromNotes = notesStorage.onChange(this.handleNotesChanged.bind(this));
+      logger.info('[RAG Service] Successfully subscribed to note changes.');
     } else {
       logger.warn(
         '[RAG Service] notesStorage.onChange is not available. Vector store will not auto-update on note changes.',
@@ -115,6 +117,18 @@ export class RagService {
     // On ne réinitialise que si l'initialisation n'est pas déjà en cours
     if (!this.isInitializing) {
       await this.initializeVectorStore();
+    }
+  }
+
+  /**
+   * Méthode pour désabonner proprement des changements de notes
+   * Utile pour le nettoyage lors de la fermeture du service
+   */
+  dispose(): void {
+    if (this.unsubscribeFromNotes) {
+      this.unsubscribeFromNotes();
+      this.unsubscribeFromNotes = null;
+      logger.info('[RAG Service] Unsubscribed from note changes.');
     }
   }
 
@@ -278,11 +292,44 @@ export class RagService {
   async processRagStreamRequest(
     userInput: string,
     chatHistory: ChatHistoryMessage[] = [],
-    port: chrome.runtime.Port,
+    portId: string,
     selectedModel?: string, // Modèle de CHAT optionnel
   ): Promise<void> {
-    logger.debug('[RAG Service] Processing RAG stream request:', { userInput });
-    const portId = port.name;
+    logger.debug('[RAG Service] Processing RAG stream request:', { userInput, portId });
+    
+    // Attendre que le port soit disponible (avec timeout amélioré)
+    let port: chrome.runtime.Port | null = null;
+    let attempts = 0;
+    const maxAttempts = 30; // 3 secondes maximum (augmenté)
+    const waitInterval = 100; // 100ms entre chaque tentative
+    
+    logger.debug(`[RAG Service] Recherche du port ${portId}...`);
+    
+    while (attempts < maxAttempts && !port) {
+      const streamingPortInfo = stateService.getStreamingPort(portId);
+      if (streamingPortInfo && streamingPortInfo.port) {
+        port = streamingPortInfo.port;
+        logger.info(`[RAG Service] Port ${portId} trouvé après ${attempts} tentatives (${attempts * waitInterval}ms)`);
+        break;
+      }
+      
+      // Log debug tous les 10 tentatives pour éviter le spam
+      if (attempts % 10 === 0 && attempts > 0) {
+        const availablePorts = stateService.getAllStreamingPorts();
+        const availablePortIds = Array.from(availablePorts.keys());
+        logger.debug(`[RAG Service] Tentative ${attempts}/${maxAttempts}: Port ${portId} non trouvé. Ports disponibles: [${availablePortIds.join(', ')}]`);
+      }
+      
+      await new Promise(resolve => setTimeout(resolve, waitInterval));
+      attempts++;
+    }
+    
+    if (!port) {
+      const availablePorts = stateService.getAllStreamingPorts();
+      const availablePortIds = Array.from(availablePorts.keys());
+      logger.error(`[RAG Service] Port ${portId} non trouvé après ${maxAttempts} tentatives (${maxAttempts * waitInterval}ms). Ports disponibles: [${availablePortIds.join(', ')}]`);
+      return;
+    }
 
     try {
       // Essayer d'initialiser si nécessaire

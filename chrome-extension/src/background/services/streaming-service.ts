@@ -37,15 +37,18 @@ export class StreamingService {
    * @param port Le port de connexion à gérer
    */
   handleStreamingConnection(port: chrome.runtime.Port): void {
+    const portId = port.name;
+    logger.debug(`[StreamingService] Tentative de connexion du port: ${portId}`);
+    
     if (
       port.name.startsWith('ai_streaming_') ||
       port.name.startsWith('rag_streaming_') ||
+      port.name.startsWith('rag_chat_stream_') || // Ajout du support pour les ports RAG chat
       port.name.startsWith('dodai_canvas_artifact_stream_') ||
       port.name.startsWith('simple_text_chat_stream_') ||
       port.name.startsWith('simple_chat_stream_')
     ) {
-      const portId = port.name;
-      logger.debug(`Nouvelle connexion de streaming établie: ${portId}`);
+      logger.info(`[StreamingService] Nouvelle connexion de streaming établie et acceptée: ${portId}`);
 
       // Stocker le port pour référence future
       stateService.addStreamingPort(portId, port);
@@ -63,6 +66,8 @@ export class StreamingService {
           // Logique d'annulation si nécessaire
         }
       });
+    } else {
+      logger.warn(`[StreamingService] Port avec nom non reconnu refusé: ${portId}`);
     }
   }
 

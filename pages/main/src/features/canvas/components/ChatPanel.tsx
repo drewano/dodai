@@ -2,7 +2,7 @@ import { useRef, useEffect, useState } from 'react';
 import { ChatInput } from './ChatInput';
 import { ChatMessage } from './ChatMessage';
 import { useDodai } from '../contexts/DodaiContext';
-import { History, Send, PlusCircle, Sparkles, MessageSquare } from 'lucide-react';
+import { History, Send, PlusCircle, Sparkles, MessageSquare, BrainCircuit } from 'lucide-react';
 import { DodaiModelSelector } from './DodaiModelSelector';
 
 // Re-defined suggestion prompts (simplified for this example)
@@ -32,8 +32,17 @@ type ChatPanelProps = {
 };
 
 const ChatPanel: React.FC<ChatPanelProps> = ({ onToggleHistory }) => {
-  const { messages, chatInput, setChatInput, isLoading, sendMessage, isArtifactModeActive, setIsArtifactModeActive } =
-    useDodai();
+  const {
+    messages,
+    chatInput,
+    setChatInput,
+    isLoading,
+    sendMessage,
+    isArtifactModeActive,
+    setIsArtifactModeActive,
+    isRagModeActive,
+    setIsRagModeActive,
+  } = useDodai();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [initialHubPrompt, setInitialHubPrompt] = useState('');
 
@@ -111,8 +120,22 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onToggleHistory }) => {
   return (
     <div className="flex flex-col h-full bg-background-tertiary text-text-primary shadow-md">
       <div className="p-3 flex justify-between items-center flex-shrink-0 h-[56px] bg-background-tertiary border-b border-border-primary">
-        <div className="flex-shrink-0">
+        <div className="flex items-center gap-2 flex-shrink-0">
           <DodaiModelSelector />
+          {!isArtifactModeActive && (
+            <button
+              onClick={() => setIsRagModeActive(!isRagModeActive)}
+              className={`flex items-center justify-center p-2 rounded-lg text-xs font-medium transition-all duration-200 ease-in-out focus:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-1 focus-visible:ring-offset-background-quaternary
+                ${
+                  isRagModeActive
+                    ? 'bg-green-600 text-white shadow-sm hover:bg-green-700'
+                    : 'text-text-secondary hover:bg-background-quaternary hover:text-text-primary bg-background-quaternary'
+                }`}
+              title={isRagModeActive ? 'Désactiver le chat avec les notes' : 'Activer le chat avec les notes'}
+              aria-label={isRagModeActive ? 'Désactiver le mode RAG' : 'Activer le mode RAG'}>
+              <BrainCircuit size={16} className={isRagModeActive ? 'text-white' : 'text-text-secondary'} />
+            </button>
+          )}
         </div>
 
         <div className="flex items-center bg-background-quaternary rounded-full p-0.5">
@@ -165,7 +188,13 @@ const ChatPanel: React.FC<ChatPanelProps> = ({ onToggleHistory }) => {
               setChatInput={setChatInput}
               handleSubmit={handleSendMessage}
               isLoading={isLoading}
-              placeholder="Envoyer un message..."
+              placeholder={
+                isArtifactModeActive
+                  ? "Décrivez l'artefact que vous souhaitez créer..."
+                  : isRagModeActive
+                    ? 'Posez une question sur vos notes...'
+                    : 'Envoyer un message...'
+              }
             />
           </div>
         </>

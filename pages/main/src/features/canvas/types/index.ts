@@ -5,6 +5,12 @@ export interface Message {
   timestamp: number;
   isStreaming?: boolean;
   model?: string;
+  sourceDocuments?: Array<{
+    id: string;
+    title: string;
+    contentSnippet: string;
+    sourceUrl?: string;
+  }>;
 }
 
 export type ArtifactType = 'text' | 'code';

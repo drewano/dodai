@@ -45,7 +45,7 @@ export type NotesStorageType = BaseStorage<NoteEntry[]> & {
   moveFolder: (folderId: string, targetFolderId: string | null) => Promise<void>;
   getNotesInFolder: (folderId: string | null) => Promise<NoteEntry[]>;
   reorderNote: (noteId: string, newOrderIndex: number) => Promise<void>;
-  onChange?: (callback: (newValue: NoteEntry[], oldValue?: NoteEntry[]) => void) => void;
+  onChange?: (callback: (newValue: NoteEntry[], oldValue?: NoteEntry[]) => void) => () => void;
 };
 
 // Création du stockage de base
@@ -304,5 +304,28 @@ export const notesStorage: NotesStorageType = {
         note.id === noteId ? { ...note, orderIndex: newOrderIndex, updatedAt: Date.now() } : note,
       ),
     );
+  },
+
+  // Implémenter onChange pour l'écoute des changements
+  onChange: (callback: (newValue: NoteEntry[], oldValue?: NoteEntry[]) => void) => {
+    let previousValue: NoteEntry[] | null = null;
+    
+    // Utiliser subscribe pour écouter les changements
+    const unsubscribe = storage.subscribe(() => {
+      const currentValue = storage.getSnapshot();
+      if (currentValue !== null) {
+        // Appeler le callback avec les nouvelles et anciennes valeurs
+        callback(currentValue, previousValue || undefined);
+        previousValue = currentValue;
+      }
+    });
+    
+    // Initialiser previousValue avec la valeur actuelle
+    const currentSnapshot = storage.getSnapshot();
+    if (currentSnapshot !== null) {
+      previousValue = currentSnapshot;
+    }
+    
+    return unsubscribe;
   },
 };

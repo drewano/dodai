@@ -1,6 +1,6 @@
 {
   "output": {
-    "style": "markdown",
+    "style": "xml",
     "filePath": "repomix.md",
     "directoryStructure": true,
     "removeComments": false,

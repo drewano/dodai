@@ -779,30 +779,22 @@ export class MessageHandler {
 
     if (streamHandler && portId) {
       logger.debug(`[Message Handler] Mode streaming RAG demandé avec portId: ${portId}`);
-      const streamingPortInfo = stateService.getStreamingPort(portId);
-
-      if (!streamingPortInfo || !streamingPortInfo.port) {
-        logger.error(`[Message Handler] Port de streaming RAG non trouvé pour portId: ${portId}`);
-        return {
-          success: false,
-          error: `Port de streaming ${portId} non trouvé ou invalide.`,
-          streaming: true,
-        };
-      }
-
-      // Lancer le streaming RAG en asynchrone
-      // ragService.processRagStreamRequest gère lui-même l'envoi des messages sur le port.
-      ragService.processRagStreamRequest(userInput, chatHistory, streamingPortInfo.port, selectedModel).catch(error => {
+      
+      // Lancer le streaming RAG en asynchrone - le service attendra que le port soit connecté
+      ragService.processRagStreamRequest(userInput, chatHistory, portId, selectedModel).catch(error => {
         logger.error('[Message Handler] Erreur lors du lancement du streaming RAG:', error);
-        // Essayer de notifier l'erreur via le port s'il existe encore
-        try {
-          streamingPortInfo.port.postMessage({
-            type: 'STREAM_ERROR', // Consistent with StreamEventType but might need to align with RagChatStreamResponse
-            error: error instanceof Error ? error.message : 'Erreur lors du lancement du streaming RAG',
-          });
-          streamingPortInfo.port.postMessage({ type: 'STREAM_END', success: false });
-        } catch (portError) {
-          logger.warn("[Message Handler] Impossible d'envoyer l'erreur RAG sur le port:", portError);
+        // Essayer de notifier l'erreur via le port s'il existe
+        const streamingPortInfo = stateService.getStreamingPort(portId);
+        if (streamingPortInfo) {
+          try {
+            streamingPortInfo.port.postMessage({
+              type: 'STREAM_ERROR',
+              error: error instanceof Error ? error.message : 'Erreur lors du lancement du streaming RAG',
+            });
+            streamingPortInfo.port.postMessage({ type: 'STREAM_END', success: false });
+          } catch (portError) {
+            logger.warn("[Message Handler] Impossible d'envoyer l'erreur RAG sur le port:", portError);
+          }
         }
       });
 

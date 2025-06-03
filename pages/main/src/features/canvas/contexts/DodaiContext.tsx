@@ -8,6 +8,7 @@ import type {
   GenerateDodaiCanvasArtifactStreamResponse, // For handling stream responses
   ChatHistoryMessage,
   ModifyDodaiCanvasArtifactResponse, // Ajouter le type de réponse pour la modification
+  RagChatStreamResponse, // For handling RAG stream responses
 } from '../../../../../../chrome-extension/src/background/types'; // Formatage import
 
 interface DodaiContextType {
@@ -24,6 +25,8 @@ interface DodaiContextType {
   isStreamingArtifact: boolean; // Added for artifact streaming state
   isArtifactModeActive: boolean; // NEW: State for artifact vs simple chat mode
   setIsArtifactModeActive: (active: boolean) => void; // NEW: Setter for mode toggle
+  isRagModeActive: boolean; // NEW: State for RAG mode (Chat with Notes)
+  setIsRagModeActive: (active: boolean) => void; // NEW: Setter for RAG mode toggle
   selectedDodaiModel: string | null; // Added for Dodai Canvas specific model
   setSelectedDodaiModel: (model: string | null) => void; // Added setter
   sendPromptAndGenerateArtifact: (prompt: string) => Promise<void>;
@@ -49,6 +52,8 @@ const defaultContext: DodaiContextType = {
   isStreamingArtifact: false, // Added default value
   isArtifactModeActive: true, // NEW: Default to artifact mode
   setIsArtifactModeActive: () => {}, // NEW: Default setter
+  isRagModeActive: false, // NEW: Default to RAG mode disabled
+  setIsRagModeActive: () => {}, // NEW: Default setter
   selectedDodaiModel: null, // Initial state
   setSelectedDodaiModel: () => {}, // Default setter
   sendPromptAndGenerateArtifact: async () => {},
@@ -76,6 +81,7 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [isStreamingArtifact, setIsStreamingArtifact] = useState(false); // Specific state for artifact streaming
   const [isArtifactModeActive, setIsArtifactModeActive] = useState<boolean>(true); // NEW: Mode toggle state
+  const [isRagModeActive, setIsRagModeActive] = useState<boolean>(false); // NEW: Mode toggle state
   const [selectedDodaiModel, setSelectedDodaiModel] = useState<string | null>(null); // State for selected model
 
   const streamingPort = useRef<chrome.runtime.Port | null>(null);
@@ -750,7 +756,185 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
     [messages, isLoading, selectedDodaiModel, cleanupStreamingConnection],
   );
 
-  // NEW: Unified send function that routes to artifact or simple chat based on mode
+  // NEW: Function for RAG chat messaging (adapted from sendSimpleChatMessage)
+  const sendRagChatMessage = useCallback(
+    async (prompt: string) => {
+      if (!prompt.trim()) return;
+
+      currentStreamingPrompt.current = prompt;
+
+      const userMessage: Message = {
+        id: uuidv4(),
+        role: 'user',
+        content: prompt,
+        timestamp: Date.now(),
+      };
+
+      const assistantMsgId = uuidv4();
+      currentAssistantMessageId.current = assistantMsgId;
+      const assistantPlaceholderMessage: Message = {
+        id: assistantMsgId,
+        role: 'assistant',
+        content: '', // Start with empty content, will be filled by stream
+        timestamp: Date.now() + 1,
+        isStreaming: true,
+      };
+
+      setMessages(prev => [...prev, userMessage, assistantPlaceholderMessage]);
+      setChatInput('');
+      setIsLoading(true);
+
+      // Setup streaming port
+      const uniquePortId = `rag_chat_stream_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+      streamingPortId.current = uniquePortId;
+      const port = chrome.runtime.connect({ name: uniquePortId });
+      streamingPort.current = port;
+
+      port.onMessage.addListener((msg: RagChatStreamResponse) => {
+        switch (msg.type) {
+          case StreamEventType.STREAM_START:
+            console.log('[DodaiCanvas] RAG chat stream started:', msg.model);
+            setMessages(prev => prev.map(m => (m.id === assistantMsgId ? { ...m, model: msg.model, content: '' } : m)));
+            break;
+          case StreamEventType.STREAM_CHUNK:
+            if (msg.chunk) {
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantMsgId ? { ...m, content: m.content + msg.chunk, isStreaming: true } : m,
+                ),
+              );
+            }
+            break;
+          case StreamEventType.STREAM_END: {
+            console.log('[DodaiCanvas] RAG chat stream ended, success:', msg.success);
+            setMessages(prev => {
+              const updatedMessages = prev.map(m => {
+                if (m.id === assistantMsgId) {
+                  const updatedMessage = { ...m, isStreaming: false, model: msg.model };
+                  // Attach source documents if available
+                  if (msg.sourceDocuments && Array.isArray(msg.sourceDocuments)) {
+                    updatedMessage.sourceDocuments = msg.sourceDocuments;
+                  }
+                  return updatedMessage;
+                }
+                return m;
+              });
+
+              if (!msg.success) {
+                const errorUpdatedMessages = updatedMessages.map(m =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: m.content + `\nErreur: ${msg.error || 'Erreur inconnue'}`,
+                        isStreaming: false,
+                      }
+                    : m,
+                );
+                // Call onChatTurnEnd for RAG chat
+                console.log('[DodaiContext] Calling onChatTurnEnd for RAG chat (error case)');
+                onChatTurnEndCallbackRef.current?.(errorUpdatedMessages, msg.model);
+                return errorUpdatedMessages;
+              }
+
+              // Call onChatTurnEnd for RAG chat (success case)
+              console.log('[DodaiContext] Calling onChatTurnEnd for RAG chat (success case)');
+              onChatTurnEndCallbackRef.current?.(updatedMessages, msg.model);
+              return updatedMessages;
+            });
+            cleanupStreamingConnection();
+            break;
+          }
+          case StreamEventType.STREAM_ERROR:
+            console.error('[DodaiCanvas] RAG chat stream error:', msg.error);
+            setMessages(prev =>
+              prev.map(m =>
+                m.id === assistantMsgId
+                  ? {
+                      ...m,
+                      content: `Erreur de streaming RAG: ${msg.error || 'Erreur inconnue'}`,
+                      isStreaming: false,
+                    }
+                  : m,
+              ),
+            );
+            cleanupStreamingConnection();
+            break;
+          default:
+            console.warn('[DodaiCanvas] Unknown RAG chat stream message:', msg);
+        }
+      });
+
+      port.onDisconnect.addListener(() => {
+        if (isLoading) {
+          console.warn('[DodaiCanvas] RAG chat port disconnected unexpectedly.');
+          setMessages(prev =>
+            prev.map(m =>
+              m.id === currentAssistantMessageId.current && m.isStreaming
+                ? { ...m, content: m.content + '\n(Connexion perdue)', isStreaming: false }
+                : m,
+            ),
+          );
+        }
+        cleanupStreamingConnection();
+      });
+
+      const chatHistoryForPayload = messages
+        .filter(m => m.id !== assistantMsgId) // Exclude current placeholder
+        .map(m => ({ role: m.role, content: m.content }));
+
+      // Wait for the port to be registered in the background service
+      setTimeout(() => {
+        chrome.runtime.sendMessage(
+          {
+            type: MessageType.RAG_CHAT_REQUEST,
+            payload: {
+              message: prompt,
+              chatHistory: chatHistoryForPayload,
+              streamHandler: true,
+              portId: uniquePortId,
+              selectedModel: selectedDodaiModel, // Pass the model name
+            },
+          },
+          response => {
+            if (chrome.runtime.lastError) {
+              console.error('[DodaiCanvas] RAG chat SendMessage error:', chrome.runtime.lastError);
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: `Erreur (envoi): ${chrome.runtime.lastError?.message || 'Inconnue'}`,
+                        isStreaming: false,
+                      }
+                    : m,
+                ),
+              );
+              cleanupStreamingConnection();
+              return;
+            }
+            if (response && !response.success && !response.streaming) {
+              console.error('[DodaiCanvas] Background refused RAG chat request:', response.error);
+              setMessages(prev =>
+                prev.map(m =>
+                  m.id === assistantMsgId
+                    ? {
+                        ...m,
+                        content: `Erreur (refus BG): ${response.error || 'Inconnue'}`,
+                        isStreaming: false,
+                      }
+                    : m,
+                ),
+              );
+              cleanupStreamingConnection();
+            }
+          },
+        );
+      }, 1000); // 1000ms delay to ensure port registration
+    },
+    [messages, isLoading, selectedDodaiModel, cleanupStreamingConnection],
+  );
+
+  // NEW: Unified send function that routes to artifact, RAG chat, or simple chat based on mode
   const sendMessage = useCallback(
     async (prompt: string) => {
       if (!prompt.trim()) return;
@@ -762,10 +946,23 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
       if (isArtifactModeActive) {
         await sendPromptAndGenerateArtifact(prompt);
       } else {
-        await sendSimpleChatMessage(prompt);
+        // Mode chat simple - check RAG mode
+        if (isRagModeActive) {
+          await sendRagChatMessage(prompt);
+        } else {
+          await sendSimpleChatMessage(prompt);
+        }
       }
     },
-    [isArtifactModeActive, isLoading, isStreamingArtifact, sendPromptAndGenerateArtifact, sendSimpleChatMessage],
+    [
+      isArtifactModeActive,
+      isRagModeActive,
+      isLoading,
+      isStreamingArtifact,
+      sendPromptAndGenerateArtifact,
+      sendSimpleChatMessage,
+      sendRagChatMessage,
+    ],
   );
 
   // Implementation for resetChatAndArtifact
@@ -807,6 +1004,8 @@ export const DodaiProvider: React.FC<DodaiProviderProps> = ({ children }) => {
     isStreamingArtifact,
     isArtifactModeActive, // NEW: Expose artifact mode state
     setIsArtifactModeActive, // NEW: Expose artifact mode setter
+    isRagModeActive, // NEW: Expose RAG mode state
+    setIsRagModeActive, // NEW: Expose RAG mode setter
     selectedDodaiModel,
     setSelectedDodaiModel,
     sendPromptAndGenerateArtifact,
