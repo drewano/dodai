@@ -37,7 +37,6 @@ const manifest = {
     'http://127.0.0.1:8080/', // Ajout explicite du serveur MCP à l'adresse 127.0.0.1:8080
   ],
   permissions: ['storage', 'scripting', 'tabs', 'notifications', 'sidePanel', 'contextMenus'],
-  options_page: 'options/index.html',
   background: {
     service_worker: 'background.js',
     type: 'module',

@@ -139,19 +139,9 @@ const MainLayout: React.FC = () => {
     id: 'options',
     label: 'Options',
     icon: <Settings size={20} />,
-    onClick: () => {
-      try {
-        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.openOptionsPage) {
-          chrome.runtime.openOptionsPage();
-        } else {
-          console.warn('[MainLayout] chrome.runtime.openOptionsPage not available');
-        }
-      } catch (error) {
-        console.error('[MainLayout] Error opening options page:', error);
-      }
-    },
-    isActive: false,
-    title: "Ouvrir les options de l'extension",
+    onClick: () => navigate('/options'),
+    isActive: location.pathname.startsWith('/options'),
+    title: "Accéder aux options de l'application",
   };
 
   const footerItems: NavItemProps[] = [optionsButton];
