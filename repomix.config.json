@@ -5,7 +5,7 @@
     "directoryStructure": true,
     "removeComments": false,
     "showLineNumbers": false,
-    "compress": false
+    "compress": true
   },
   "ignore": {
     "customPatterns": ["**/*.svg"]
