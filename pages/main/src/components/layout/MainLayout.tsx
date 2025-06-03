@@ -1,7 +1,7 @@
 import type React from 'react';
 import { Outlet, useNavigate, useLocation } from 'react-router-dom';
 import { DodaiSidebar, type NavItemProps } from '@extension/ui';
-import { BookText, LayoutDashboard, PlusCircle, FilePlus2 } from 'lucide-react';
+import { BookText, LayoutDashboard, PlusCircle, FilePlus2, Settings, ServerCog, Sparkles } from 'lucide-react';
 
 import { useDodai } from '@src/features/canvas/contexts/DodaiContext';
 import { useNotes } from '@src/features/notes/hooks/useNotes';
@@ -83,6 +83,42 @@ const MainLayout: React.FC = () => {
     title: 'Accéder aux Notes',
   };
 
+  const mcpToolsButton: NavItemProps = {
+    id: 'mcp-tools',
+    label: 'Outils MCP',
+    icon: <ServerCog size={20} />,
+    onClick: () => {},
+    isActive: false,
+    title: 'Gérer les outils MCP',
+  };
+
+  const sidebarIAButton: NavItemProps = {
+    id: 'sidebar-ia',
+    label: 'Sidebar IA',
+    icon: <Sparkles size={20} />,
+    onClick: () => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.sidePanel) {
+          // Récupérer l'ID de la fenêtre actuelle et ouvrir le side panel
+          chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+            if (tabs[0] && tabs[0].windowId) {
+              chrome.sidePanel.open({ windowId: tabs[0].windowId });
+              console.log('[MainLayout] Side panel opened for window:', tabs[0].windowId);
+            } else {
+              console.warn('[MainLayout] Unable to get current window ID');
+            }
+          });
+        } else {
+          console.warn('[MainLayout] chrome.sidePanel not available');
+        }
+      } catch (error) {
+        console.error('[MainLayout] Error opening side panel:', error);
+      }
+    },
+    isActive: false,
+    title: 'Ouvrir la sidebar IA',
+  };
+
   let navItems: NavItemProps[] = [];
   const isCanvasPath = location.pathname.startsWith('/canvas');
   const isNotesPath = location.pathname.startsWith('/notes');
@@ -96,11 +132,33 @@ const MainLayout: React.FC = () => {
     primaryNewButton = newCanvasButton;
   }
 
-  navItems = [primaryNewButton, canvasButton, notesButton];
+  navItems = [primaryNewButton, canvasButton, notesButton, mcpToolsButton, sidebarIAButton];
+
+  // Define footer items (Options button)
+  const optionsButton: NavItemProps = {
+    id: 'options',
+    label: 'Options',
+    icon: <Settings size={20} />,
+    onClick: () => {
+      try {
+        if (typeof chrome !== 'undefined' && chrome.runtime && chrome.runtime.openOptionsPage) {
+          chrome.runtime.openOptionsPage();
+        } else {
+          console.warn('[MainLayout] chrome.runtime.openOptionsPage not available');
+        }
+      } catch (error) {
+        console.error('[MainLayout] Error opening options page:', error);
+      }
+    },
+    isActive: false,
+    title: "Ouvrir les options de l'extension",
+  };
+
+  const footerItems: NavItemProps[] = [optionsButton];
 
   return (
     <div className="flex h-screen bg-background-primary text-text-primary">
-      <DodaiSidebar navItems={navItems} initialIsExpanded={true} />
+      <DodaiSidebar navItems={navItems} footerItems={footerItems} initialIsExpanded={true} />
       <main className="flex-1 pt-6 pr-6 pb-6 overflow-auto">
         <Outlet />
       </main>

@@ -14,6 +14,7 @@ export interface NavItemProps {
 
 interface DodaiSidebarProps {
   navItems: NavItemProps[];
+  footerItems?: NavItemProps[];
   mainContent?: React.ReactNode;
   mainContentTitle?: string;
   initialIsExpanded?: boolean;
@@ -22,6 +23,7 @@ interface DodaiSidebarProps {
 
 const DodaiSidebar: React.FC<DodaiSidebarProps> = ({
   navItems,
+  footerItems,
   mainContent,
   mainContentTitle,
   initialIsExpanded = true, // Default to true
@@ -120,6 +122,24 @@ const DodaiSidebar: React.FC<DodaiSidebarProps> = ({
             )}
             <div className="h-full">{mainContent}</div>
           </div>
+        )}
+
+        {/* Footer Items Section - Fixed at bottom */}
+        {footerItems && footerItems.length > 0 && (
+          <nav className="mt-auto p-3 pb-6 space-y-2 flex-shrink-0 overflow-x-hidden">
+            {footerItems.map(item => (
+              <button
+                key={item.id}
+                onClick={item.onClick}
+                className={getNavItemClasses(currentIsExpanded, item.isActive)}
+                aria-label={item.label}
+                title={item.title || item.label}>
+                <span className={iconClasses}>{item.icon}</span>
+                {currentIsExpanded && <span className={getTextClasses(true)}>{item.label}</span>}
+                {!currentIsExpanded && <span className="sr-only">{item.label}</span>}
+              </button>
+            ))}
+          </nav>
         )}
       </div>
     </div>
