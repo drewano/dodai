@@ -445,25 +445,22 @@ export class MessageHandler {
       // Convertir l'historique du chat
       const history = convertChatHistory(chatHistory);
 
-      // Récupérer le contenu de la page active si non fourni et si l'expéditeur n'est pas interne
+      // Récupérer le contenu de la page active si non fourni
       let pageContent = providedPageContent;
       const senderIsInternal = sender?.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`);
 
-      if (!pageContent && !senderIsInternal) {
+      if (!pageContent) {
         try {
           pageContent = await this.fetchCurrentPageContent();
           logger.debug(
             'Contenu de la page récupéré pour le streaming:',
             pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun',
+            senderIsInternal ? '(requête interne)' : '(requête externe)',
           );
         } catch (error) {
           logger.warn('Erreur lors de la récupération du contenu de la page pour le streaming:', error);
           // pageContent reste undefined, ce qui est géré par l'agent
         }
-      } else if (senderIsInternal && !pageContent) {
-        logger.debug(
-          'Requête interne (streaming) et pas de providedPageContent. pageContent non récupéré via fetchCurrentPageContent.',
-        );
       }
 
       // Lancer le streaming en asynchrone
@@ -490,22 +487,22 @@ export class MessageHandler {
     try {
       const history = convertChatHistory(chatHistory);
 
-      // Récupérer le contenu de la page active si non fourni et si l'expéditeur n'est pas interne
+      // Récupérer le contenu de la page active si non fourni
       let pageContent = providedPageContent;
       const senderIsInternal = sender?.url?.startsWith(`chrome-extension://${chrome.runtime.id}/`);
 
-      if (!pageContent && !senderIsInternal) {
+      if (!pageContent) {
         try {
           pageContent = await this.fetchCurrentPageContent();
-          logger.debug('Contenu de la page récupéré:', pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun');
+          logger.debug(
+            'Contenu de la page récupéré:',
+            pageContent ? `${pageContent.substring(0, 100)}...` : 'Aucun',
+            senderIsInternal ? '(requête interne)' : '(requête externe)',
+          );
         } catch (error) {
           logger.warn('Erreur lors de la récupération du contenu de la page:', error);
           // pageContent reste undefined, ce qui est géré par l'agent
         }
-      } else if (senderIsInternal && !pageContent) {
-        logger.debug(
-          'Requête interne (non-streaming) et pas de providedPageContent. pageContent non récupéré via fetchCurrentPageContent.',
-        );
       }
 
       // Utiliser l'agent ou fallback au LLM direct selon l'état
@@ -779,7 +776,7 @@ export class MessageHandler {
 
     if (streamHandler && portId) {
       logger.debug(`[Message Handler] Mode streaming RAG demandé avec portId: ${portId}`);
-      
+
       // Lancer le streaming RAG en asynchrone - le service attendra que le port soit connecté
       ragService.processRagStreamRequest(userInput, chatHistory, portId, selectedModel).catch(error => {
         logger.error('[Message Handler] Erreur lors du lancement du streaming RAG:', error);
