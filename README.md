@@ -25,6 +25,8 @@ Un système de gestion de connaissances (PKM) complet, directement dans votre na
 - **Graphe de Tags Interactif** : Visualisez les connexions entre vos notes grâce à un graphe de tags dynamique.
 - **Import/Export** : Sauvegardez et restaurez vos notes aux formats JSON ou Markdown (ZIP).
 
+![screenshot_placeholder](https://github.com/drewano/dodai/blob/main/screenshot/Capture%20d'%C3%A9cran%202025-06-08%20160942.png)
+
 ### 💬 **Assistant IA Intégré (Side Panel)**
 Discutez avec votre assistant IA à tout moment depuis le panneau latéral du navigateur.
 - **Chat Contextuel** : L'assistant peut utiliser le contenu de la page que vous consultez pour fournir des réponses plus pertinentes.
