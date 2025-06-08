@@ -5,7 +5,7 @@
 [![Licence: MIT](https://img.shields.io/badge/Licence-MIT-blue.svg)](https://opensource.org/licenses/MIT)
 [![Version du projet](https://img.shields.io/badge/version-0.4.3-brightgreen.svg)]()
 
-![screenshot_placeholder](https://via.placeholder.com/800x450.png?text=Aperçu+de+My+Brain)
+![screenshot_placeholder](https://github.com/drewano/dodai/blob/main/screenshot/Capture%20d'%C3%A9cran%202025-06-08%20160810.png)
 
 ## ✨ Fonctionnalités Principales
 
