@@ -9,8 +9,6 @@
 
 ## ✨ Fonctionnalités Principales
 
-Ce projet est bien plus qu'un simple "boilerplate". C'est une application complète et modulaire dotée de fonctionnalités avancées.
-
 ### 🧠 **Dodai Canvas** : Un Espace de Travail Génératif
 Le cœur de l'application. Le Canvas est un environnement interactif où vous dialoguez avec l'IA pour créer des "artefacts" :
 - **Génération de Contenu** : Demandez à l'IA de rédiger des articles, des poèmes, des résumés ou tout autre type de document Markdown.
